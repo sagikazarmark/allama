@@ -87,6 +87,8 @@ const KNOWN_EVENTS: &[&str] = &["delta", "done", "error"];
 // ── Required: the provider and its capability answers (guide §2, §3 "Preflight first") ──
 
 /// A chat provider for the Acme API.
+///
+/// `Debug` never shows the API key.
 #[derive(Clone)]
 pub struct AcmeProvider {
     http: Arc<dyn HttpTransport>,
@@ -96,6 +98,16 @@ pub struct AcmeProvider {
     request_timeout: Option<Duration>,
     stream_timeouts: StreamTimeouts,
     max_stream_event_size: usize,
+}
+
+impl std::fmt::Debug for AcmeProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AcmeProvider")
+            .field("base_url", &self.base_url)
+            .field("credential_scope", &self.credential_slot.scope)
+            .field("api_key", &"<redacted>")
+            .finish_non_exhaustive()
+    }
 }
 
 impl AcmeProvider {
@@ -266,6 +278,8 @@ impl ChatProvider for AcmeProvider {
 // ── Required: the builder, with the credential slot and timeouts (guide §5) ──
 
 /// Builds an [`AcmeProvider`].
+///
+/// `Debug` never shows the API key.
 pub struct AcmeProviderBuilder {
     api_key: Option<String>,
     credential_scope: String,
@@ -274,6 +288,20 @@ pub struct AcmeProviderBuilder {
     request_timeout: Option<Duration>,
     stream_timeouts: StreamTimeouts,
     max_stream_event_size: usize,
+}
+
+impl std::fmt::Debug for AcmeProviderBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AcmeProviderBuilder")
+            .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
+            .field("credential_scope", &self.credential_scope)
+            .field("base_url", &self.base_url)
+            .field("http_transport", &self.http.is_some())
+            .field("request_timeout", &self.request_timeout)
+            .field("stream_timeouts", &self.stream_timeouts)
+            .field("max_stream_event_size", &self.max_stream_event_size)
+            .finish()
+    }
 }
 
 impl Default for AcmeProviderBuilder {

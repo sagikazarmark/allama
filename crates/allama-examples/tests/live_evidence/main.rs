@@ -86,6 +86,7 @@ pub fn record_raw(check: &str, file: &str, contents: &str) {
 }
 
 /// One HTTP exchange: what the API answered.
+#[derive(Debug)]
 pub struct Exchange {
     pub status: u16,
     pub headers: Headers,
@@ -226,6 +227,7 @@ pub fn one_property(property: Value, object_keywords: Value) -> Value {
 }
 
 /// A JSON Schema keyword under test, placed where it applies.
+#[derive(Debug)]
 pub struct KeywordCase {
     pub keyword: &'static str,
     pub schema: Value,

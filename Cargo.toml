@@ -75,7 +75,6 @@ missing_debug_implementations = "warn"
 
 [workspace.lints.clippy]
 all = "warn"
-pedantic = "warn"
 
 [workspace.metadata.release]
 sign-commit = true

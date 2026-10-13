@@ -46,6 +46,7 @@ pub const KNOWN_PROVIDERS: [KnownProvider; 4] = [
 ];
 
 /// A provider built from a model address, with the model to send.
+#[derive(Debug)]
 pub struct Loaded<P> {
     /// The provider.
     pub provider: P,

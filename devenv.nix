@@ -3,18 +3,26 @@
 {
   dotenv.enable = true;
 
-  packages = with pkgs; [
-    jq
-    just
+  packages =
+    with pkgs;
+    [
+      jq
+      just
 
-    cargo-audit
-    cargo-deny
-    cargo-expand
-    cargo-hack
-    cargo-release
-    cargo-semver-checks
-    cargo-watch
-  ];
+      cargo-audit
+      cargo-deny
+      cargo-expand
+      cargo-hack
+      cargo-release
+      cargo-semver-checks
+      cargo-watch
+    ]
+    # The `native-tls` features (on in `--all-features` builds) link the
+    # system OpenSSL on Linux.
+    ++ lib.optionals stdenv.isLinux [
+      openssl
+      pkg-config
+    ];
 
   worker-build = {
     enable = true;
@@ -57,9 +65,9 @@
     msrv = {
       extends = [ "ci" ];
       module = {
-        languages.rust.version =
-          lib.mkForce lib.versions.pad 3
-            (fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.rust-version;
+        languages.rust.version = lib.mkForce (
+          lib.versions.pad 3 (fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.rust-version
+        );
       };
     };
   };

@@ -126,9 +126,12 @@ msrv:
 # (it runs on the host); allama-conformance is native test tooling (a
 # dev-dependency; its default `server` feature runs a local HTTP server). The
 # tests run on Node, with the wasm-bindgen-test-runner that matches the
-# lockfile, installed under target/.
+# lockfile, installed under target/. The devenv shell's RUSTFLAGS make the
+# host linker lld (`-fuse-ld=lld`), an argument rust-lld rejects when it links
+# wasm (wasm-streams is a cdylib), so they are cleared.
 # Build and test for wasm32-unknown-unknown.
 [env("CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER", "wasm-bindgen-test-runner")]
+[env("RUSTFLAGS", "")]
 wasm:
     #!/usr/bin/env bash
     set -euo pipefail

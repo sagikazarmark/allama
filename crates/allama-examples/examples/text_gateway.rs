@@ -53,6 +53,15 @@ pub struct Gateway {
     slot: CredentialSlot,
 }
 
+impl std::fmt::Debug for Gateway {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Gateway")
+            .field("url", &self.url)
+            .field("token", &"<redacted>")
+            .finish_non_exhaustive()
+    }
+}
+
 impl Gateway {
     pub fn new(base_url: &str, token: &str, http: impl HttpTransport) -> Self {
         let url = format!("{}/generate", base_url.trim_end_matches('/'));

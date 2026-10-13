@@ -27,7 +27,7 @@ pub enum Urgency {
     Immediate,
 }
 
-#[derive(Decision)]
+#[derive(Debug, Decision)]
 pub struct Triage {
     #[decision(instructions = "Which label fits this ticket?")]
     pub label: Choice<Label>,
