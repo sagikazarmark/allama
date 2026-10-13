@@ -1,0 +1,43 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "openai": {
+          "encrypted_content": "gAAAAABqvw_zW8pIoSQIHZ_P56HybktxQztVhzDjUFj02eH5TD9Y0GbU8iADOg-AmB-rlVA4BDCpH6Y_7vx89zqsO_djm7u7D89pOh1DyPJgZk3IrtCkB_UwrCANhHXRZL4WfXFN6lVSLPtyJ35zv_yaPmRFWth55yTDFeB4H5tHr3Mz1qm8DT-fXjPJY8J_pC63zchlhfxqzvTyES1lrJTaPqbqHOllQcxoOJLKr-aq0lI_Uqju4_epOIDTSxt4ECCXv_XqVWN6Xf-CBhpDdoe56_cUFLfQO0dFYxdEqPCDrGGHQIypwRGuelCym8osbhpF9lS6W2edt09uch2_3gMcpZVb4fXo_ka6vcVI91t4PcB19vznuZ39dswpn4WfxYQGjD6dHBB76a9hsGK6az-vhnG-lhsDxbM8CFYQoQL2C40vIQ4nSn24dj1aXC4wWoNorjkC-jKV7rvJEhojnn9pujIhaOUNxeE8ZH6RbouJk6bBEmle9ImwLVrCBC9ei48Ecd1e80KKQb7Ro4lsgZejCOmBUecefPSn_ry932GEu35jDG8kOGwoUevmyPLmSSfYc9_ohwww1w1lPGpxc-DIjiuw8eVn3e83-GbbcEOA1tmfNLwl55glUIY3TVNkUgwbtBI2sSaawgF6uAhH7bYM7iedgpRonUCO-JidXOXbp8dXT2KXsJ9ya-7hgAqSbbbrNXiSTq03OCaal7HEwUbv4X4gx9CGKcX1lYkTJuDwu_13yAzO7CALdhVPGa3m1GZEoUpcPCys5xPDg6xTKr0IHZW3BLEoBs02AdpuL6uDj-UGirR5KgtZ0_93UUS5C9_JsQ50XjixAR_SYPLIgM2GHSIsZu7Z7dXsooJn13XIwMitlnSYUHFvKIRf0tCyuB0BEtOL5E80e35EY--zm_2IHRdEky60rJB0zDjbWO_oJ9pNpIcxQ6xr63jK3a1sX4u9qGFsd9MpNJieONI5SoE2-usdkQUdxcI1UAdicz3Spff8KZGTBQmhufBWx8Y6GtQWb2dIeRJCZm5gzhqZqpfiOdj24QfdsjxV3AgCB2TO3maQahxotJ-LpjzYfaNOa8nj_UW2J9_h0CKwEe_DQ-DOcVqCzoZLbtErZ5q6zA6xQVOKztnviv6LU1u5oTeedI6GkTLoWXRfO48IF0OhowPEzLvFfqPADpq4JF9f3PQaD-nnM-gi9ROqbVB6fYJk5QhZouTL8JH3xp6uWsxqCRTF0Smq8-XYjdrignlCZkLnNA3nXyaY-Hd9LHf93Ee7mBdWJYidFCH1WJNKdeuPGEZo2gUVnTEFzBzK1bO4f190TSZZNX9j1JolKPD1ViLPR8u_BYl-OzJSSYUeN0tC2nWu6pk3wEX1dPN9M8JhJFXsm99JLtzcQB6Zy1WULhcN9uXvTEEz8J0j",
+          "item_id": "rs_09aae77eac25f89e016abf0ff2041c87d1856037e397a67a03"
+        }
+      },
+      "text": "**Getting weather information**\n\nI need to call the weather tool using the function for Paris. I’ll make sure to send the right parameters and then wait for the tool's response. Once I have the results, I’ll respond to the user in one clear sentence, summarizing what I find. It’s all about keeping things straightforward and informative for the user! Let’s get this done!",
+      "type": "reasoning"
+    },
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "call_PjwUgDhNZ21aFQIQcBdmAAC2",
+      "name": "get_weather",
+      "provider_data": {
+        "openai": {
+          "item_id": "fc_09aae77eac25f89e016abf0ff31d1887d19ce158c7814c817b"
+        }
+      },
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "completed",
+  "id": "resp_09aae77eac25f89e016abf0ff1b57c87d19f22ee1b72f0ea5d",
+  "model": "gpt-5-nano-2025-08-07",
+  "provider": "openai",
+  "provider_data": {
+    "openai": {
+      "service_tier": "default"
+    }
+  },
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "input_tokens": 61,
+    "output_tokens": 57,
+    "reasoning_tokens": 0,
+    "total_tokens": 118
+  }
+}

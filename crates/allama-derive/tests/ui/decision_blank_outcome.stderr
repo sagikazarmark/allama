@@ -1,0 +1,5 @@
+error: descriptions must not be blank
+ --> tests/ui/decision_blank_outcome.rs:5:46
+  |
+5 |     #[decision(instructions = "Spam?", yes = " ")]
+  |                                              ^^^

@@ -1,0 +1,11 @@
+{
+  "body_len": 92,
+  "body_present": true,
+  "message": "HTTP 404",
+  "message_origin": "authored",
+  "provider": "anthropic",
+  "provider_type": "not_found_error",
+  "status": 404,
+  "type": "model_not_found",
+  "upstream_message": "model: claude-does-not-exist"
+}

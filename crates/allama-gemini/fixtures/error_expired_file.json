@@ -1,0 +1,11 @@
+{
+  "body_len": 159,
+  "body_present": true,
+  "message": "HTTP 403: the Files API file does not exist or has expired (files are kept for 48 hours); upload it again",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_type": "PERMISSION_DENIED",
+  "status": 403,
+  "type": "invalid_request",
+  "upstream_message": "You do not have permission to access the File doesnotexist123 or it may not exist."
+}

@@ -1,0 +1,9 @@
+{
+  "content": [
+    {
+      "text": "Hello world",
+      "type": "text"
+    }
+  ],
+  "provider": "cloudflare"
+}

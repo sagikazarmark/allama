@@ -1,0 +1,39 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_agree_tools_01","object":"response","created_at":1790906350,"status":"in_progress","background":false,"error":null,"incomplete_details":null,"model":"gpt-4.1-nano-2025-04-14","output":[],"parallel_tool_calls":true,"service_tier":"default","store":false,"usage":null,"metadata":{}},"sequence_number":0}
+
+event: response.in_progress
+data: {"type":"response.in_progress","response":{"id":"resp_agree_tools_01","object":"response","created_at":1790906350,"status":"in_progress","background":false,"error":null,"incomplete_details":null,"model":"gpt-4.1-nano-2025-04-14","output":[],"parallel_tool_calls":true,"service_tier":"default","store":false,"usage":null,"metadata":{}},"sequence_number":1}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"fc_agree_01","type":"function_call","status":"in_progress","call_id":"call_agree_paris","name":"get_weather","arguments":""},"sequence_number":2}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","item_id":"fc_agree_01","output_index":0,"delta":"{\"city\":","sequence_number":3}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","item_id":"fc_agree_01","output_index":0,"delta":" \"Paris\"}","sequence_number":4}
+
+event: response.function_call_arguments.done
+data: {"type":"response.function_call_arguments.done","item_id":"fc_agree_01","output_index":0,"arguments":"{\"city\": \"Paris\"}","sequence_number":5}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_agree_01","type":"function_call","status":"completed","call_id":"call_agree_paris","name":"get_weather","arguments":"{\"city\": \"Paris\"}"},"sequence_number":6}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","output_index":1,"item":{"id":"fc_agree_02","type":"function_call","status":"in_progress","call_id":"call_agree_tokyo","name":"get_weather","arguments":""},"sequence_number":7}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","item_id":"fc_agree_02","output_index":1,"delta":"{\"city\":","sequence_number":8}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","item_id":"fc_agree_02","output_index":1,"delta":" \"Tokyo\"}","sequence_number":9}
+
+event: response.function_call_arguments.done
+data: {"type":"response.function_call_arguments.done","item_id":"fc_agree_02","output_index":1,"arguments":"{\"city\": \"Tokyo\"}","sequence_number":10}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":1,"item":{"id":"fc_agree_02","type":"function_call","status":"completed","call_id":"call_agree_tokyo","name":"get_weather","arguments":"{\"city\": \"Tokyo\"}"},"sequence_number":11}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_agree_tools_01","object":"response","created_at":1790906350,"status":"completed","background":false,"error":null,"incomplete_details":null,"model":"gpt-4.1-nano-2025-04-14","output":[{"id":"fc_agree_01","type":"function_call","status":"completed","call_id":"call_agree_paris","name":"get_weather","arguments":"{\"city\": \"Paris\"}"},{"id":"fc_agree_02","type":"function_call","status":"completed","call_id":"call_agree_tokyo","name":"get_weather","arguments":"{\"city\": \"Tokyo\"}"}],"parallel_tool_calls":true,"service_tier":"default","store":false,"usage":{"input_tokens":43,"input_tokens_details":{"cached_tokens":0},"output_tokens":44,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":87},"metadata":{}},"sequence_number":12}
+

@@ -1,0 +1,6 @@
+{
+  "dropped_incomplete_tool_calls": false,
+  "has_open_blocks": true,
+  "saw_response_start": true,
+  "saw_response_stop": false
+}

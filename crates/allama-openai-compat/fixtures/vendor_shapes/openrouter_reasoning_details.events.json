@@ -1,0 +1,117 @@
+[
+  {
+    "event": "response_start",
+    "id": "gen-r1",
+    "model": "anthropic/claude-sonnet-4.5"
+  },
+  {
+    "event": "response_metadata",
+    "provider": "vendor"
+  },
+  {
+    "event": "response_provider_data",
+    "provider_data": {
+      "openai-compat:vendor": {
+        "provider": "Anthropic"
+      }
+    }
+  },
+  {
+    "block_type": "reasoning",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "block_provider_data",
+    "index": 0,
+    "provider_data": {
+      "openai-compat:vendor": {
+        "reasoning_field": "reasoning"
+      }
+    }
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": "Weather needs"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " a tool."
+  },
+  {
+    "event": "block_provider_data",
+    "index": 0,
+    "provider_data": {
+      "openai-compat:vendor": {
+        "reasoning_details": [
+          {
+            "format": "anthropic-claude-v1",
+            "index": 0,
+            "signature": "EqQBCkgIBxABGAIiQK",
+            "text": "Weather needs a tool.",
+            "type": "reasoning.text"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "block_type": "tool_call",
+    "event": "block_start",
+    "id": "toolu_01",
+    "index": 1,
+    "name": "get_weather"
+  },
+  {
+    "arguments": "{\"city\":\"Paris\"}",
+    "event": "tool_call_delta",
+    "index": 1
+  },
+  {
+    "event": "block_stop",
+    "index": 1
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "tool_calls",
+    "finish_reason_raw": "tool_calls"
+  },
+  {
+    "event": "response_provider_data",
+    "provider_data": {
+      "openai-compat:vendor": {
+        "native_finish_reason": "tool_use"
+      }
+    }
+  },
+  {
+    "event": "response_metadata",
+    "usage": {
+      "cache_read_input_tokens": 0,
+      "input_tokens": 120,
+      "output_tokens": 40,
+      "reasoning_tokens": 12,
+      "total_tokens": 160
+    }
+  },
+  {
+    "event": "response_provider_data",
+    "provider_data": {
+      "openai-compat:vendor": {
+        "usage": {
+          "cost": 0.00096,
+          "is_byok": false
+        }
+      }
+    }
+  },
+  {
+    "event": "response_stop"
+  }
+]

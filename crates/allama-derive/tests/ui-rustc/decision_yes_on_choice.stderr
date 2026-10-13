@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: `yes` and `no` describe the outcomes of yes/no questions only
+  --> tests/ui-rustc/decision_yes_on_choice.rs:12:12
+   |
+12 |     label: Label,
+   |            ^^^^^ evaluation of `_` failed here

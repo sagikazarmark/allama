@@ -1,0 +1,9 @@
+{
+  "message": "Workers AI error 5007",
+  "message_origin": "authored",
+  "provider": "cloudflare",
+  "provider_code": "5007",
+  "status": 400,
+  "type": "model_not_found",
+  "upstream_message": "AiError: 5007: No such model @cf/meta/missing or task"
+}

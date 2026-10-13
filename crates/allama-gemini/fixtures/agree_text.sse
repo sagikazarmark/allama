@@ -1,0 +1,4 @@
+data: {"candidates":[{"content":{"parts":[{"text":"Paris is "}],"role":"model"},"index":0}],"usageMetadata":{"promptTokenCount":9,"candidatesTokenCount":4,"totalTokenCount":13,"promptTokensDetails":[{"modality":"TEXT","tokenCount":9}],"serviceTier":"standard"},"modelVersion":"gemini-3.5-flash","responseId":"agreeTextR1"}
+
+data: {"candidates":[{"content":{"parts":[{"text":"the capital of France."}],"role":"model"},"index":0,"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":9,"candidatesTokenCount":8,"totalTokenCount":17,"promptTokensDetails":[{"modality":"TEXT","tokenCount":9}],"serviceTier":"standard"},"modelVersion":"gemini-3.5-flash","responseId":"agreeTextR1"}
+

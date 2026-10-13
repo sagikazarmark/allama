@@ -1,0 +1,46 @@
+{
+  "messages": [
+    {
+      "content": "Weather in London?",
+      "role": "user"
+    },
+    {
+      "content": "",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"city\":\"London\"}",
+            "name": "lookup_weather"
+          },
+          "id": "cf_call_1_0",
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "content": "12C, cloudy",
+      "role": "tool",
+      "tool_call_id": "cf_call_1_0"
+    }
+  ],
+  "tools": [
+    {
+      "function": {
+        "name": "lookup_weather",
+        "parameters": {
+          "properties": {
+            "city": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "city"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "function"
+    }
+  ]
+}

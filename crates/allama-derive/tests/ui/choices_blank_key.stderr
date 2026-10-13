@@ -1,0 +1,11 @@
+error: this variant's option key is blank after `rename_all`; add `rename`
+ --> tests/ui/choices_blank_key.rs:6:5
+  |
+6 |     __,
+  |     ^^
+
+error: option keys must not be blank
+  --> tests/ui/choices_blank_key.rs:12:25
+   |
+12 |     #[decision(rename = " ")]
+   |                         ^^^

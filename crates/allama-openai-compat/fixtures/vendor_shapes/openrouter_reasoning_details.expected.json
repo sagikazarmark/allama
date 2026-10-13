@@ -1,0 +1,53 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "openai-compat:vendor": {
+          "reasoning_details": [
+            {
+              "format": "google-gemini-v1",
+              "index": 0,
+              "text": "Looking up the weather.",
+              "type": "reasoning.text"
+            },
+            {
+              "data": "CiQB0e2Kb1x",
+              "format": "google-gemini-v1",
+              "id": "tool_get_weather_1",
+              "index": 1,
+              "type": "reasoning.encrypted"
+            }
+          ],
+          "reasoning_field": "reasoning"
+        }
+      },
+      "text": "Looking up the weather.",
+      "type": "reasoning"
+    },
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "tool_get_weather_1",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "tool_calls",
+  "id": "gen-r2",
+  "model": "google/gemini-3-pro-preview",
+  "provider": "vendor",
+  "provider_data": {
+    "openai-compat:vendor": {
+      "native_finish_reason": "STOP",
+      "provider": "Google",
+      "usage": {
+        "cost": 0.0004
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 80,
+    "output_tokens": 30,
+    "total_tokens": 110
+  }
+}

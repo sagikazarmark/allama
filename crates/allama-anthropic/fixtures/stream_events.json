@@ -1,0 +1,209 @@
+[
+  {
+    "event": "response_start",
+    "id": "msg_011CfcWdYeeD2GNQg2mBNkU3",
+    "model": "claude-haiku-4-5-20251001"
+  },
+  {
+    "event": "response_metadata",
+    "id": "msg_011CfcWdYeeD2GNQg2mBNkU3",
+    "model": "claude-haiku-4-5-20251001",
+    "provider": "anthropic",
+    "usage": {
+      "cache_read_input_tokens": 0,
+      "cache_write_input_tokens": 0,
+      "input_tokens": 613,
+      "output_tokens": 4,
+      "total_tokens": 617
+    }
+  },
+  {
+    "block_type": "reasoning",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": "The user is asking"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " for the weather in"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " Paris and"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " explicitly"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " wants me to use"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " the tool. I"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " have the"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " `get_weather"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": "` function available,"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " which requires"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " a \""
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": "city\" parameter."
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " The user has specified"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " \"Paris\" as"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " the city, so"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " I have"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " all the information"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " I need to make"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " the function call."
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": "\n\nLet"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " me call the get"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": "_weather function with"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " city=\"Paris\"."
+  },
+  {
+    "event": "block_provider_data",
+    "index": 0,
+    "provider_data": {
+      "anthropic": {
+        "signature": "EuUECrgBCBIYAipAUOFmSZnsey0+m7GmQtZlgbi5L2y/Vghztmc1tK2PZYXAGd8bllTYQydb1Xft06FHGpT1uouWCJYY5Jd2D05g0jIZY2xhdWRlLWhhaWt1LTQtNS0yMDI1MTAwMTgAQgh0aGlua2luZ1okODVhOTU1ZmEtMmY5OS00NGQ4LWJjMTUtNDcyNWY0YmFjYzMzmgEbChljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxqAGvhvzVBhIM8g8hG91+mGAJC9V4GgxL7KU6a4UqR28/sbMiMJvIL+XIEa9l758NaY7BdqLAJXcZ8QCwDPcZljY1fWxUH5X5FgKXlcNP6Dc0mCkCkSrZAoNnVsVksXeE43xQwvSETG++vZpHirTPaK08Dn2AS9rNBmGq3AGuRe3UY3YiFcs7a+TE/D0xG+2yieMA+1vBx0QVivMgDRqJGv1n+E205zpIjcoYG7m1ftZ7Qj3wBBRvm2JU2Z7KIBwITgQwR8zjxvbfJsu/ze0I4LiwL/tYZIQ2AMwfKb5TwFfjela5AQftozBOVRM5J10W9oAlAcSXH6nVcWh6NVSKgmRtWgjt50fPSYFNoSs5Q/ctOfy7KwwNhZhAd4bduKXo8Z5zmaW9RjKOUBQ5zfDWxHY6oUg5pk4gQPmYVyIqkno3rRNkIgZzzUiT2VPiVmWqTTL12gnYHE8w8/hb1kAK+Jir28thsEO9qfJzBXoz2XOVohMn1DPkWxMBLyVkVoSs42VYn7EvjxxtR9pgehaB77INvwcEgRqo1YSySOIxg6nd1A9YEFuZlydWyfM5Re3qmhgB"
+      }
+    }
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "block_type": "tool_call",
+    "event": "block_start",
+    "id": "toolu_01JsmfTGtaXgB7BcvHuVEYRs",
+    "index": 1,
+    "name": "get_weather"
+  },
+  {
+    "arguments": "",
+    "event": "tool_call_delta",
+    "index": 1
+  },
+  {
+    "arguments": "{\"city\"",
+    "event": "tool_call_delta",
+    "index": 1
+  },
+  {
+    "arguments": ": \"Pari",
+    "event": "tool_call_delta",
+    "index": 1
+  },
+  {
+    "arguments": "s\"}",
+    "event": "tool_call_delta",
+    "index": 1
+  },
+  {
+    "event": "block_stop",
+    "index": 1
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "tool_calls",
+    "finish_reason_raw": "tool_use",
+    "provider": "anthropic",
+    "provider_data": {
+      "anthropic": {
+        "service_tier": "standard",
+        "usage": {
+          "inference_geo": "not_available"
+        }
+      }
+    },
+    "usage": {
+      "cache_read_input_tokens": 0,
+      "cache_write_input_tokens": 0,
+      "input_tokens": 613,
+      "output_tokens": 137,
+      "reasoning_tokens": 82,
+      "total_tokens": 750
+    }
+  },
+  {
+    "event": "response_stop"
+  }
+]

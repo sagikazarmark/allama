@@ -1,0 +1,11 @@
+{
+  "body_len": 108,
+  "body_present": true,
+  "message": "HTTP 404",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_type": "NOT_FOUND",
+  "status": 404,
+  "type": "model_not_found",
+  "upstream_message": "models/text-embedding-9999 is not found"
+}

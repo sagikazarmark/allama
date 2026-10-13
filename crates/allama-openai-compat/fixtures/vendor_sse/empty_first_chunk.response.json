@@ -1,0 +1,39 @@
+{
+  "content": [
+    {
+      "text": "Hi",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "stop",
+  "id": "chatcmpl-A1",
+  "model": "gpt-4o-2024-08-06",
+  "provider": "vendor",
+  "provider_data": {
+    "openai-compat:vendor": {
+      "content_filter_results": {
+        "hate": {
+          "filtered": false,
+          "severity": "safe"
+        }
+      },
+      "prompt_filter_results": [
+        {
+          "content_filter_results": {
+            "hate": {
+              "filtered": false,
+              "severity": "safe"
+            },
+            "violence": {
+              "filtered": false,
+              "severity": "safe"
+            }
+          },
+          "prompt_index": 0
+        }
+      ],
+      "system_fingerprint": "fp_1"
+    }
+  }
+}

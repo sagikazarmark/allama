@@ -1,0 +1,26 @@
+[
+  {
+    "event": "response_start",
+    "id": "gem_stream_trunc_1",
+    "model": "gemini-2.5-pro"
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "Partial answer"
+  },
+  {
+    "error": {
+      "message": "Gemini stream ended without a finishReason",
+      "message_origin": "authored",
+      "provider": "gemini",
+      "stream_kind": "incomplete",
+      "type": "stream"
+    }
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "requests": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "hello world"
+          }
+        ]
+      },
+      "model": "models/gemini-embedding-001",
+      "taskType": "RETRIEVAL_QUERY"
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "gemini embeddings"
+          }
+        ]
+      },
+      "model": "models/gemini-embedding-001",
+      "taskType": "RETRIEVAL_QUERY"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+data: {"choices":[{"delta":{"content":null,"tool_calls":[{"function":{"name":"get_weather"},"id":"chatcmpl-tool-a","index":0,"type":"function"}]},"finish_reason":null,"index":0}],"id":"chatcmpl-agree-1","model":"@cf/qwen/qwen3-30b-a3b-fp8","object":"chat.completion.chunk","p":"abc","response":null,"tool_calls":[{"name":"get_weather"}],"usage":{"prompt_tokens":0,"completion_tokens":9,"total_tokens":9}}
+
+data: {"choices":[{"delta":{"content":null,"tool_calls":[{"function":{"arguments":"{\"city\": \"Paris\"}"},"index":0}]},"finish_reason":null,"index":0}],"id":"chatcmpl-agree-1","model":"@cf/qwen/qwen3-30b-a3b-fp8","object":"chat.completion.chunk","p":"de","response":null,"tool_calls":[{"arguments":"{\"city\": \"Paris\"}"}],"usage":{"prompt_tokens":0,"completion_tokens":6,"total_tokens":6}}
+
+data: {"choices":[{"delta":{"content":null,"tool_calls":[{"function":{"name":"get_weather"},"id":"chatcmpl-tool-b","index":1,"type":"function"}]},"finish_reason":null,"index":0}],"id":"chatcmpl-agree-1","model":"@cf/qwen/qwen3-30b-a3b-fp8","object":"chat.completion.chunk","p":"f","response":null,"tool_calls":[{"name":"get_weather"}],"usage":{"prompt_tokens":0,"completion_tokens":9,"total_tokens":9}}
+
+data: {"choices":[{"delta":{"content":null,"tool_calls":[{"function":{"arguments":"{\"city\": \"Tokyo\"}"},"index":1}]},"finish_reason":null,"index":0}],"id":"chatcmpl-agree-1","model":"@cf/qwen/qwen3-30b-a3b-fp8","object":"chat.completion.chunk","p":"gh","response":null,"tool_calls":[{"arguments":"{\"city\": \"Tokyo\"}"}],"usage":{"prompt_tokens":0,"completion_tokens":6,"total_tokens":6}}
+
+data: {"choices":[{"delta":{},"finish_reason":"tool_calls","index":0}],"id":"chatcmpl-agree-1","model":"@cf/qwen/qwen3-30b-a3b-fp8","object":"chat.completion.chunk","p":"i","tool_calls":[],"usage":{"prompt_tokens":0,"completion_tokens":10,"total_tokens":10}}
+
+data: {"choices":[],"id":"chatcmpl-agree-1","model":"@cf/qwen/qwen3-30b-a3b-fp8","object":"chat.completion.chunk","p":"j","tool_calls":[],"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}}
+
+data: {"response":"","usage":{"prompt_tokens":156,"completion_tokens":40,"total_tokens":196}}
+
+data: [DONE]
+

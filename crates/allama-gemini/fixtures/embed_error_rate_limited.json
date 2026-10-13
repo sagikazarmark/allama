@@ -1,0 +1,12 @@
+{
+  "body_len": 97,
+  "body_present": true,
+  "message": "HTTP 429",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_type": "RESOURCE_EXHAUSTED",
+  "retry_after_secs": 30.0,
+  "status": 429,
+  "type": "rate_limited",
+  "upstream_message": "Rate limit exceeded"
+}

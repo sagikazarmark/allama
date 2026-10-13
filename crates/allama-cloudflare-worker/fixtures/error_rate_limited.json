@@ -1,0 +1,7 @@
+{
+  "message": "Workers AI error",
+  "message_origin": "authored",
+  "provider": "cloudflare",
+  "type": "rate_limited",
+  "upstream_message": "Rate limit exceeded"
+}

@@ -1,0 +1,16 @@
+: OPENROUTER PROCESSING
+
+retry: 3000
+
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-1","object":"chat.completion.chunk","created":1727000000,"model":"vendor/model","provider":"Upstream","choices":[{"index":0,"delta":{"role":"assistant","content":"Hel"}}]}
+
+: keepalive
+data: {"id":"gen-1","object":"chat.completion.chunk","created":1727000000,"model":"vendor/model","provider":"Upstream","choices":[{"index":0,"delta":{"content":"lo"}}]}
+
+retry: 1500
+data: {"id":"gen-1","object":"chat.completion.chunk","created":1727000000,"model":"vendor/model","provider":"Upstream","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}
+
+data: [DONE]
+

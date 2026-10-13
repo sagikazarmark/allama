@@ -1,0 +1,26 @@
+{
+  "content": [
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "call_chatcmpl_x9_0",
+      "name": "get_weather",
+      "type": "tool_call"
+    },
+    {
+      "arguments": "{\"city\":\"Tokyo\"}",
+      "id": "call_chatcmpl_x9_1",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "tool_calls",
+  "id": "chatcmpl:x9",
+  "model": "local-model",
+  "provider": "vendor",
+  "usage": {
+    "input_tokens": 20,
+    "output_tokens": 10,
+    "total_tokens": 30
+  }
+}

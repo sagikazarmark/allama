@@ -1,0 +1,21 @@
+{
+    "model": "claude-haiku-4-5-20251001",
+    "id": "msg_01AgreeLengthM7",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+        {
+            "type": "text",
+            "text": "Once upon a time, in a land far"
+        }
+    ],
+    "stop_reason": "max_tokens",
+    "stop_sequence": null,
+    "usage": {
+        "input_tokens": 12,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 8,
+        "service_tier": "standard"
+    }
+}

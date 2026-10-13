@@ -1,0 +1,75 @@
+{
+  "body": {
+    "max_tokens": 4096,
+    "messages": [
+      {
+        "content": [
+          {
+            "text": "Weather in Paris and Rome?",
+            "type": "text"
+          }
+        ],
+        "role": "user"
+      },
+      {
+        "content": [
+          {
+            "id": "toolu_01",
+            "input": {
+              "city": "Paris"
+            },
+            "name": "get_weather",
+            "type": "tool_use"
+          },
+          {
+            "id": "toolu_02",
+            "input": {
+              "city": "Rome"
+            },
+            "name": "get_weather",
+            "type": "tool_use"
+          }
+        ],
+        "role": "assistant"
+      },
+      {
+        "content": [
+          {
+            "content": "Sunny",
+            "tool_use_id": "toolu_01",
+            "type": "tool_result"
+          },
+          {
+            "content": "Rain",
+            "tool_use_id": "toolu_02",
+            "type": "tool_result"
+          },
+          {
+            "text": "(Rome may be slow to answer.)",
+            "type": "text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "model": "claude-haiku-4-5-20251001",
+    "stream": false,
+    "tools": [
+      {
+        "input_schema": {
+          "properties": {
+            "city": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "city"
+          ],
+          "type": "object"
+        },
+        "name": "get_weather"
+      }
+    ]
+  },
+  "warnings": []
+}

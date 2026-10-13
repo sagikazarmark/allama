@@ -1,0 +1,485 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    # Every step runs in the devenv shell, with the project's toolchain.
+    shell: devenv shell -- bash -e {0}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Build
+        run: just build
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Test
+        run: just test
+
+  examples:
+    name: Examples
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run examples
+        run: just examples
+
+  benchmarks:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run benchmarks
+        run: just benchmarks
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Build documentation
+        run: just docs
+
+  features:
+    name: Features
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Check features
+        run: just features
+
+  provider-features:
+    name: Provider features
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Check provider features
+        run: just provider-features
+
+  footprint:
+    name: Provider footprint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Provider crates without reqwest
+        run: just footprint
+
+      - name: Install musl-tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: musl build with ring TLS
+        run: just musl
+
+  collector:
+    name: Collector
+    runs-on: ubuntu-latest
+    env:
+      # The OpenTelemetry Collector Contrib version the shipped config
+      # (docs/guides/observability/otelcol-genai-metrics.yaml) is tested with.
+      OTELCOL_VERSION: 0.161.0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Install otelcol-contrib
+        shell: bash -euo pipefail {0}
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/otelcol-contrib.tar.gz" \
+            "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTELCOL_VERSION}/otelcol-contrib_${OTELCOL_VERSION}_linux_amd64.tar.gz"
+          tar -xzf "$RUNNER_TEMP/otelcol-contrib.tar.gz" -C "$RUNNER_TEMP" otelcol-contrib
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Run the collector tests
+        run: just collector
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Package the workspace
+        run: just package
+
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # The ci profile, with the MSRV in place of the pinned toolchain.
+          profile: msrv
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Check with the minimum supported Rust version
+        run: just msrv
+
+  wasm:
+    name: Wasm
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Build and test for wasm32-unknown-unknown
+        run: just wasm
+
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Check formatting
+        run: just fmt
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run clippy
+        run: just clippy
+
+  unused-dependencies:
+    name: Unused dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Check for unused dependencies
+        run: just unused-dependencies
+
+  audit:
+    name: Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Run cargo audit
+        run: just audit
+
+  deny:
+    name: Deny
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Run cargo deny
+        run: just deny
+
+  semver-checks:
+    name: Semver checks
+    runs-on: ubuntu-latest
+    # Only meaningful on PRs: the baseline is the PR's base branch.
+    if: github.event_name == 'pull_request'
+    # Advisory until 0.1.0 is on crates.io: breaking changes are free before
+    # the first release. After publishing, make this blocking and compare
+    # with the published version: delete this `continue-on-error` and the
+    # `--baseline-rev` argument below.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Full history so the baseline commit is present locally.
+          fetch-depth: 0
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run cargo-semver-checks
+        env:
+          # Compare against the PR's merge base rather than the last published
+          # version on crates.io. The crate is pre-release; the main branch is
+          # the moving source of truth until 0.1.0 ships.
+          BASELINE: ${{ github.event.pull_request.base.sha }}
+        run: just semver-checks --baseline-rev "$BASELINE"

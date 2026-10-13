@@ -1,0 +1,124 @@
+[
+  {
+    "event": "response_start",
+    "id": "c1",
+    "model": "m-large"
+  },
+  {
+    "event": "warning",
+    "warning": {
+      "kind": "other",
+      "message": "unrecognized stream event `search_results`; its data is kept in the response's provider data under `openai-compat:vendor`",
+      "provider": "vendor",
+      "subject": {
+        "type": "response"
+      }
+    }
+  },
+  {
+    "event": "response_provider_data",
+    "provider_data": {
+      "openai-compat:vendor": {
+        "search_results": [
+          {
+            "results": [
+              {
+                "title": "A",
+                "url": "https://a.example"
+              },
+              {
+                "title": "B",
+                "url": "https://b.example"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "event": "response_metadata",
+    "provider": "vendor"
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "Rust is"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " fast [1]."
+  },
+  {
+    "event": "response_provider_data",
+    "provider_data": {
+      "openai-compat:vendor": {
+        "search_results": [
+          {
+            "results": [
+              {
+                "title": "C",
+                "url": "https://c.example"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "stop",
+    "finish_reason_raw": "stop"
+  },
+  {
+    "event": "response_metadata",
+    "usage": {
+      "input_tokens": 12,
+      "output_tokens": 5,
+      "total_tokens": 17
+    }
+  },
+  {
+    "event": "response_provider_data",
+    "provider_data": {
+      "openai-compat:vendor": {
+        "search_results": [
+          {
+            "results": [
+              {
+                "title": "A",
+                "url": "https://a.example"
+              },
+              {
+                "title": "B",
+                "url": "https://b.example"
+              }
+            ]
+          },
+          {
+            "results": [
+              {
+                "title": "C",
+                "url": "https://c.example"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "event": "response_stop"
+  }
+]

@@ -1,0 +1,5 @@
+error: unknown attribute `crate`, expected `instructions`, `rename`, `yes`, or `no`
+ --> tests/ui/decision_crate_on_field.rs:6:16
+  |
+6 |     #[decision(crate = "allama")]
+  |                ^^^^^

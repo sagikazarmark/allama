@@ -1,0 +1,27 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "openai-compat:vendor": {
+          "reasoning_field": "thinking"
+        }
+      },
+      "text": "The user asks for a greeting.",
+      "type": "reasoning"
+    },
+    {
+      "text": "Hello there!",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "stop",
+  "id": "cmpl-m1",
+  "model": "magistral-medium-2509",
+  "provider": "vendor",
+  "usage": {
+    "input_tokens": 9,
+    "output_tokens": 14,
+    "total_tokens": 23
+  }
+}

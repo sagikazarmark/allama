@@ -1,0 +1,79 @@
+{
+  "frequency_penalty": 0.1,
+  "max_completion_tokens": 256,
+  "messages": [
+    {
+      "content": "You are a precise assistant.",
+      "role": "developer"
+    },
+    {
+      "content": "Find rust docs",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "trace_id": "trace-123"
+  },
+  "model": "acme-reasoner",
+  "parallel_tool_calls": true,
+  "presence_penalty": 0.2,
+  "prompt_cache_key": "session-1",
+  "reasoning_effort": "high",
+  "response_format": {
+    "json_schema": {
+      "name": "answer",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "type": "object"
+      },
+      "strict": true
+    },
+    "type": "json_schema"
+  },
+  "seed": 99,
+  "service_tier": "flex",
+  "stop": [
+    "END"
+  ],
+  "store": true,
+  "stream": false,
+  "temperature": 0.7,
+  "tool_choice": {
+    "function": {
+      "name": "search"
+    },
+    "type": "function"
+  },
+  "tools": [
+    {
+      "function": {
+        "description": "Search docs",
+        "name": "search",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "q": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "q"
+          ],
+          "type": "object"
+        },
+        "strict": true
+      },
+      "type": "function"
+    }
+  ],
+  "top_p": 0.9,
+  "user": "user_123"
+}

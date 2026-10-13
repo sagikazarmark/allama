@@ -1,0 +1,16 @@
+{
+  "content": [
+    {
+      "text": "The docs cover ownership, borrowing and",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "length",
+  "finish_reason_raw": "length",
+  "provider": "cloudflare",
+  "usage": {
+    "input_tokens": 18,
+    "output_tokens": 8,
+    "total_tokens": 26
+  }
+}

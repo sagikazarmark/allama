@@ -1,0 +1,103 @@
+{
+  "content": [
+    {
+      "arguments": "{\"action\":{\"queries\":[\"latest stable Rust release official announcement\"],\"query\":\"latest stable Rust release official announcement\",\"type\":\"search\"}}",
+      "id": "ws_044c6e4434287684016abfab4e3ac087d1a3e8f68092b1f391",
+      "name": "web_search",
+      "origin": "openai",
+      "provider_data": {
+        "openai": {
+          "type": "web_search_call"
+        }
+      },
+      "type": "provider_tool_call"
+    },
+    {
+      "call_id": "ws_044c6e4434287684016abfab4e3ac087d1a3e8f68092b1f391",
+      "origin": "openai",
+      "output": {
+        "status": "completed"
+      },
+      "provider_data": {
+        "openai": {
+          "type": "web_search_call"
+        }
+      },
+      "type": "provider_tool_result"
+    },
+    {
+      "citations": [
+        {
+          "provider_data": {
+            "openai": {
+              "type": "url_citation"
+            }
+          },
+          "source": {
+            "title": "Announcing Rust 1.99.0 | Rust Blog",
+            "type": "url",
+            "url": "https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai"
+          },
+          "span": {
+            "end": 172,
+            "start": 80
+          }
+        }
+      ],
+      "provider_data": {
+        "openai": {
+          "annotations": [
+            {
+              "end_index": 172,
+              "start_index": 80,
+              "title": "Announcing Rust 1.99.0 | Rust Blog",
+              "type": "url_citation",
+              "url": "https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai"
+            }
+          ]
+        }
+      },
+      "text": "The latest stable Rust release is version 1.99.0, announced on October 1, 2026. ([blog.rust-lang.org](https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai)) ",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "completed",
+  "id": "resp_044c6e4434287684016abfab4d494487d18e4785efca266e4d",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "provider": "openai",
+  "provider_data": {
+    "openai": {
+      "service_tier": "default",
+      "tool_usage": {
+        "image_gen": {
+          "input_tokens": 0,
+          "input_tokens_details": {
+            "image_tokens": 0,
+            "text_tokens": 0
+          },
+          "output_tokens": 0,
+          "output_tokens_details": {
+            "image_tokens": 0,
+            "text_tokens": 0
+          },
+          "total_tokens": 0
+        },
+        "web_search": {
+          "num_requests": 1
+        }
+      }
+    }
+  },
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "input_tokens": 8174,
+    "output_tokens": 77,
+    "reasoning_tokens": 0,
+    "tool_requests": {
+      "web_search": 1
+    },
+    "total_tokens": 8251
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "resp_mcp1",
+  "object": "response",
+  "status": "completed",
+  "model": "gpt-5-mini",
+  "output": [
+    {
+      "id": "mcpl_1",
+      "type": "mcp_list_tools",
+      "server_label": "deepwiki",
+      "tools": [{"name": "ask_question", "input_schema": {"type": "object"}}]
+    },
+    {
+      "id": "mcpr_1",
+      "type": "mcp_approval_request",
+      "arguments": "{\"repoName\":\"rust-lang/rust\",\"question\":\"What is the MSRV policy?\"}",
+      "name": "ask_question",
+      "server_label": "deepwiki"
+    }
+  ],
+  "usage": {"input_tokens": 300, "output_tokens": 40, "total_tokens": 340}
+}

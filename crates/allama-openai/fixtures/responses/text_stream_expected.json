@@ -1,0 +1,27 @@
+{
+  "content": [
+    {
+      "text": "Sure! Here are the numbers from 1 to 12 in words:\n\n1. One  \n2. Two  \n3. Three  \n4. Four  \n5. Five  \n6. Six  \n7. Seven  \n8. Eight  \n9. Nine  \n10. Ten  \n11. Eleven  \n12. Twelve",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "completed",
+  "id": "resp_00d905906f94ef59016abf0feeb1a087d1a41464f751b55e91",
+  "model": "gpt-4.1-nano-2025-04-14",
+  "provider": "openai",
+  "provider_data": {
+    "openai": {
+      "service_tier": "default"
+    }
+  },
+  "request_id": "req_stream",
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "input_tokens": 17,
+    "output_tokens": 63,
+    "reasoning_tokens": 0,
+    "total_tokens": 80
+  }
+}

@@ -1,0 +1,37 @@
+{
+    "model": "claude-haiku-4-5-20251001",
+    "id": "msg_01AgreeToolsP2",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+        {
+            "type": "text",
+            "text": "I'll check both."
+        },
+        {
+            "type": "tool_use",
+            "id": "toolu_01WeatherParisA1",
+            "name": "get_weather",
+            "input": {
+                "city": "Paris"
+            }
+        },
+        {
+            "type": "tool_use",
+            "id": "toolu_01TimeParisB2",
+            "name": "get_time",
+            "input": {
+                "zone": "Europe/Paris"
+            }
+        }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": {
+        "input_tokens": 402,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 88,
+        "service_tier": "standard"
+    }
+}

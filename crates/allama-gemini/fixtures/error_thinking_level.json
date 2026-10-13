@@ -1,0 +1,11 @@
+{
+  "body_len": 171,
+  "body_present": true,
+  "message": "HTTP 400: the model does not take this thinking level",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_type": "INVALID_ARGUMENT",
+  "status": 400,
+  "type": "unsupported",
+  "upstream_message": "Thinking level MINIMAL is not supported for this model. Please retry with other thinking level."
+}

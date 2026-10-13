@@ -1,0 +1,30 @@
+{
+  "body": {
+    "max_tokens": 4096,
+    "messages": [
+      {
+        "content": [
+          {
+            "text": "Hello",
+            "type": "text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "model": "claude-haiku-4-5-20251001",
+    "stream": false
+  },
+  "warnings": [
+    {
+      "code": "unsupported.reasoning",
+      "kind": "unsupported",
+      "message": "reasoning output `omitted` applies only while thinking is on, and `claude-haiku-4-5-20251001` does not think unless asked; it was not sent; set a reasoning effort to turn thinking on",
+      "provider": "anthropic",
+      "subject": {
+        "field": "reasoning",
+        "type": "field"
+      }
+    }
+  ]
+}

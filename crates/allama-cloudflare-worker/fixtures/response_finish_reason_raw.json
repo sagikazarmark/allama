@@ -1,0 +1,10 @@
+{
+  "response": "The docs cover ownership, borrowing and",
+  "tool_calls": [],
+  "usage": {
+    "prompt_tokens": 18,
+    "completion_tokens": 8,
+    "total_tokens": 26
+  },
+  "finish_reason": "length"
+}

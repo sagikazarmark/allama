@@ -1,0 +1,6 @@
+error: duplicate option key "billing"
+ --> tests/ui/choices_duplicate_key.rs:7:5
+  |
+7 | /     #[decision(rename = "billing")]
+8 | |     Payments,
+  | |____________^

@@ -1,0 +1,41 @@
+{
+  "content": [
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "call_234181",
+      "name": "get_weather",
+      "provider_data": {
+        "google-ai": {
+          "thought_signature": "EpcDCpQDAWkUfRMTzyV2rkatng7zfWtN+3qYACFXQ1wNJfYwF3qzLMYEwOvaVPhMjnG7+c+QSiHqGqckueyX6OUiykhYRXtVzeJubMofdWgjOcxlMlQkWrNFukhYZ+9zSQmEK+iJgjv8ASNwWH4cAsXy0Gmjnr15avFiNhwFyJSo6/XNkWfYwgkRDR4GQxbe1Dng7rDT7evIKnX8Kc9Dog3LDbStm+VfK62hBKMf5K6VMlBTFU7UrX1/1SGVY1WLVq3Z4/dR+de0gXV5ugOrTVENRV1DH9L0v9u/7CQtxz58orvQytDSilxpP5uwgh9vYd01g1ehSxkgS9yIz4nn1wzG3bl0+3xOemcmgdKPEH88Z5TgOEoV+9qirsKoBoHMJHCPz8BGQ1jEJSmxOKfX/rvOh+eBZXrkVx9OQT1/5o8o/8eZBqHLgWpdrrNQTUH5mIbqqu8HYKZwIoOUBWqNpj9YqOm9Jo2Xsucw4JNe/A1K0j+/wbITBRLL/dykQNbK7V0Jq448QowC7a7QcILEInX1++atP7mE+sg="
+        }
+      },
+      "type": "tool_call"
+    },
+    {
+      "arguments": "{\"city\":\"Tokyo\"}",
+      "id": "call_234182",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "STOP",
+  "id": "_fW-aqmPIfG_nsEP4tcj",
+  "model": "gemini-3.5-flash",
+  "provider": "gemini",
+  "provider_data": {
+    "google-ai": {
+      "finish_message": "Model generated function call(s).",
+      "service_tier": "standard"
+    }
+  },
+  "usage": {
+    "breakdowns": {
+      "text_input_tokens": 56
+    },
+    "input_tokens": 56,
+    "output_tokens": 106,
+    "reasoning_tokens": 74,
+    "total_tokens": 162
+  }
+}

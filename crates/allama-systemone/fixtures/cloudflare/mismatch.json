@@ -1,0 +1,11 @@
+{
+  "errors": [
+    {
+      "message": "AiError: AiError: {\"error\":{\"type\":\"invalid_request\",\"message\":\"Unsupported model 'clef-flash'. Use 'clef'.\"}} (50a92614-dbc3-4883-aaab-86da282c83e4)",
+      "code": 5012
+    }
+  ],
+  "success": false,
+  "result": {},
+  "messages": []
+}

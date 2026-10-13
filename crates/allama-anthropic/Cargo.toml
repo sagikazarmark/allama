@@ -1,0 +1,56 @@
+[package]
+name = "allama-anthropic"
+version = { workspace = true }
+description = "Anthropic provider for allama"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+keywords = ["llm", "anthropic", "claude", "ai", "chat"]
+categories = ["api-bindings", "artificial-intelligence"]
+
+[features]
+default = ["default-tls", "reqwest"]
+# The default `reqwest` transport. Without it, a provider built with
+# `http_transport(..)` works as usual (encoding, decoding, every call), and
+# the constructors that would build a `reqwest` client (`new`, `from_env`)
+# are not compiled.
+reqwest = ["allama-http/reqwest"]
+# TLS backend of the default `reqwest` transport.
+default-tls = ["reqwest", "allama-http/default-tls"]
+native-tls = ["reqwest", "allama-http/native-tls"]
+rustls = ["reqwest", "allama-http/rustls"]
+# rustls with the `ring` crypto provider: no `aws-lc-sys` (and so no cmake)
+# for musl builds.
+rustls-ring = ["reqwest", "allama-http/rustls-ring"]
+# Turn on `allama-http`'s `reqwest-tracing` spans, which every provider in the
+# build shares, not only this crate's.
+http-tracing = ["reqwest", "allama-http/http-tracing"]
+
+[dependencies]
+allama = { workspace = true }
+allama-http = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+allama-conformance = { workspace = true, features = ["extract", "server"] }
+
+criterion = { workspace = true }
+futures-executor = { workspace = true }
+futures-util = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+
+[[bench]]
+name = "streaming"
+harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+# Marks feature-gated items with the feature they need.
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true

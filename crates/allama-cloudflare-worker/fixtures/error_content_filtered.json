@@ -1,0 +1,7 @@
+{
+  "message": "Workers AI error",
+  "message_origin": "authored",
+  "provider": "cloudflare",
+  "type": "content_filtered",
+  "upstream_message": "Safety system blocked this response"
+}

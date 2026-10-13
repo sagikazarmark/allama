@@ -1,0 +1,11 @@
+{
+  "body_len": 94,
+  "body_present": true,
+  "message": "HTTP 403",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_type": "PERMISSION_DENIED",
+  "status": 403,
+  "type": "auth",
+  "upstream_message": "Permission denied"
+}

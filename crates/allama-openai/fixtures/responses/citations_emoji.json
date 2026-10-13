@@ -1,0 +1,129 @@
+{
+  "id": "resp_076a86d2444eb868016abfc6734af087d1875ce14063d23823",
+  "object": "response",
+  "created_at": 1790953075,
+  "status": "completed",
+  "access_programs": null,
+  "background": false,
+  "billing": {
+    "payer": "developer"
+  },
+  "completed_at": 1790953077,
+  "error": null,
+  "frequency_penalty": 0.0,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": 300,
+  "max_tool_calls": null,
+  "model": "gpt-4.1-mini-2025-04-14",
+  "moderation": null,
+  "output": [
+    {
+      "id": "ws_076a86d2444eb868016abfc674086c87d1a3515891620701ef",
+      "type": "web_search_call",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "queries": [
+          "latest stable Rust release official announcement"
+        ],
+        "query": "latest stable Rust release official announcement"
+      }
+    },
+    {
+      "id": "msg_076a86d2444eb868016abfc674ecac87d1aa568f5397d40b4e",
+      "type": "message",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "annotations": [
+            {
+              "type": "url_citation",
+              "end_index": 196,
+              "start_index": 104,
+              "title": "Announcing Rust 1.99.0 | Rust Blog",
+              "url": "https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai"
+            }
+          ],
+          "logprobs": [],
+          "text": "\ud83e\udd80\ud83d\ude80\ud83c\udf89\n\nA Rust 1.99.0 stabiliz\u00e1lja a C-ABI vari\u00e1dikus f\u00fcggv\u00e9nyek defini\u00e1l\u00e1s\u00e1t a \"C\" \u00e9s \"C-unwind\" ABI-kal. ([blog.rust-lang.org](https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai)) "
+        }
+      ],
+      "role": "assistant"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "presence_penalty": 0.0,
+  "previous_response_id": null,
+  "prompt_cache_key": null,
+  "prompt_cache_retention": "in_memory",
+  "reasoning": {
+    "context": null,
+    "effort": null,
+    "summary": null
+  },
+  "safety_identifier": null,
+  "service_tier": "default",
+  "store": false,
+  "temperature": 1.0,
+  "text": {
+    "format": {
+      "type": "text"
+    },
+    "verbosity": "medium"
+  },
+  "tool_choice": "auto",
+  "tool_usage": {
+    "image_gen": {
+      "input_tokens": 0,
+      "input_tokens_details": {
+        "image_tokens": 0,
+        "text_tokens": 0
+      },
+      "output_tokens": 0,
+      "output_tokens_details": {
+        "image_tokens": 0,
+        "text_tokens": 0
+      },
+      "total_tokens": 0
+    },
+    "web_search": {
+      "num_requests": 1
+    }
+  },
+  "tools": [
+    {
+      "type": "web_search",
+      "return_token_budget": "default",
+      "search_content_types": [
+        "text"
+      ],
+      "search_context_size": "medium",
+      "user_location": {
+        "type": "approximate",
+        "city": null,
+        "country": "US",
+        "region": null,
+        "timezone": null
+      }
+    }
+  ],
+  "top_logprobs": 0,
+  "top_p": 1.0,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 8174,
+    "input_tokens_details": {
+      "cache_write_tokens": 0,
+      "cached_tokens": 0
+    },
+    "output_tokens": 101,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 8275
+  },
+  "user": null,
+  "metadata": {}
+}

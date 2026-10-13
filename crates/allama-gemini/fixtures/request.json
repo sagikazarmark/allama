@@ -1,0 +1,90 @@
+{
+  "cachedContent": "cachedContents/abc",
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Find rust docs"
+        }
+      ],
+      "role": "user"
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 256,
+    "responseJsonSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "answer"
+      ],
+      "type": "object"
+    },
+    "responseMimeType": "application/json",
+    "seed": 7,
+    "stopSequences": [
+      "END"
+    ],
+    "temperature": 0.4,
+    "thinkingConfig": {
+      "includeThoughts": true,
+      "thinkingBudget": 1024
+    },
+    "topK": 7,
+    "topP": 0.8
+  },
+  "systemInstruction": {
+    "parts": [
+      {
+        "text": "You are a precise assistant."
+      }
+    ]
+  },
+  "toolConfig": {
+    "functionCallingConfig": {
+      "allowedFunctionNames": [
+        "search"
+      ],
+      "mode": "ANY"
+    }
+  },
+  "tools": [
+    {
+      "functionDeclarations": [
+        {
+          "description": "Search docs",
+          "name": "search",
+          "parametersJsonSchema": {
+            "$defs": {
+              "Filter": {
+                "properties": {
+                  "site": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "additionalProperties": false,
+            "properties": {
+              "filter": {
+                "$ref": "#/$defs/Filter"
+              },
+              "q": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "q"
+            ],
+            "type": "object"
+          }
+        }
+      ]
+    }
+  ]
+}

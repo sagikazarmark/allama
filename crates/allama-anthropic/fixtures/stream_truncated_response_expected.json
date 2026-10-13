@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "text": "Partial answer",
+      "type": "text"
+    }
+  ],
+  "id": "msg_stream_trunc_1",
+  "model": "claude-sonnet-4-20250514",
+  "provider": "anthropic",
+  "usage": {
+    "input_tokens": 12
+  }
+}

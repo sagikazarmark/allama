@@ -1,0 +1,35 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "openai-compat:vendor": {
+          "reasoning_field": "reasoning_content"
+        }
+      },
+      "text": "First thought.",
+      "type": "reasoning"
+    },
+    {
+      "text": "Partial answer.",
+      "type": "text"
+    },
+    {
+      "provider_data": {
+        "openai-compat:vendor": {
+          "reasoning_field": "reasoning_content"
+        }
+      },
+      "text": "Second thought.",
+      "type": "reasoning"
+    },
+    {
+      "text": "Final answer.",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "stop",
+  "id": "c-r",
+  "model": "m",
+  "provider": "vendor"
+}

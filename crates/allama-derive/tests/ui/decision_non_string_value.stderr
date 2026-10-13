@@ -1,0 +1,5 @@
+error: expected string literal
+ --> tests/ui/decision_non_string_value.rs:5:31
+  |
+5 |     #[decision(instructions = 42)]
+  |                               ^^

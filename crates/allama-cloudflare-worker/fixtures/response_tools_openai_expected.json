@@ -1,0 +1,24 @@
+{
+  "content": [
+    {
+      "arguments": "{\"city\":\"London\"}",
+      "id": "chatcmpl-tool-8f3a",
+      "name": "lookup_weather",
+      "type": "tool_call"
+    },
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "cf_call_1_1",
+      "name": "lookup_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "tool_calls",
+  "provider": "cloudflare",
+  "usage": {
+    "input_tokens": 210,
+    "output_tokens": 31,
+    "total_tokens": 241
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "allama": [
+    "dropped.content_replay",
+    "dropped.foreign_content",
+    "dropped.foreign_provider_data",
+    "dropped.foreign_reasoning",
+    "dropped.reasoning_replay",
+    "other.capability_override",
+    "unsupported.image_detail"
+  ],
+  "allama-anthropic": [
+    "approximated.tool_call_arguments"
+  ],
+  "allama-cloudflare-worker": [
+    "approximated.tool_result_error",
+    "dropped.provider_name_options"
+  ],
+  "allama-gemini": [
+    "approximated.thought_signature",
+    "approximated.tool_call_arguments",
+    "approximated.tool_result_order",
+    "dropped.provider_name_options"
+  ],
+  "allama-openai": [
+    "dropped.chat_completions_options"
+  ],
+  "allama-openai-compat": [
+    "approximated.tool_call_arguments",
+    "approximated.tool_result_error",
+    "dropped.chat_completions_options",
+    "dropped.provider_name_options",
+    "unsupported.logprobs",
+    "unsupported.top_logprobs"
+  ],
+  "allama-systemone": [
+    "dropped.provider_name_options"
+  ]
+}

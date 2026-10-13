@@ -1,0 +1,135 @@
+# Every key path of a serialized `ChatRequest`, and how the request field
+# audit (C2, `allama_conformance::probe::assert_request_fields_accounted`)
+# accounts for it.
+#
+# Each line is a key path and an account:
+#
+#   <path>  probe: <probe>[, <probe>...]   C2 probes check it.
+#   <path>  exempt: <reason>               C2 does not probe it, for <reason>.
+#
+# Paths follow the serialized form. Arrays add `[]`; an object tagged with
+# `role` or `type` adds its tag as a segment, so `messages[].user.cache{}` is
+# `UserMessage::cache`. A path ending in `[]` or `{}` accounts for the whole
+# array or object there (`provider_data{}` is the provider data map); any
+# other path accounts for a single value.
+# Probe names are the snake_case names of `allama_conformance::probe::Probe`.
+#
+# A test in this package serializes a request with every field and every
+# message, part, and block kind set, and fails on any path that is not
+# listed here or is listed but no longer serialized. A new field therefore
+# lands with a probe or an explicit exemption.
+
+model                                                              exempt: selects the model; transports may carry it outside the body, and every probe sends it
+system[].content                                                   probe: system_prompt
+system[].cache{}                                                   probe: system_cache
+system[].options{}                                                 exempt: provider options, read only by the adapter that owns the namespace (ADR 0006)
+system[].app_data{}                                                probe: app_data
+
+messages[].user.content                                            exempt: conversation content; never dropped (ADR 0003), and request fixtures pin its encoding
+messages[].user.content[].text.text                                exempt: conversation content; never dropped (ADR 0003), and request fixtures pin its encoding
+messages[].user.content[].text.citations[]                         exempt: citations are a read-only view of model output; adapters replay their own annotations (ADR 0007)
+messages[].user.content[].text.provider_data{}                     probe: foreign_provider_data
+messages[].user.content[].image.source{}                           probe: image_source
+messages[].user.content[].image.media_type                         exempt: adapter input naming the media type of a URL image; adapters that need one read it
+messages[].user.content[].image.detail                             probe: image_detail
+messages[].user.content[].image.provider_data{}                    probe: foreign_provider_data
+messages[].user.content[].file.media_type                          exempt: file input; refused when `FileInput` is unsupported (C3), and request fixtures pin its encoding
+messages[].user.content[].file.source{}                            exempt: file input; refused when `FileInput` is unsupported (C3), and request fixtures pin its encoding
+messages[].user.content[].file.filename                            probe: file_name
+messages[].user.content[].file.provider_data{}                     probe: foreign_provider_data
+messages[].user.content[].other.type_name                          probe: foreign_other_content
+messages[].user.content[].other.origin                             probe: foreign_other_content
+messages[].user.content[].other.data{}                             probe: foreign_other_content
+messages[].user.content[].other.provider_data{}                    exempt: gated by namespace on content replayed to its origin; `probe::assert_other_provider_data_gated` checks it
+messages[].user.cache{}                                            probe: message_cache
+messages[].user.provider_data{}                                    probe: foreign_provider_data
+messages[].user.app_data{}                                         probe: app_data
+
+messages[].assistant.content[].text.text                           exempt: conversation content; never dropped (ADR 0003), and request fixtures pin its encoding
+messages[].assistant.content[].text.citations[]                    exempt: citations are a read-only view of model output; adapters replay their own annotations (ADR 0007)
+messages[].assistant.content[].text.provider_data{}                probe: foreign_provider_data
+messages[].assistant.content[].image.source{}                      probe: image_source
+messages[].assistant.content[].image.media_type                    exempt: adapter input naming the media type of a URL image; adapters that need one read it
+messages[].assistant.content[].image.detail                        exempt: requested fidelity applies to input images; a replayed output image is sent as it was returned
+messages[].assistant.content[].image.provider_data{}               probe: foreign_provider_data
+messages[].assistant.content[].tool_call.id                        exempt: tool-call replay; request fixtures and the tool-call contracts pin its encoding
+messages[].assistant.content[].tool_call.name                      exempt: tool-call replay; request fixtures and the tool-call contracts pin its encoding
+messages[].assistant.content[].tool_call.arguments                 exempt: tool-call replay; request fixtures and the tool-call contracts pin its encoding
+messages[].assistant.content[].tool_call.provider_data{}           probe: foreign_provider_data
+messages[].assistant.content[].reasoning.text                      probe: foreign_reasoning
+messages[].assistant.content[].reasoning.provider_data{}           probe: foreign_reasoning, foreign_provider_data
+messages[].assistant.content[].refusal.text                        exempt: conversation content; replayed in the provider's refusal form or as assistant text, never dropped, and replay tests pin its encoding
+messages[].assistant.content[].refusal.provider_data{}             probe: foreign_provider_data
+messages[].assistant.content[].provider_tool_call.id               probe: foreign_provider_tool
+messages[].assistant.content[].provider_tool_call.name             probe: foreign_provider_tool
+messages[].assistant.content[].provider_tool_call.arguments        probe: foreign_provider_tool
+messages[].assistant.content[].provider_tool_call.origin           probe: foreign_provider_tool
+messages[].assistant.content[].provider_tool_call.provider_data{}  probe: foreign_provider_tool, foreign_provider_data
+messages[].assistant.content[].provider_tool_result.call_id        probe: foreign_provider_tool
+messages[].assistant.content[].provider_tool_result.output{}       probe: foreign_provider_tool
+messages[].assistant.content[].provider_tool_result.is_error       probe: foreign_provider_tool
+messages[].assistant.content[].provider_tool_result.origin         probe: foreign_provider_tool
+messages[].assistant.content[].provider_tool_result.provider_data{} probe: foreign_provider_tool, foreign_provider_data
+messages[].assistant.content[].other.type_name                     probe: foreign_other_content
+messages[].assistant.content[].other.origin                        probe: foreign_other_content
+messages[].assistant.content[].other.data{}                        probe: foreign_other_content
+messages[].assistant.content[].other.provider_data{}               exempt: gated by namespace on content replayed to its origin; `probe::assert_other_provider_data_gated` checks it
+messages[].assistant.cache{}                                       probe: message_cache
+messages[].assistant.provider_data{}                               probe: foreign_provider_data
+messages[].assistant.app_data{}                                    probe: app_data
+
+messages[].tool.tool_call_id                                       exempt: tool-result correlation; request fixtures and the tool-call contracts pin its encoding
+messages[].tool.name                                               exempt: tool-result correlation; request fixtures and the tool-call contracts pin its encoding
+messages[].tool.content                                            exempt: conversation content; never dropped (ADR 0003), and request fixtures pin its encoding
+messages[].tool.content{}                                          exempt: conversation content; never dropped (ADR 0003), and request fixtures pin its encoding
+messages[].tool.content[].text.text                                exempt: conversation content; never dropped (ADR 0003), and request fixtures pin its encoding
+messages[].tool.content[].text.citations[]                         exempt: citations are a read-only view of model output; adapters replay their own annotations (ADR 0007)
+messages[].tool.content[].text.provider_data{}                     probe: foreign_provider_data
+messages[].tool.content[].image.source{}                           probe: image_source
+messages[].tool.content[].image.media_type                         exempt: adapter input naming the media type of a URL image; adapters that need one read it
+messages[].tool.content[].image.detail                             probe: image_detail
+messages[].tool.content[].image.provider_data{}                    probe: foreign_provider_data
+messages[].tool.content[].file.media_type                          exempt: file input; refused when `FileInput` is unsupported (C3), and request fixtures pin its encoding
+messages[].tool.content[].file.source{}                            exempt: file input; refused when `FileInput` is unsupported (C3), and request fixtures pin its encoding
+messages[].tool.content[].file.filename                            probe: file_name
+messages[].tool.content[].file.provider_data{}                     probe: foreign_provider_data
+messages[].tool.content[].other.type_name                          probe: foreign_other_content
+messages[].tool.content[].other.origin                             probe: foreign_other_content
+messages[].tool.content[].other.data{}                             probe: foreign_other_content
+messages[].tool.content[].other.provider_data{}                    exempt: gated by namespace on content replayed to its origin; `probe::assert_other_provider_data_gated` checks it
+messages[].tool.is_error                                           probe: tool_result_error
+messages[].tool.cache{}                                            probe: message_cache
+messages[].tool.provider_data{}                                    probe: foreign_provider_data
+messages[].tool.app_data{}                                         probe: app_data
+
+temperature                                                        probe: temperature
+max_output_tokens                                                  probe: max_output_tokens
+top_p                                                              probe: top_p
+top_k                                                              probe: top_k
+stop[]                                                             probe: stop
+frequency_penalty                                                  probe: frequency_penalty
+presence_penalty                                                   probe: presence_penalty
+seed                                                               probe: seed
+
+tools[].name                                                       exempt: tool definition; refused when `ToolCalls` is unsupported (C3), and request fixtures pin its encoding
+tools[].description                                                exempt: tool definition; refused when `ToolCalls` is unsupported (C3), and request fixtures pin its encoding
+tools[].parameters{}                                               exempt: tool definition; refused when `ToolCalls` is unsupported (C3), and request fixtures pin its encoding
+tools[].strict                                                     probe: tool_strict
+tools[].cache{}                                                    probe: tool_cache
+tools[].provider_data{}                                            probe: foreign_provider_data
+tool_choice                                                        exempt: tool choice; a forced choice is refused when `ForcedToolChoice` is unsupported (C3), and request fixtures pin it
+tool_choice.specific.name                                          exempt: tool choice; a forced choice is refused when `ForcedToolChoice` is unsupported (C3), and request fixtures pin it
+parallel_tool_calls                                                probe: parallel_tool_calls
+
+response_format                                                    probe: response_format
+response_format.json_schema.name                                   exempt: a label for the schema, which some providers have no field for; the schema itself is probed
+response_format.json_schema.schema{}                               probe: response_format
+response_format.json_schema.strict                                 exempt: implied where structured output is always constrained; `probe::assert_strict_not_honoured_warns` checks configurations without strict mode
+
+reasoning.effort                                                   probe: reasoning_config
+reasoning.output                                                   probe: reasoning_config
+cache.key                                                          probe: prompt_cache
+cache.retention                                                    probe: prompt_cache
+cache.automatic                                                    exempt: an intent that providers caching prefixes on their own satisfy without sending anything, so no wire evidence can judge it; adapter tests cover the opt-in mapping (Anthropic top-level `cache_control`)
+unsupported_policy                                                 exempt: tells the adapter how to report what it cannot honor; never sent
+options{}                                                          exempt: provider options, read only by the adapter that owns the namespace (ADR 0006)

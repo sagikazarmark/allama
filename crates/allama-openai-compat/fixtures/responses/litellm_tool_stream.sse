@@ -1,0 +1,220 @@
+data: {"type":"response.created","response":{"id":"resp_9a0e17be-9b2c-49ee-95cc-94459c19a951","created_at":1790956695,"model":"qwen3:1.7b","object":"response","output":[],"parallel_tool_calls":true,"tool_choice":"auto","tools":[{"name":"get_weather","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]},"type":"function","description":"Get the weather for a city"}],"top_p":1.0,"reasoning":{"effort":null,"summary":null},"status":"in_progress","store":true},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.in_progress","response":{"id":"resp_9a0e17be-9b2c-49ee-95cc-94459c19a951","created_at":1790956695,"model":"qwen3:1.7b","object":"response","output":[],"parallel_tool_calls":true,"tool_choice":"auto","tools":[{"name":"get_weather","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]},"type":"function","description":"Get the weather for a city"}],"top_p":1.0,"reasoning":{"effort":null,"summary":null},"status":"in_progress","store":true},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"rs_394f3bb1-9d5d-470d-b911-58793ae5751f","type":"reasoning","status":"in_progress"},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4416954982394688835","output_index":0,"delta":"Okay","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6246337497322605816","output_index":0,"delta":" user","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6644792486942831019","output_index":0,"delta":" is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-638723277269210080","output_index":0,"delta":" asking","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6476397259901100090","output_index":0,"delta":" for","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-7376590874737132738","output_index":0,"delta":" weather","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_5339774466371792470","output_index":0,"delta":" in","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6137163541479003090","output_index":0,"delta":" Paris","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-426038365751775746","output_index":0,"delta":" I","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-7034903353041794325","output_index":0,"delta":" need","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2387011742141014413","output_index":0,"delta":" to","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6832041522755598074","output_index":0,"delta":" use","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6992878739673593298","output_index":0,"delta":" provided","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8623091858525996487","output_index":0,"delta":" tool","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2387011742141014413","output_index":0,"delta":" to","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3420760636121086610","output_index":0,"delta":" get","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3439545048895260652","output_index":0,"delta":" that","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_570124875279032231","output_index":0,"delta":" information","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-3518725634315107496","output_index":0,"delta":" Let","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2329635004410838435","output_index":0,"delta":" me","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-7927497497398425600","output_index":0,"delta":" check","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8623091858525996487","output_index":0,"delta":" tool","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4521578066790683431","output_index":0,"delta":"'s","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-1299667729823916319","output_index":0,"delta":" function","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1461640169049222724","output_index":0,"delta":" The","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-1299667729823916319","output_index":0,"delta":" function","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6644792486942831019","output_index":0,"delta":" is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1856615917950354419","output_index":0,"delta":" called","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3420760636121086610","output_index":0,"delta":" get","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5160310568649199080","output_index":0,"delta":"_weather","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3300944347819954115","output_index":0,"delta":" and","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_9037914627853851979","output_index":0,"delta":" it","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5260573311299593745","output_index":0,"delta":" takes","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4128380534685046749","output_index":0,"delta":" a","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-3540547409162662204","output_index":0,"delta":" city","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3425875717007107266","output_index":0,"delta":" parameter","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2767770426192501193","output_index":0,"delta":" which","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3527646369376738342","output_index":0,"delta":" should","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_7271288723626211492","output_index":0,"delta":" be","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4128380534685046749","output_index":0,"delta":" a","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_7140140248979398568","output_index":0,"delta":" string","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1461640169049222724","output_index":0,"delta":" The","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6246337497322605816","output_index":0,"delta":" user","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1793609234147016233","output_index":0,"delta":" specified","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6137163541479003090","output_index":0,"delta":" Paris","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-817753761529837645","output_index":0,"delta":" so","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-426038365751775746","output_index":0,"delta":" I","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8655697604631400415","output_index":0,"delta":"'ll","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-955569736002451291","output_index":0,"delta":" call","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-1299667729823916319","output_index":0,"delta":" function","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6100652787643004637","output_index":0,"delta":" with","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-3540547409162662204","output_index":0,"delta":" city","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2086895713494924909","output_index":0,"delta":" set","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2387011742141014413","output_index":0,"delta":" to","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_454794018278660107","output_index":0,"delta":"Paris","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3915697848243233837","output_index":0,"delta":"\".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-426038365751775746","output_index":0,"delta":" I","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-7034903353041794325","output_index":0,"delta":" need","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2387011742141014413","output_index":0,"delta":" to","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2701495676828606287","output_index":0,"delta":" make","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2178308751498721794","output_index":0,"delta":" sure","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-516382415635674517","output_index":0,"delta":" arguments","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_439450664040029390","output_index":0,"delta":" are","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_5339774466371792470","output_index":0,"delta":" in","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2983918326753820168","output_index":0,"delta":" JSON","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_441191487631962707","output_index":0,"delta":" format","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-9211165609403900951","output_index":0,"delta":" within","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8623091858525996487","output_index":0,"delta":" tool","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1810350872220058844","output_index":0,"delta":"_call","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-478484636954383062","output_index":0,"delta":" tags","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-3518725634315107496","output_index":0,"delta":" Let","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2329635004410838435","output_index":0,"delta":" me","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2423535895645570800","output_index":0,"delta":" structure","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3527640240175429536","output_index":0,"delta":" response","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2633039548375583149","output_index":0,"delta":" correctly","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4114471330104422501","output_index":0,"delta":".\n","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.done","item_id":"rs_394f3bb1-9d5d-470d-b911-58793ae5751f","output_index":0,"sequence_number":4,"summary_index":0,"text":"Okay, the user is asking for the weather in Paris. I need to use the provided tool to get that information. Let me check the tool's function. The function is called get_weather, and it takes a city parameter, which should be a string. The user specified Paris, so I'll call the function with city set to \"Paris\". I need to make sure the arguments are in JSON format within the tool_call tags. Let me structure the response correctly.\n","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_part.done","item_id":"rs_394f3bb1-9d5d-470d-b911-58793ae5751f","output_index":0,"sequence_number":5,"summary_index":0,"part":{"type":"summary_text","text":"Okay, the user is asking for the weather in Paris. I need to use the provided tool to get that information. Let me check the tool's function. The function is called get_weather, and it takes a city parameter, which should be a string. The user specified Paris, so I'll call the function with city set to \"Paris\". I need to make sure the arguments are in JSON format within the tool_call tags. Let me structure the response correctly.\n"},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_item.done","output_index":0,"sequence_number":6,"item":{"id":"rs_394f3bb1-9d5d-470d-b911-58793ae5751f","type":"reasoning","summary":[{"type":"summary_text","text":"Okay, the user is asking for the weather in Paris. I need to use the provided tool to get that information. Let me check the tool's function. The function is called get_weather, and it takes a city parameter, which should be a string. The user specified Paris, so I'll call the function with city set to \"Paris\". I need to make sure the arguments are in JSON format within the tool_call tags. Let me structure the response correctly.\n"}]},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"57c8b6d6-1f3f-4d57-b631-e851d2db1d81","call_id":"57c8b6d6-1f3f-4d57-b631-e851d2db1d81","name":"get_weather","status":"in_progress","arguments":""},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.function_call_arguments.delta","item_id":"57c8b6d6-1f3f-4d57-b631-e851d2db1d81","output_index":1,"delta":"{\"city\": \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.function_call_arguments.delta","item_id":"57c8b6d6-1f3f-4d57-b631-e851d2db1d81","output_index":1,"delta":"Paris\"}","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.function_call_arguments.done","item_id":"57c8b6d6-1f3f-4d57-b631-e851d2db1d81","output_index":1,"arguments":"{\"city\": \"Paris\"}","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_item.done","output_index":1,"sequence_number":11,"item":{"type":"function_call","id":"57c8b6d6-1f3f-4d57-b631-e851d2db1d81","call_id":"57c8b6d6-1f3f-4d57-b631-e851d2db1d81","name":"get_weather","status":"completed","arguments":"{\"city\": \"Paris\"}"},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_text.done","item_id":"9e66897b-fbe1-4d37-90e7-246aba697b89","output_index":0,"content_index":0,"text":"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.content_part.done","item_id":"9e66897b-fbe1-4d37-90e7-246aba697b89","output_index":0,"content_index":0,"part":{"type":"reasoning_text","reasoning":"Okay, the user is asking for the weather in Paris. I need to use the provided tool to get that information. Let me check the tool's function. The function is called get_weather, and it takes a city parameter, which should be a string. The user specified Paris, so I'll call the function with city set to \"Paris\". I need to make sure the arguments are in JSON format within the tool_call tags. Let me structure the response correctly.\n"},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_item.done","output_index":0,"sequence_number":1,"item":{"id":"9e66897b-fbe1-4d37-90e7-246aba697b89","status":"completed","type":"message","role":"assistant","content":[{"type":"output_text","text":"","annotations":[]}]},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.completed","response":{"id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9sbGFtYV9jaGF0O21vZGVsX2lkOjUxNGY3MDRkN2Y3ODNiYWUxOWRiMGYwMzI5ZGQ1ODlhOGVmOTM0OGEyZDMwNDA0MWFhYTk1MjFjOTA1ZjM3NTc7cmVzcG9uc2VfaWQ6cmVzcF85YTBlMTdiZS05YjJjLTQ5ZWUtOTVjYy05NDQ1OWMxOWE5NTE=","created_at":1790956695,"metadata":{},"model":"qwen3:1.7b","object":"response","output":[{"type":"reasoning","id":"rs_3032863745100501000","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Okay, the user is asking for the weather in Paris. I need to use the provided tool to get that information. Let me check the tool's function. The function is called get_weather, and it takes a city parameter, which should be a string. The user specified Paris, so I'll call the function with city set to \"Paris\". I need to make sure the arguments are in JSON format within the tool_call tags. Let me structure the response correctly.\n","annotations":[]}]},{"type":"message","id":"9e66897b-fbe1-4d37-90e7-246aba697b89","status":"completed","role":"assistant","content":[{"type":"output_text","annotations":[]}]},{"arguments":"{\"city\": \"Paris\"}","call_id":"57c8b6d6-1f3f-4d57-b631-e851d2db1d81","name":"get_weather","type":"function_call","id":"57c8b6d6-1f3f-4d57-b631-e851d2db1d81","status":"completed"}],"parallel_tool_calls":false,"temperature":0.0,"tool_choice":"auto","tools":[],"status":"completed","text":{},"usage":{"input_tokens":141,"output_tokens":118,"output_tokens_details":{"reasoning_tokens":94},"total_tokens":259}},"model":"ollama/qwen3:1.7b"}
+
+data: [DONE]
+

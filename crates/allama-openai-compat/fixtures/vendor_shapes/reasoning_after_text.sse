@@ -1,0 +1,10 @@
+data: {"id":"c-r","model":"m","choices":[{"index":0,"delta":{"reasoning_content":"First thought."}}]}
+
+data: {"id":"c-r","choices":[{"index":0,"delta":{"content":"Partial answer."}}]}
+
+data: {"id":"c-r","choices":[{"index":0,"delta":{"reasoning_content":"Second thought."}}]}
+
+data: {"id":"c-r","choices":[{"index":0,"delta":{"content":"Final answer."},"finish_reason":"stop"}]}
+
+data: [DONE]
+

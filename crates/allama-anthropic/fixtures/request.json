@@ -1,0 +1,62 @@
+{
+  "cache_control": {
+    "type": "ephemeral"
+  },
+  "max_tokens": 8192,
+  "messages": [
+    {
+      "content": [
+        {
+          "text": "Find the answer",
+          "type": "text"
+        }
+      ],
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "user_id": "user-anthropic-123"
+  },
+  "model": "claude-haiku-4-5-20251001",
+  "service_tier": "standard_only",
+  "stop_sequences": [
+    "END"
+  ],
+  "stream": false,
+  "system": [
+    {
+      "cache_control": {
+        "type": "ephemeral"
+      },
+      "text": "You are a careful assistant.",
+      "type": "text"
+    }
+  ],
+  "thinking": {
+    "budget_tokens": 4096,
+    "type": "enabled"
+  },
+  "tool_choice": {
+    "disable_parallel_tool_use": true,
+    "type": "auto"
+  },
+  "tools": [
+    {
+      "description": "Search docs",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "q": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "type": "object"
+      },
+      "name": "search",
+      "strict": true
+    }
+  ]
+}

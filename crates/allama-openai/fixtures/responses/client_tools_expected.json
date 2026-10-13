@@ -1,0 +1,85 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "openai": {
+          "encrypted_content": "gAAAAABpv9B_c2xpZW50LXRvb2xzLWZpeHR1cmU=",
+          "item_id": "rs_0c1e7f3a9b2d4e5f016abf107f0a0c8191"
+        }
+      },
+      "text": "",
+      "type": "reasoning"
+    },
+    {
+      "data": {
+        "call_id": "call_Rk3XbQ1mZc7Vn2Pq8Ld5Ws0Y",
+        "id": "ctc_0c1e7f3a9b2d4e5f016abf107f8b1c8191",
+        "input": "SELECT count(*) FROM users WHERE created_at >= date('now')",
+        "name": "sql",
+        "status": "completed"
+      },
+      "origin": "openai",
+      "type": "other",
+      "type_name": "custom_tool_call"
+    },
+    {
+      "data": {
+        "action": {
+          "command": [
+            "tail",
+            "-n",
+            "20",
+            "/var/log/signup.log"
+          ],
+          "env": {
+            "LANG": "C"
+          },
+          "timeout_ms": 10000,
+          "type": "exec",
+          "user": null,
+          "working_directory": "/srv/app"
+        },
+        "call_id": "call_Hn8TcW4yJf2Kd6Rm1Qa9Ze3B",
+        "id": "lsh_0c1e7f3a9b2d4e5f016abf107f9c2d8191",
+        "status": "completed"
+      },
+      "origin": "openai",
+      "type": "other",
+      "type_name": "local_shell_call"
+    },
+    {
+      "data": {
+        "action": {
+          "commands": [
+            "wc -l /var/log/signup.log"
+          ],
+          "max_output_length": 4096,
+          "timeout_ms": 120000
+        },
+        "call_id": "call_Vb5NsX7pLk1Gh4Ty2Ec8Rj6M",
+        "id": "sh_0c1e7f3a9b2d4e5f016abf107fad3e8191",
+        "status": "completed"
+      },
+      "origin": "openai",
+      "type": "other",
+      "type_name": "shell_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "completed",
+  "id": "resp_0c1e7f3a9b2d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e",
+  "model": "gpt-5.1-2025-11-13",
+  "provider": "openai",
+  "provider_data": {
+    "openai": {
+      "service_tier": "default"
+    }
+  },
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "input_tokens": 412,
+    "output_tokens": 96,
+    "reasoning_tokens": 18,
+    "total_tokens": 508
+  }
+}

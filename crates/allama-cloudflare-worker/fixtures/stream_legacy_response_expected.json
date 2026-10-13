@@ -1,0 +1,10 @@
+{
+  "content": [
+    {
+      "text": "Hello world",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "provider": "cloudflare"
+}

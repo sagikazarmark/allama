@@ -1,0 +1,39 @@
+{
+  "content": [
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "call_112681",
+      "name": "get_weather",
+      "provider_data": {
+        "google-ai": {
+          "thought_signature": "EmAKXgFpFH0Tvha/dI18HHgAtJ+91QM1pwxLdirdJdUTdvJjMP6WouSek4t/5uJ1KY57KqCPmUmrIzHcFv+lKJrSCEc3sQUBaM5XG5O8SLDMqYBWzx1AAlojaYca3tYi66Y="
+        }
+      },
+      "type": "tool_call"
+    },
+    {
+      "arguments": "{\"city\":\"Rome\"}",
+      "id": "call_112687",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "STOP",
+  "id": "c-XFat-0Kp_R28oP6dSP0Qo",
+  "model": "gemini-3.5-flash-lite",
+  "provider": "gemini",
+  "provider_data": {
+    "google-ai": {
+      "service_tier": "standard"
+    }
+  },
+  "usage": {
+    "breakdowns": {
+      "text_input_tokens": 72
+    },
+    "input_tokens": 72,
+    "output_tokens": 32,
+    "total_tokens": 104
+  }
+}

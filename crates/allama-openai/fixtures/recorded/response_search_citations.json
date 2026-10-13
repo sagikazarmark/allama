@@ -1,0 +1,44 @@
+{
+  "id": "chatcmpl-b9f9e206-950f-40d7-84cc-e6cc63411754",
+  "object": "chat.completion",
+  "created": 1790946154,
+  "model": "gpt-5-search-api-2025-10-14",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The latest stable Rust release is **Rust 1.99.0**, officially announced on **October 1, 2026**. ([rust.dev](https://rust.dev/updates?utm_source=openai))",
+        "refusal": null,
+        "annotations": [
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 152,
+              "start_index": 96,
+              "title": "Rust Updates — rust.dev",
+              "url": "https://rust.dev/updates?utm_source=openai"
+            }
+          }
+        ]
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 16640,
+    "completion_tokens": 46,
+    "total_tokens": 16686,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "system_fingerprint": null
+}

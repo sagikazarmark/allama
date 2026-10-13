@@ -1,0 +1,104 @@
+{
+  "id": "resp_0c1e7f3a9b2d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e",
+  "object": "response",
+  "created_at": 1790906495,
+  "status": "completed",
+  "background": false,
+  "error": null,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": null,
+  "model": "gpt-5.1-2025-11-13",
+  "output": [
+    {
+      "id": "rs_0c1e7f3a9b2d4e5f016abf107f0a0c8191",
+      "type": "reasoning",
+      "encrypted_content": "gAAAAABpv9B_c2xpZW50LXRvb2xzLWZpeHR1cmU=",
+      "summary": []
+    },
+    {
+      "id": "ctc_0c1e7f3a9b2d4e5f016abf107f8b1c8191",
+      "type": "custom_tool_call",
+      "status": "completed",
+      "call_id": "call_Rk3XbQ1mZc7Vn2Pq8Ld5Ws0Y",
+      "input": "SELECT count(*) FROM users WHERE created_at >= date('now')",
+      "name": "sql"
+    },
+    {
+      "id": "lsh_0c1e7f3a9b2d4e5f016abf107f9c2d8191",
+      "type": "local_shell_call",
+      "status": "completed",
+      "call_id": "call_Hn8TcW4yJf2Kd6Rm1Qa9Ze3B",
+      "action": {
+        "type": "exec",
+        "command": ["tail", "-n", "20", "/var/log/signup.log"],
+        "env": {"LANG": "C"},
+        "timeout_ms": 10000,
+        "user": null,
+        "working_directory": "/srv/app"
+      }
+    },
+    {
+      "id": "sh_0c1e7f3a9b2d4e5f016abf107fad3e8191",
+      "type": "shell_call",
+      "status": "completed",
+      "call_id": "call_Vb5NsX7pLk1Gh4Ty2Ec8Rj6M",
+      "action": {
+        "commands": ["wc -l /var/log/signup.log"],
+        "timeout_ms": 120000,
+        "max_output_length": 4096
+      }
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": "low",
+    "summary": null
+  },
+  "service_tier": "default",
+  "store": false,
+  "text": {
+    "format": {
+      "type": "text"
+    },
+    "verbosity": "medium"
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "custom",
+      "name": "sql",
+      "description": "Run a read-only SQLite query.",
+      "format": {
+        "type": "grammar",
+        "syntax": "regex",
+        "definition": "SELECT .+"
+      }
+    },
+    {
+      "type": "local_shell"
+    },
+    {
+      "type": "shell",
+      "environment": {
+        "type": "local"
+      }
+    }
+  ],
+  "top_p": 1.0,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 412,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 96,
+    "output_tokens_details": {
+      "reasoning_tokens": 18
+    },
+    "total_tokens": 508
+  },
+  "user": null,
+  "metadata": {}
+}

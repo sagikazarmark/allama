@@ -1,0 +1,11 @@
+{
+  "body_len": 115,
+  "body_present": true,
+  "message": "HTTP 402",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_type": "RESOURCE_EXHAUSTED",
+  "status": 402,
+  "type": "quota_exhausted",
+  "upstream_message": "Your prepayment credits are depleted."
+}

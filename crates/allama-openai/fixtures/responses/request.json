@@ -1,0 +1,78 @@
+{
+  "input": [
+    {
+      "content": [
+        {
+          "text": "You are precise.",
+          "type": "input_text"
+        }
+      ],
+      "role": "developer",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Find rust docs",
+          "type": "input_text"
+        }
+      ],
+      "role": "user",
+      "type": "message"
+    }
+  ],
+  "max_output_tokens": 512,
+  "metadata": {
+    "trace_id": "trace-123"
+  },
+  "model": "gpt-5-mini",
+  "parallel_tool_calls": false,
+  "prompt_cache_key": "session-1",
+  "reasoning": {
+    "effort": "medium",
+    "summary": "auto"
+  },
+  "safety_identifier": "user-hash",
+  "service_tier": "flex",
+  "store": false,
+  "text": {
+    "format": {
+      "name": "answer",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "type": "object"
+      },
+      "strict": true,
+      "type": "json_schema"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "description": "Get the current weather for a city",
+      "name": "get_weather",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "type": "object"
+      },
+      "strict": true,
+      "type": "function"
+    }
+  ]
+}

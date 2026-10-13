@@ -1,0 +1,17 @@
+{
+  "id": "gen-u1",
+  "provider": "OpenAI",
+  "model": "openai/gpt-4.1-nano",
+  "object": "chat.completion",
+  "created": 1791350000,
+  "choices": [
+    {
+      "logprobs": {"content": [{"token": "Hi", "logprob": -0.01, "bytes": [72, 105], "top_logprobs": []}], "refusal": null},
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "index": 0,
+      "message": {"role": "assistant", "content": "Hi", "refusal": null, "reasoning": null}
+    }
+  ],
+  "usage": {"prompt_tokens": 5, "completion_tokens": null, "total_tokens": 6, "cost": 0.0000021, "is_byok": false, "prompt_tokens_details": {"cached_tokens": 0}}
+}

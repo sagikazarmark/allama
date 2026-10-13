@@ -1,0 +1,43 @@
+[package]
+name = "allama-conformance"
+version = { workspace = true }
+description = "Conformance contracts, fixture assertions, and a mock HTTP server for testing allama providers and wrappers"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+keywords = ["llm", "allama", "conformance", "testing", "fixtures"]
+categories = ["development-tools::testing"]
+
+[features]
+default = ["extract", "server"]
+extract = ["dep:schemars", "allama/extract"]
+server = ["dep:axum", "tokio/net", "tokio/rt", "tokio/sync"]
+
+[dependencies]
+allama = { workspace = true }
+allama-http = { workspace = true }
+
+axum = { workspace = true, optional = true }
+futures-core = { workspace = true }
+futures-util = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
+
+[dev-dependencies]
+allama = { workspace = true, features = ["mock", "tracing"] }
+allama-http = { workspace = true, features = ["reqwest"] }
+
+reqwest = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[package.metadata.docs.rs]
+all-features = true
+# Marks feature-gated items with the feature they need.
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true

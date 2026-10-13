@@ -1,0 +1,457 @@
+name: E2E Tests
+
+# The live evidence checks (crates/allama-examples/tests/live_evidence) are
+# not run here: they record provider behaviour for design decisions, and the
+# rate-limit checks send bursts on purpose. Run them by hand; the module docs
+# of tests/live_evidence/main.rs say how.
+
+on:
+  schedule:
+    # Weekly, Monday 06:00 UTC, to catch provider drift.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Provider to test"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - anthropic
+          - gemini
+          - openai
+          - openai-compat/all
+          - openai-compat/cloudflare
+          - openai-compat/generic
+          - openai-compat/presets
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    # Every step runs in the devenv shell, with the project's toolchain.
+    shell: devenv shell -- bash -e {0}
+
+jobs:
+  credentials:
+    name: Credentials
+    runs-on: ubuntu-latest
+    outputs:
+      anthropic: ${{ steps.check.outputs.anthropic }}
+      gemini: ${{ steps.check.outputs.gemini }}
+      openai: ${{ steps.check.outputs.openai }}
+      cloudflare: ${{ steps.check.outputs.cloudflare }}
+
+    steps:
+      # Provider jobs skip when their credentials are missing on manual runs,
+      # and fail on the scheduled run (which must have every secret).
+      - name: Check which provider secrets are configured
+        id: check
+        shell: bash
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          {
+            echo "anthropic=${ANTHROPIC_API_KEY:+true}"
+            echo "gemini=${GEMINI_API_KEY:+true}"
+            echo "openai=${OPENAI_API_KEY:+true}"
+            echo "cloudflare=${CLOUDFLARE_API_TOKEN:+true}"
+          } >> "$GITHUB_OUTPUT"
+
+  anthropic:
+    name: Anthropic
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'anthropic') &&
+      (needs.credentials.outputs.anthropic == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run e2e tests
+        run: cargo test --locked -p allama-anthropic --test e2e -- --ignored --nocapture
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  gemini:
+    name: Gemini
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'gemini') &&
+      (needs.credentials.outputs.gemini == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run e2e tests
+        run: cargo test --locked -p allama-gemini --test e2e -- --ignored --nocapture
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+  openai:
+    name: OpenAI
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'openai') &&
+      (needs.credentials.outputs.openai == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run e2e tests
+        run: cargo test --locked -p allama-openai --test e2e --test e2e_responses -- --ignored --nocapture
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+  # The sampling drift check (ADR 0015 decision 4): `temperature(0.2)` on
+  # each vendor's newest model, resolved from its models API, must be
+  # answered or refused as `Unsupported { stage: Provider, subject: Field }`,
+  # never `InvalidRequest`. A failure means a new refusal wording the
+  # adapter's error mapping does not recognize. One short call per endpoint.
+  anthropic-newest:
+    name: Anthropic (newest model)
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'anthropic') &&
+      (needs.credentials.outputs.anthropic == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      # The models API lists the most recently released model first.
+      - name: Resolve the newest model
+        run: |
+          model=$(curl -fsS "https://api.anthropic.com/v1/models?limit=1" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" \
+            | jq -er '.data[0].id')
+          echo "Newest model: $model"
+          echo "ANTHROPIC_NEWEST_MODEL=$model" >> "$GITHUB_ENV"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Sampling on the newest model
+        run: cargo test --locked -p allama-examples --test newest_models anthropic -- --ignored --nocapture
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  gemini-newest:
+    name: Gemini (newest model)
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'gemini') &&
+      (needs.credentials.outputs.gemini == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      # The highest numbered `gemini-X.Y-flash` or `-pro` model.
+      - name: Resolve the newest model
+        run: |
+          model=$(curl -fsS "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000" \
+            -H "x-goog-api-key: $GEMINI_API_KEY" \
+            | jq -er '[.models[].name | ltrimstr("models/") | select(test("^gemini-[0-9]+(\\.[0-9]+)?-(flash|pro)$"))]
+                | sort_by(capture("^gemini-(?<v>[0-9.]+)").v | split(".") | map(tonumber)) | last')
+          echo "Newest model: $model"
+          echo "GEMINI_NEWEST_MODEL=$model" >> "$GITHUB_ENV"
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Sampling on the newest model
+        run: cargo test --locked -p allama-examples --test newest_models gemini -- --ignored --nocapture
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+  openai-newest:
+    name: OpenAI (newest model)
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'openai') &&
+      (needs.credentials.outputs.openai == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      # The most recently created `gpt-N[.M][-variant]` text model; pro,
+      # chat, codex, audio, realtime, image, search, speech and live
+      # variants are skipped.
+      - name: Resolve the newest model
+        run: |
+          model=$(curl -fsS "https://api.openai.com/v1/models" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            | jq -er '[.data[] | select(.id | test("^gpt-[0-9]+(\\.[0-9]+)*(-[a-z]+)?$"))
+                | select(.id | test("-(pro|chat|codex|audio|realtime|image|search|transcribe|tts|live)$") | not)]
+                | sort_by(.created) | last | .id')
+          echo "Newest model: $model"
+          echo "OPENAI_NEWEST_MODEL=$model" >> "$GITHUB_ENV"
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Sampling on the newest model
+        run: cargo test --locked -p allama-examples --test newest_models openai -- --ignored --nocapture
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+  cross-provider:
+    name: Cross-provider history
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all') &&
+      ((needs.credentials.outputs.anthropic == 'true' && needs.credentials.outputs.gemini == 'true') || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Claude thinking history continues on Gemini 3
+        run: cargo test --locked -p allama-examples --test cross_provider -- --ignored --nocapture
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+  openai-compat-cloudflare:
+    name: OpenAI Compatible (Cloudflare)
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'openai-compat/all' || inputs.provider == 'openai-compat/cloudflare') &&
+      (needs.credentials.outputs.cloudflare == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run e2e tests
+        run: cargo test --locked -p allama-openai-compat --test e2e_cloudflare -- --ignored --nocapture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      # Clef decision models, on the same account (allama-systemone's
+      # Cloudflare preset).
+      - name: Run decision e2e tests
+        run: cargo test --locked -p allama-systemone --test e2e_cloudflare -- --ignored --nocapture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  openai-compat-generic:
+    name: OpenAI Compatible (generic)
+    if: |
+      github.event_name == 'schedule' ||
+      inputs.provider == 'all' ||
+      inputs.provider == 'openai-compat/all' ||
+      inputs.provider == 'openai-compat/generic'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      models: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run e2e tests
+        run: cargo test --locked -p allama-openai-compat --test e2e -- --ignored --nocapture
+        env:
+          OPENAI_COMPAT_BASE_URL: https://models.github.ai/inference
+          OPENAI_COMPAT_API_KEY: ${{ github.token }}
+          OPENAI_COMPAT_MODEL: openai/gpt-4o-mini
+          OPENAI_COMPAT_EMBEDDING_MODEL: openai/text-embedding-3-small
+
+  # The hosted presets (Groq, OpenRouter, DeepSeek, Mistral, Together,
+  # Fireworks, DeepInfra, xAI). Optional: each preset's test skips when its
+  # secret is missing, so this job covers whichever keys are configured.
+  openai-compat-presets:
+    name: OpenAI Compatible (presets)
+    if: |
+      github.event_name == 'schedule' ||
+      inputs.provider == 'all' ||
+      inputs.provider == 'openai-compat/all' ||
+      inputs.provider == 'openai-compat/presets'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run e2e tests
+        run: cargo test --locked -p allama-openai-compat --test e2e_presets -- --ignored --nocapture
+        env:
+          DEEPINFRA_API_KEY: ${{ secrets.DEEPINFRA_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}

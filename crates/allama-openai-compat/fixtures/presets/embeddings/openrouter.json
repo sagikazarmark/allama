@@ -1,0 +1,22 @@
+{
+  "document": {
+    "body": {
+      "input": [
+        "Weather in Paris?"
+      ],
+      "input_type": "search_document",
+      "model": "model-x"
+    },
+    "warnings": []
+  },
+  "query": {
+    "body": {
+      "input": [
+        "Weather in Paris?"
+      ],
+      "input_type": "search_query",
+      "model": "model-x"
+    },
+    "warnings": []
+  }
+}

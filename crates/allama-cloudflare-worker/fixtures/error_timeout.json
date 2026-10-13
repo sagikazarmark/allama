@@ -1,0 +1,7 @@
+{
+  "message": "Workers AI error",
+  "message_origin": "authored",
+  "provider": "cloudflare",
+  "type": "timeout",
+  "upstream_message": "Worker request timed out"
+}

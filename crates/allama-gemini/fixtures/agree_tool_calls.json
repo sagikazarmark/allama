@@ -1,0 +1,45 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "functionCall": {
+              "name": "get_weather",
+              "args": {
+                "city": "Paris"
+              },
+              "id": "call_734101"
+            }
+          },
+          {
+            "functionCall": {
+              "name": "get_weather",
+              "args": {
+                "city": "Tokyo"
+              },
+              "id": "call_734102"
+            }
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 56,
+    "candidatesTokenCount": 32,
+    "totalTokenCount": 88,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 56
+      }
+    ],
+    "serviceTier": "standard"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "responseId": "agreeToolsR2"
+}

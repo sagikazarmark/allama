@@ -1,0 +1,98 @@
+//! What an extraction plan reports through both OpenAI APIs, for the
+//! typical schemas in each mode, without sending anything.
+
+use allama_http::ReplayTransport;
+use allama_openai::{Provider, ResponsesProvider};
+
+#[test]
+fn plans_per_api() {
+    let transport = ReplayTransport::new([]);
+    let chat = Provider::builder()
+        .api_key("k")
+        .http_transport(transport.clone())
+        .build()
+        .unwrap();
+    let responses = ResponsesProvider::builder()
+        .api_key("k")
+        .http_transport(transport.clone())
+        .build()
+        .unwrap();
+    // OpenAI strict mode: optional fields become required-nullable without
+    // changing what `T` reads; a map cannot be expressed.
+    let expected = [
+        "Native Person: exact",
+        "Native Order: exact",
+        "Native Tagged: not_enforced",
+        "ForcedTool Person: exact",
+        "ForcedTool Order: exact",
+        "ForcedTool Tagged: not_enforced",
+    ];
+    assert_eq!(typical::plans(&chat, "gpt-4.1"), expected);
+    assert_eq!(typical::plans(&responses, "gpt-4.1"), expected);
+    assert!(transport.requests().is_empty());
+}
+
+// The fixture types are only planned for, never built.
+#[allow(dead_code)]
+mod typical {
+    use std::collections::HashMap;
+
+    use allama::extract::{ExtractionMode, Extractor};
+    use allama::schemars::JsonSchema;
+    use allama::{ChatProvider, ChatRequest, ValidationCoverage};
+    use serde::Deserialize;
+
+    /// Strings, one of them optional.
+    #[derive(Deserialize, JsonSchema)]
+    #[schemars(crate = "allama::schemars")]
+    pub struct Person {
+        name: String,
+        nickname: Option<String>,
+    }
+
+    /// An unsigned integer (schemars writes `minimum: 0`).
+    #[derive(Deserialize, JsonSchema)]
+    #[schemars(crate = "allama::schemars")]
+    pub struct Order {
+        id: String,
+        quantity: u32,
+    }
+
+    /// A map.
+    #[derive(Deserialize, JsonSchema)]
+    #[schemars(crate = "allama::schemars")]
+    pub struct Tagged {
+        title: String,
+        labels: HashMap<String, String>,
+    }
+
+    /// The plan of each typical schema in each explicit mode, as
+    /// `"<mode> <type>: <enforcement>"`, or `refused <field>` when the plan
+    /// fails before sending. Every plan is a dry run (`Encoding`).
+    pub fn plans<P: ChatProvider + ?Sized>(provider: &P, model: &str) -> Vec<String> {
+        let mut rows = Vec::new();
+        for mode in [ExtractionMode::Native, ExtractionMode::ForcedTool] {
+            let request = ChatRequest::new(model).user("x").with_option(mode);
+            let extractor = Extractor::new();
+            for (name, plan) in [
+                ("Person", extractor.plan::<Person>(provider, &request)),
+                ("Order", extractor.plan::<Order>(provider, &request)),
+                ("Tagged", extractor.plan::<Tagged>(provider, &request)),
+            ] {
+                let cell = match plan {
+                    Ok(plan) => {
+                        assert_eq!(plan.coverage, ValidationCoverage::Encoding, "{name}");
+                        plan.enforcement.to_string()
+                    }
+                    Err(err) => format!(
+                        "refused {}",
+                        err.unsupported_field()
+                            .map_or("-".to_owned(), |f| f.to_string())
+                    ),
+                };
+                rows.push(format!("{mode:?} {name}: {cell}"));
+            }
+        }
+        rows
+    }
+}

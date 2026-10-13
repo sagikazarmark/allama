@@ -1,0 +1,10 @@
+{
+  "response": "Hello world",
+  "tool_calls": [],
+  "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 2,
+    "total_tokens": 26
+  },
+  "finish_reason": "stop"
+}

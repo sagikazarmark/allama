@@ -1,0 +1,43 @@
+[package]
+name = "allama-cloudflare-worker"
+version = { workspace = true }
+description = "Cloudflare Workers AI provider for allama using the workers-rs binding"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+keywords = ["llm", "cloudflare", "workers-ai", "decision", "wasm"]
+categories = ["api-bindings", "artificial-intelligence", "wasm"]
+
+[dependencies]
+allama = { workspace = true }
+allama-http = { workspace = true }
+allama-openai-compat = { workspace = true }
+allama-systemone = { workspace = true }
+
+futures-util = { workspace = true }
+js-sys = { workspace = true }
+send_wrapper = { workspace = true }
+serde = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+worker = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+allama = { workspace = true, features = ["extract"] }
+allama-conformance = { workspace = true }
+
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+# Marks feature-gated items with the feature they need.
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true

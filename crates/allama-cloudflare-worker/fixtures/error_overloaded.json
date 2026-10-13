@@ -1,0 +1,9 @@
+{
+  "message": "Workers AI error 3040",
+  "message_origin": "authored",
+  "provider": "cloudflare",
+  "provider_code": "3040",
+  "status": 429,
+  "type": "overloaded",
+  "upstream_message": "InferenceUpstreamError: 3040: Capacity temporarily exceeded, please try again."
+}

@@ -1,0 +1,28 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "cloudflare-workers-ai": {
+          "reasoning_field": "reasoning_content"
+        }
+      },
+      "text": "The user wants the Rust documentation URL.",
+      "type": "reasoning"
+    },
+    {
+      "text": "Rust's docs live at doc.rust-lang.org.",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "stop",
+  "id": "chatcmpl-5c2e8d",
+  "model": "@cf/qwen/qwen3-30b-a3b-fp8",
+  "provider": "cloudflare",
+  "usage": {
+    "cache_read_input_tokens": 16,
+    "input_tokens": 30,
+    "output_tokens": 25,
+    "total_tokens": 55
+  }
+}

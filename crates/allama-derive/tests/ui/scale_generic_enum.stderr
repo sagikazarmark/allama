@@ -1,0 +1,5 @@
+error: `Scale` cannot be derived for generic enums
+ --> tests/ui/scale_generic_enum.rs:4:13
+  |
+4 | enum Urgency<const N: usize> {
+  |             ^^^^^^^^^^^^^^^^

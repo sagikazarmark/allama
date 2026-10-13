@@ -1,0 +1,8 @@
+data: {"id":"p1","model":"sonar","created":1727000000,"object":"chat.completion.chunk","citations":["https://a.example","https://b.example"],"choices":[{"index":0,"delta":{"role":"assistant","content":"Rust is memory safe [1]"},"finish_reason":null}]}
+
+data: {"id":"p1","model":"sonar","created":1727000000,"object":"chat.completion.chunk","citations":["https://a.example","https://b.example"],"choices":[{"index":0,"delta":{"content":" and fast [2]."},"finish_reason":null}]}
+
+data: {"id":"p1","model":"sonar","created":1727000000,"object":"chat.completion.chunk","citations":["https://a.example","https://b.example"],"search_results":[{"title":"A","url":"https://a.example","date":"2024-01-01"},{"title":"B","url":"https://b.example","date":null}],"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":7,"completion_tokens":11,"total_tokens":18,"search_context_size":"low"}}
+
+data: [DONE]
+

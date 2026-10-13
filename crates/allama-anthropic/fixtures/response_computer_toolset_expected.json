@@ -1,0 +1,51 @@
+{
+  "content": [
+    {
+      "text": "I'll search for pictures of cats.",
+      "type": "text"
+    },
+    {
+      "arguments": "{\"coordinate\":[640,60]}",
+      "id": "toolu_01HqCF3nJ4Vzr8sTkPZ2wxYA",
+      "name": "left_click",
+      "provider_data": {
+        "anthropic": {
+          "toolset_name": "computer"
+        }
+      },
+      "type": "tool_call"
+    },
+    {
+      "arguments": "{\"text\":\"pictures of cats\"}",
+      "id": "toolu_01Ppr3sZ3TnE9m6VUu4RyH2K",
+      "name": "type",
+      "provider_data": {
+        "anthropic": {
+          "toolset_name": "computer"
+        }
+      },
+      "type": "tool_call"
+    },
+    {
+      "arguments": "{}",
+      "id": "toolu_01Xf5W1sD8Q9aBcJ7kLmN2pQ",
+      "name": "screenshot",
+      "provider_data": {
+        "anthropic": {
+          "toolset_name": "computer"
+        }
+      },
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "tool_use",
+  "id": "msg_01ComputerToolsetFixture",
+  "model": "claude-sonnet-5-5",
+  "provider": "anthropic",
+  "usage": {
+    "input_tokens": 2412,
+    "output_tokens": 96,
+    "total_tokens": 2508
+  }
+}

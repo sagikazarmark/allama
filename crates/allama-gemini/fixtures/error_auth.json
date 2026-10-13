@@ -1,0 +1,12 @@
+{
+  "body_len": 228,
+  "body_present": true,
+  "message": "HTTP 400",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_code": "API_KEY_INVALID",
+  "provider_type": "INVALID_ARGUMENT",
+  "status": 400,
+  "type": "auth",
+  "upstream_message": "API key not valid. Please pass a valid API key."
+}

@@ -1,0 +1,57 @@
+[
+  {
+    "event": "response_start",
+    "id": "8vW-arfTPLKJvdIPkOWA6AY",
+    "model": "gemini-3.5-flash-lite"
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "one"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": ", two, three, four, five, six, seven, eight, nine, ten"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": ", eleven, twelve, thirteen, fourteen, fifteen, sixteen, seventeen, eighteen, nineteen, twenty, twenty-one, twenty"
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "content_filter",
+    "finish_reason_raw": "RECITATION",
+    "id": "8vW-arfTPLKJvdIPkOWA6AY",
+    "model": "gemini-3.5-flash-lite",
+    "provider": "gemini",
+    "provider_data": {
+      "google-ai": {
+        "decline_explanation": "The generated content was filtered because it may contain material that resembles existing copyrighted works. Try rephrasing the prompt. If you think this was an error, [send feedback](https://ai.google.dev/gemini-api/docs/troubleshooting).",
+        "finish_message": "The generated content was filtered because it may contain material that resembles existing copyrighted works. Try rephrasing the prompt. If you think this was an error, [send feedback](https://ai.google.dev/gemini-api/docs/troubleshooting).",
+        "service_tier": "standard"
+      }
+    },
+    "usage": {
+      "breakdowns": {
+        "text_input_tokens": 15
+      },
+      "input_tokens": 15,
+      "output_tokens": 45,
+      "total_tokens": 60
+    }
+  },
+  {
+    "event": "response_stop"
+  }
+]

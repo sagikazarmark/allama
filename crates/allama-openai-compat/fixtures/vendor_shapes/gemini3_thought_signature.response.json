@@ -1,0 +1,30 @@
+{
+  "content": [
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "call_110217",
+      "name": "get_weather",
+      "provider_data": {
+        "openai-compat:vendor": {
+          "extra_content": {
+            "google": {
+              "thought_signature": "Eu4ECusEAWkUfRNtyUaeiMX1Nd/IQxq2nL5CYgoWciwvO8VX/Xlde4Zc5DTq23VLlNSowKqeksLUlBHxMJha+jG+qu1hK8mvvR5wfnsoPFL2hNCPeIOFokCSy6baCjfd9zWznJoYEiu/lPRt/9fVxqOmExE0kagQLXVYcLoBUTCTQufisrQh1ecKsCiL8aNjVq/EOKpO09gJFWOSgvCjsUwpl/700s+A68+gV0Z3UPDw2SLQw3XvIhpMktEb/anfubgpIESwK7RXlCzwJ8CPVzOp8YCWG8hVp0hz4X+UWP3eSfBMf/tc7GQyS8XRQDvRCUX9it8Nqa5pdpU2EWBHgC6cSpw4GtnuPkuslPgkkyLERjWQvTU7TfazeDxFxVkH01JhYfeQctkxsxOy8YycQdwzl9eMtarGJGSy13B5SFC/Xn3mdOq5VLhftBfpmqNh8eOReTGI61QTDu4Ejspsfj0vExLEfeEXcs89gwCeNzD7X8n4uuz2etO2AjHzPEEyKzxcu23EHHKCjNYt4Xi1LOQv8vE+KhbDSqhwue9j1DCn8fTVgn+GiIQTKX/ZKQhAwuXn5aMzJpyNoMEG+mGQtmBgP/fsALsQHu5yjoonfJnoHKFaNK99vnC64fu5n+QK3oKZCv1EbaMJM8ykQ7MzS3cts48k3ydgcWBlIM+a307jbqQ8zN67FTdtysCcqh7vLdanfX+WN2D3ZdJ0epMxynLW6IgmXXVv1wxtEGrvnfdQJQ1JNc9O86vKUDkMBPV4VKFVlCf4av+h6mG5d8O1e0/PMVXAdhW48iATQwve68wiO8S42Es3dtLPQc3QXmfd+w=="
+            }
+          }
+        }
+      },
+      "type": "tool_call"
+    },
+    {
+      "arguments": "{\"city\":\"Tokyo\"}",
+      "id": "call_110218",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "stop",
+  "id": "qOPFavXUGurskdUPxIaSyAM",
+  "model": "gemini-3-flash-preview",
+  "provider": "vendor"
+}

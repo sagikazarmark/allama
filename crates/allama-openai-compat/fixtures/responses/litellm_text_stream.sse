@@ -1,0 +1,404 @@
+data: {"type":"response.created","response":{"id":"resp_60dcae51-ddca-4660-95e7-98e99f24e22d","created_at":1790956487,"model":"qwen3:1.7b","object":"response","output":[],"parallel_tool_calls":true,"tool_choice":"auto","tools":[],"top_p":1.0,"reasoning":{"effort":null,"summary":null},"status":"in_progress","store":true},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.in_progress","response":{"id":"resp_60dcae51-ddca-4660-95e7-98e99f24e22d","created_at":1790956487,"model":"qwen3:1.7b","object":"response","output":[],"parallel_tool_calls":true,"tool_choice":"auto","tools":[],"top_p":1.0,"reasoning":{"effort":null,"summary":null},"status":"in_progress","store":true},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"rs_115f03c3-320f-4b34-ab53-2abf0430a5be","type":"reasoning","status":"in_progress"},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4416954982394688835","output_index":0,"delta":"Okay","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6246337497322605816","output_index":0,"delta":" user","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_786744535757032473","output_index":0,"delta":" wants","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2387011742141014413","output_index":0,"delta":" to","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4588205163557958713","output_index":0,"delta":" say","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-7937436625041838102","output_index":0,"delta":"say","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2023672135235813434","output_index":0,"delta":" hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_5339774466371792470","output_index":0,"delta":" in","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4676964924670064783","output_index":0,"delta":" one","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8271428606337924757","output_index":0,"delta":" word","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_9024371353641598265","output_index":0,"delta":".\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-3518725634315107496","output_index":0,"delta":" Let","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2329635004410838435","output_index":0,"delta":" me","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5842163391849643593","output_index":0,"delta":" think","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1645794261571125302","output_index":0,"delta":" about","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2322299683551460956","output_index":0,"delta":" best","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6185623500707174902","output_index":0,"delta":" single","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8271428606337924757","output_index":0,"delta":" word","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3439545048895260652","output_index":0,"delta":" that","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_7164020145664450274","output_index":0,"delta":" con","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_867337246580833296","output_index":0,"delta":"veys","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-7937436625041838102","output_index":0,"delta":"say","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2023672135235813434","output_index":0,"delta":" hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_9024371353641598265","output_index":0,"delta":".\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1461640169049222724","output_index":0,"delta":" The","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4785102672645114190","output_index":0,"delta":" most","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5953394730167825412","output_index":0,"delta":" common","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8822889706364015640","output_index":0,"delta":" answer","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_740398048507691724","output_index":0,"delta":" would","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_7271288723626211492","output_index":0,"delta":" be","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4881310999729328475","output_index":0,"delta":"hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_7821262528412936205","output_index":0,"delta":",\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2334518573756942489","output_index":0,"delta":" but","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8088401209168406446","output_index":0,"delta":" maybe","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_609981959174244346","output_index":0,"delta":" they","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6888733518557959495","output_index":0,"delta":" want","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2833187337476971700","output_index":0,"delta":" something","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8138700730942856126","output_index":0,"delta":" more","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6326362800384017846","output_index":0,"delta":" creative","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-1343757232859780583","output_index":0,"delta":" or","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4128380534685046749","output_index":0,"delta":" a","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6522380443218771431","output_index":0,"delta":" different","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5092751855986133862","output_index":0,"delta":" approach","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3342183066637482614","output_index":0,"delta":".\n\n","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_7565071014891583100","output_index":0,"delta":"Hmm","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4881310999729328475","output_index":0,"delta":"hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2904904515492676523","output_index":0,"delta":"\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6644792486942831019","output_index":0,"delta":" is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-597095805793649475","output_index":0,"delta":" straightforward","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8249978599710805673","output_index":0,"delta":" But","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8088401209168406446","output_index":0,"delta":" maybe","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_609981959174244346","output_index":0,"delta":" they","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-819294491883306654","output_index":0,"delta":"'re","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_785095877719507761","output_index":0,"delta":" looking","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6476397259901100090","output_index":0,"delta":" for","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4128380534685046749","output_index":0,"delta":" a","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6522380443218771431","output_index":0,"delta":" different","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8271428606337924757","output_index":0,"delta":" word","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-3518725634315107496","output_index":0,"delta":" Let","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2329635004410838435","output_index":0,"delta":" me","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3389769610329826849","output_index":0,"delta":" consider","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3936259727551594833","output_index":0,"delta":" alternatives","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8455688737337220888","output_index":0,"delta":" Words","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2036062152054032169","output_index":0,"delta":" like","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2096571579003691106","output_index":0,"delta":"hello","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2904904515492676523","output_index":0,"delta":"\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_439450664040029390","output_index":0,"delta":" are","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1028019545799002120","output_index":0,"delta":" longer","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-817753761529837645","output_index":0,"delta":" so","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4881310999729328475","output_index":0,"delta":"hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2904904515492676523","output_index":0,"delta":"\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6644792486942831019","output_index":0,"delta":" is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5483717043468692558","output_index":0,"delta":" better","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4161219417343109104","output_index":0,"delta":" What","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1645794261571125302","output_index":0,"delta":" about","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4158092142439706792","output_index":0,"delta":"g","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2199440859174727368","output_index":0,"delta":"reetings","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6023540346477155297","output_index":0,"delta":"\"?","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3330519634837800459","output_index":0,"delta":" That","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4521578066790683431","output_index":0,"delta":"'s","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4128380534685046749","output_index":0,"delta":" a","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1861295491488784691","output_index":0,"delta":" phrase","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_2591767621148571728","output_index":0,"delta":" not","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4128380534685046749","output_index":0,"delta":" a","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6185623500707174902","output_index":0,"delta":" single","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8271428606337924757","output_index":0,"delta":" word","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8861537149165569296","output_index":0,"delta":"Hey","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2904904515492676523","output_index":0,"delta":"\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6644792486942831019","output_index":0,"delta":" is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5065154010012857094","output_index":0,"delta":" another","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-766368041712259007","output_index":0,"delta":" option","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2334518573756942489","output_index":0,"delta":" but","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_9037914627853851979","output_index":0,"delta":" it","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4521578066790683431","output_index":0,"delta":"'s","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8138700730942856126","output_index":0,"delta":" more","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6149020602593328501","output_index":0,"delta":" informal","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-1568241599318169379","output_index":0,"delta":"Hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2904904515492676523","output_index":0,"delta":"\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6644792486942831019","output_index":0,"delta":" is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4785102672645114190","output_index":0,"delta":" most","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_7207861795967872302","output_index":0,"delta":" natural","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3300944347819954115","output_index":0,"delta":" and","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1973876760162815346","output_index":0,"delta":" concise","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3342183066637482614","output_index":0,"delta":".\n\n","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-7207109047935747301","output_index":0,"delta":"Is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-7443208455539844559","output_index":0,"delta":" there","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4128380534685046749","output_index":0,"delta":" a","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_504138770015744796","output_index":0,"delta":" cultural","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-1343757232859780583","output_index":0,"delta":" or","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4316079308203830010","output_index":0,"delta":" contextual","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5117180699665180527","output_index":0,"delta":" consideration","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_7222606151443211351","output_index":0,"delta":"?","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_1461640169049222724","output_index":0,"delta":" The","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6246337497322605816","output_index":0,"delta":" user","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5238135202904870475","output_index":0,"delta":" didn","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8407140701835036104","output_index":0,"delta":"'t","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-562943171923056334","output_index":0,"delta":" specify","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-817753761529837645","output_index":0,"delta":" so","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4141560405947772520","output_index":0,"delta":" keep","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_9037914627853851979","output_index":0,"delta":" it","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-3789465427675893678","output_index":0,"delta":" general","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-1568241599318169379","output_index":0,"delta":"Hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2904904515492676523","output_index":0,"delta":"\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6644792486942831019","output_index":0,"delta":" is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_7845084668281305954","output_index":0,"delta":" safest","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3300944347819954115","output_index":0,"delta":" and","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4785102672645114190","output_index":0,"delta":" most","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8779843092994552626","output_index":0,"delta":" direct","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8822889706364015640","output_index":0,"delta":" answer","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-426038365751775746","output_index":0,"delta":" I","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3527646369376738342","output_index":0,"delta":" should","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_5878812624416407679","output_index":0,"delta":" confirm","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2569011867058616770","output_index":0,"delta":" if","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_609981959174244346","output_index":0,"delta":" they","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6888733518557959495","output_index":0,"delta":" want","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4128380534685046749","output_index":0,"delta":" a","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6522380443218771431","output_index":0,"delta":" different","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8271428606337924757","output_index":0,"delta":" word","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-1343757232859780583","output_index":0,"delta":" or","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2569011867058616770","output_index":0,"delta":" if","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4881310999729328475","output_index":0,"delta":"hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2904904515492676523","output_index":0,"delta":"\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6644792486942831019","output_index":0,"delta":" is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6719717517839321427","output_index":0,"delta":" acceptable","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8135090408003346544","output_index":0,"delta":".","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8249978599710805673","output_index":0,"delta":" But","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-5030290574557363860","output_index":0,"delta":" since","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_609981959174244346","output_index":0,"delta":" they","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_979047856294050153","output_index":0,"delta":" asked","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6476397259901100090","output_index":0,"delta":" for","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4676964924670064783","output_index":0,"delta":" one","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_8271428606337924757","output_index":0,"delta":" word","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-8821274080780884629","output_index":0,"delta":",","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-6082402081214017401","output_index":0,"delta":" \"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4881310999729328475","output_index":0,"delta":"hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2904904515492676523","output_index":0,"delta":"\"","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_6644792486942831019","output_index":0,"delta":" is","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-4534788834308952129","output_index":0,"delta":" the","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_-2780172386517955019","output_index":0,"delta":" correct","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_3527640240175429536","output_index":0,"delta":" response","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_4114471330104422501","output_index":0,"delta":".\n","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_text.done","item_id":"rs_115f03c3-320f-4b34-ab53-2abf0430a5be","output_index":0,"sequence_number":4,"summary_index":0,"text":"Okay, the user wants to say \"say hi in one word.\" Let me think about the best single word that conveys \"say hi.\" The most common answer would be \"hi,\" but maybe they want something more creative or a different approach.\n\nHmm, \"hi\" is straightforward. But maybe they're looking for a different word. Let me consider alternatives. Words like \"hello\" are longer, so \"hi\" is better. What about \"greetings\"? That's a phrase, not a single word. \"Hey\" is another option, but it's more informal. \"Hi\" is the most natural and concise.\n\nIs there a cultural or contextual consideration? The user didn't specify, so keep it general. \"Hi\" is the safest and most direct answer. I should confirm if they want a different word or if \"hi\" is acceptable. But since they asked for one word, \"hi\" is the correct response.\n","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.reasoning_summary_part.done","item_id":"rs_115f03c3-320f-4b34-ab53-2abf0430a5be","output_index":0,"sequence_number":5,"summary_index":0,"part":{"type":"summary_text","text":"Okay, the user wants to say \"say hi in one word.\" Let me think about the best single word that conveys \"say hi.\" The most common answer would be \"hi,\" but maybe they want something more creative or a different approach.\n\nHmm, \"hi\" is straightforward. But maybe they're looking for a different word. Let me consider alternatives. Words like \"hello\" are longer, so \"hi\" is better. What about \"greetings\"? That's a phrase, not a single word. \"Hey\" is another option, but it's more informal. \"Hi\" is the most natural and concise.\n\nIs there a cultural or contextual consideration? The user didn't specify, so keep it general. \"Hi\" is the safest and most direct answer. I should confirm if they want a different word or if \"hi\" is acceptable. But since they asked for one word, \"hi\" is the correct response.\n"},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_item.done","output_index":0,"sequence_number":6,"item":{"id":"rs_115f03c3-320f-4b34-ab53-2abf0430a5be","type":"reasoning","summary":[{"type":"summary_text","text":"Okay, the user wants to say \"say hi in one word.\" Let me think about the best single word that conveys \"say hi.\" The most common answer would be \"hi,\" but maybe they want something more creative or a different approach.\n\nHmm, \"hi\" is straightforward. But maybe they're looking for a different word. Let me consider alternatives. Words like \"hello\" are longer, so \"hi\" is better. What about \"greetings\"? That's a phrase, not a single word. \"Hey\" is another option, but it's more informal. \"Hi\" is the most natural and concise.\n\nIs there a cultural or contextual consideration? The user didn't specify, so keep it general. \"Hi\" is the safest and most direct answer. I should confirm if they want a different word or if \"hi\" is acceptable. But since they asked for one word, \"hi\" is the correct response.\n"}]},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_text.delta","item_id":"9f0af927-0b18-47f7-9112-5acac6ec06ac","output_index":0,"content_index":0,"delta":"hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_text.done","item_id":"9f0af927-0b18-47f7-9112-5acac6ec06ac","output_index":0,"content_index":0,"text":"hi","model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.content_part.done","item_id":"9f0af927-0b18-47f7-9112-5acac6ec06ac","output_index":0,"content_index":0,"part":{"type":"reasoning_text","reasoning":"Okay, the user wants to say \"say hi in one word.\" Let me think about the best single word that conveys \"say hi.\" The most common answer would be \"hi,\" but maybe they want something more creative or a different approach.\n\nHmm, \"hi\" is straightforward. But maybe they're looking for a different word. Let me consider alternatives. Words like \"hello\" are longer, so \"hi\" is better. What about \"greetings\"? That's a phrase, not a single word. \"Hey\" is another option, but it's more informal. \"Hi\" is the most natural and concise.\n\nIs there a cultural or contextual consideration? The user didn't specify, so keep it general. \"Hi\" is the safest and most direct answer. I should confirm if they want a different word or if \"hi\" is acceptable. But since they asked for one word, \"hi\" is the correct response.\n"},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.output_item.done","output_index":0,"sequence_number":1,"item":{"id":"9f0af927-0b18-47f7-9112-5acac6ec06ac","status":"completed","type":"message","role":"assistant","content":[{"type":"output_text","text":"hi","annotations":[]}]},"model":"ollama/qwen3:1.7b"}
+
+data: {"type":"response.completed","response":{"id":"resp_bGl0ZWxsbTpjdXN0b21fbGxtX3Byb3ZpZGVyOm9sbGFtYV9jaGF0O21vZGVsX2lkOjUxNGY3MDRkN2Y3ODNiYWUxOWRiMGYwMzI5ZGQ1ODlhOGVmOTM0OGEyZDMwNDA0MWFhYTk1MjFjOTA1ZjM3NTc7cmVzcG9uc2VfaWQ6cmVzcF82MGRjYWU1MS1kZGNhLTQ2NjAtOTVlNy05OGU5OWYyNGUyMmQ=","created_at":1790956487,"metadata":{},"model":"qwen3:1.7b","object":"response","output":[{"type":"reasoning","id":"rs_3454642567693218642","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Okay, the user wants to say \"say hi in one word.\" Let me think about the best single word that conveys \"say hi.\" The most common answer would be \"hi,\" but maybe they want something more creative or a different approach.\n\nHmm, \"hi\" is straightforward. But maybe they're looking for a different word. Let me consider alternatives. Words like \"hello\" are longer, so \"hi\" is better. What about \"greetings\"? That's a phrase, not a single word. \"Hey\" is another option, but it's more informal. \"Hi\" is the most natural and concise.\n\nIs there a cultural or contextual consideration? The user didn't specify, so keep it general. \"Hi\" is the safest and most direct answer. I should confirm if they want a different word or if \"hi\" is acceptable. But since they asked for one word, \"hi\" is the correct response.\n","annotations":[]}]},{"type":"message","id":"9f0af927-0b18-47f7-9112-5acac6ec06ac","status":"completed","role":"assistant","content":[{"type":"output_text","text":"hi","annotations":[]}]}],"parallel_tool_calls":false,"temperature":0.0,"tool_choice":"auto","tools":[],"status":"completed","text":{},"usage":{"input_tokens":16,"output_tokens":196,"output_tokens_details":{"reasoning_tokens":190},"total_tokens":212}},"model":"ollama/qwen3:1.7b"}
+
+data: [DONE]
+

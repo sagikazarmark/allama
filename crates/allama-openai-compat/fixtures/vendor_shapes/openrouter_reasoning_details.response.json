@@ -1,0 +1,50 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "openai-compat:vendor": {
+          "reasoning_details": [
+            {
+              "format": "anthropic-claude-v1",
+              "index": 0,
+              "signature": "EqQBCkgIBxABGAIiQK",
+              "text": "Weather needs a tool.",
+              "type": "reasoning.text"
+            }
+          ],
+          "reasoning_field": "reasoning"
+        }
+      },
+      "text": "Weather needs a tool.",
+      "type": "reasoning"
+    },
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "toolu_01",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "tool_calls",
+  "id": "gen-r1",
+  "model": "anthropic/claude-sonnet-4.5",
+  "provider": "vendor",
+  "provider_data": {
+    "openai-compat:vendor": {
+      "native_finish_reason": "tool_use",
+      "provider": "Anthropic",
+      "usage": {
+        "cost": 0.00096,
+        "is_byok": false
+      }
+    }
+  },
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "input_tokens": 120,
+    "output_tokens": 40,
+    "reasoning_tokens": 12,
+    "total_tokens": 160
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "content": [
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "call_VJuS1JQPEih06QoFDZyeEAZI",
+      "name": "get_weather",
+      "provider_data": {
+        "openai": {
+          "item_id": "fc_04c201e849b05abd016abf0ff1514887d1978cac54cd95404d"
+        }
+      },
+      "type": "tool_call"
+    },
+    {
+      "arguments": "{\"city\":\"Tokyo\"}",
+      "id": "call_LDTy70Cg5a0YFD2XtrIfntxT",
+      "name": "get_weather",
+      "provider_data": {
+        "openai": {
+          "item_id": "fc_04c201e849b05abd016abf0ff1515887d1b20bdc1dea290042"
+        }
+      },
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "completed",
+  "id": "resp_04c201e849b05abd016abf0ff040dc87d19d8035b26723cf61",
+  "model": "gpt-4.1-nano-2025-04-14",
+  "provider": "openai",
+  "provider_data": {
+    "openai": {
+      "service_tier": "default"
+    }
+  },
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "input_tokens": 56,
+    "output_tokens": 45,
+    "reasoning_tokens": 0,
+    "total_tokens": 101
+  }
+}

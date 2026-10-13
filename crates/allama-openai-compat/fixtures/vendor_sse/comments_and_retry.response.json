@@ -1,0 +1,23 @@
+{
+  "content": [
+    {
+      "text": "Hello",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "stop",
+  "id": "gen-1",
+  "model": "vendor/model",
+  "provider": "vendor",
+  "provider_data": {
+    "openai-compat:vendor": {
+      "provider": "Upstream"
+    }
+  },
+  "usage": {
+    "input_tokens": 3,
+    "output_tokens": 2,
+    "total_tokens": 5
+  }
+}

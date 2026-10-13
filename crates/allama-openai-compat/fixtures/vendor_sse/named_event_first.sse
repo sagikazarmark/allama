@@ -1,0 +1,14 @@
+event: search_results
+data: {"results":[{"url":"https://a.example","title":"A"},{"url":"https://b.example","title":"B"}]}
+
+data: {"id":"c1","object":"chat.completion.chunk","created":1727000000,"model":"m-large","choices":[{"index":0,"delta":{"role":"assistant","content":"Rust is"}}]}
+
+data: {"id":"c1","object":"chat.completion.chunk","created":1727000000,"model":"m-large","choices":[{"index":0,"delta":{"content":" fast [1]."}}]}
+
+event: search_results
+data: {"results":[{"url":"https://c.example","title":"C"}]}
+
+data: {"id":"c1","object":"chat.completion.chunk","created":1727000000,"model":"m-large","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":5,"total_tokens":17}}
+
+data: [DONE]
+

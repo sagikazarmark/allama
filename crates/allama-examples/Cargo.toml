@@ -1,0 +1,100 @@
+[package]
+name = "allama-examples"
+version = { workspace = true }
+description = "Runnable examples and live tests for allama providers"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+publish = false
+
+[dependencies]
+allama = { workspace = true, features = ["derive", "extract", "warning-events"] }
+allama-anthropic = { workspace = true, features = ["default"] }
+allama-gemini = { workspace = true, features = ["default"] }
+allama-openai = { workspace = true, features = ["default"] }
+allama-providers = { workspace = true, features = ["default"] }
+allama-systemone = { workspace = true, features = ["default"] }
+
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[dev-dependencies]
+allama = { workspace = true, features = ["mock", "tracing"] }
+allama-cloudflare-worker = { workspace = true }
+allama-conformance = { workspace = true, features = ["extract", "server"] }
+allama-http = { workspace = true, features = ["reqwest"] }
+allama-openai-compat = { workspace = true }
+
+# The documented `main`s (READMEs, guides) return `anyhow::Result`, so a
+# failure prints the error's message, which `allama::Error`'s `Debug` withholds.
+anyhow = { workspace = true }
+axum = { workspace = true }
+futures-util = { workspace = true }
+# The current OpenTelemetry releases: the `trace_context` example (the
+# observability guide's propagation recipe) injects through the
+# application's own `opentelemetry`.
+opentelemetry = { workspace = true, features = ["trace"] }
+# The observability guide's examples export to memory (`testing`).
+opentelemetry_sdk = { workspace = true, features = ["testing", "trace"] }
+reqwest = { workspace = true, features = ["rustls"] }
+tokio = { workspace = true, features = ["net", "sync"] }
+tracing = { workspace = true, features = ["default"] }
+tracing-opentelemetry = { workspace = true }
+tracing-subscriber = { workspace = true }
+# The allama-cloudflare-worker README takes a `worker::Env`.
+worker = { workspace = true }
+
+[[example]]
+name = "web_backend"
+# Run the error-mapping tests with `cargo test`.
+test = true
+
+[[example]]
+name = "native_adapter"
+# Run the adapter's contract tests, and the check that the provider guide
+# quotes this file verbatim, with `cargo test`.
+test = true
+
+[[example]]
+name = "text_gateway"
+# Run the gateway's conformance aggregate with `cargo test`.
+test = true
+
+[[example]]
+name = "axum_sse"
+# Run the handler tests with `cargo test`. `tests/guide_quotes.rs` checks
+# that the applications guide quotes this file verbatim.
+test = true
+
+[[example]]
+name = "middleware"
+# Run its transparency and behaviour tests with `cargo test`.
+test = true
+
+[[example]]
+name = "tool_loop"
+# Run the loop's tests against a function-backed mock with `cargo test`.
+test = true
+
+[[example]]
+name = "chat_repl"
+# Run its turn and history-rule tests against mocks with `cargo test`.
+# `tests/guide_quotes.rs` checks that the applications guide quotes this
+# file verbatim.
+test = true
+
+[[example]]
+name = "trace_context"
+# Run its propagation tests (the header is sent, and a caller's
+# `traceparent` wins) with `cargo test`. `tests/guide_quotes.rs` checks that
+# the observability guide quotes this file verbatim.
+test = true
+
+[package.metadata.release]
+release = false
+
+[lints]
+workspace = true

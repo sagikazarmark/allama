@@ -1,0 +1,27 @@
+{
+  "content": [
+    {
+      "text": "Hello, how are?",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "completed",
+  "id": "resp_0c173985561de800016abf0feccbf087d1852c8d4c99c8e699",
+  "model": "gpt-4.1-nano-2025-04-14",
+  "provider": "openai",
+  "provider_data": {
+    "openai": {
+      "service_tier": "default"
+    }
+  },
+  "request_id": "req_recorded",
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "input_tokens": 21,
+    "output_tokens": 6,
+    "reasoning_tokens": 0,
+    "total_tokens": 27
+  }
+}

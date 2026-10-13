@@ -1,0 +1,9 @@
+{
+  "dimensions": null,
+  "input_type": "document",
+  "inputs": [
+    "hello world",
+    "gemini embeddings"
+  ],
+  "model": "gemini-embedding-001"
+}

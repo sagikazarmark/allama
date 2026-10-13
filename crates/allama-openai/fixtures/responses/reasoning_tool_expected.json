@@ -1,0 +1,44 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "openai": {
+          "encrypted_content": "gAAAAABqvw-As1RfpXGqB8VQxAEjjqssV9c7Lu_TaeXT_f1YQzM1qZUYIDCX81BULHwNdHt48SORxZ2lneo-ZJeZWR69SvpqVQ0695wUWJFJVdmRW9hipLfcjIX_sTT9cXBFCdNXb7ROLgxcLwEQ-hZTpY9UUE8N7JOtOPsjdBak2dSI3TCWiIkX852PMgUELaKpL2h_F9zOjJMQxs2ybL-YWyUjSIe3G_Slc99aXBjtd0CJaWtQTZy6bdT1KFZxJ27u2SLzoX1iwTIySlRSxvf_Y4rDDpH9vTI2VyfQNxxzJHZV0ybuflFY5NZkbXjSSdPlywhisC8clT2GholzSipM6a_B7b4sdFrH85NGW0I0gMchyduHid41StFSLsK15p1HiuF98Ohgl8nMyShKMlpKSE916Sp16XR_F3U2Wjdw3IlNxgXL8Jp-SUpq0Nb9o272Z1L3qAMQmpiM6JEsfV8ggY4Y_fUk1qgyBjCR0QdaRUTj3u8yYy2HG60DecSRS3puFPjB06u5Bam9OwAHd9p_ejLEkAIv1GiryzJZMNRhAOHpCJGeRU3altG06uMOOwT2vlEbp0ddDAZQsWEEDnGMngYW5S9MGWMxkRr9b6K28Y8_F6N6A_tioDsyJmf-OtAsUxVfm4nk0BaP-IWqQF56Q3avf_q5olGatmqkPc_FEajNyfsZFfGEgdW0cysR1U6f67aCkpmOSBBOFV3_WUto55EmCXBIr7AXxef4X_r4m9sC9KWgDoeXxdLg4wAFqk7wV3bPREEJTORIgY1iO2-raveDV_svKsqJP0FO6MiV2dMqC28xqGeaH2XEaqr_sx0QaLZqAymIkAUwZnakGHd1EQ59FfdXLGx_ByIrH4NZu4R3Q5tsMWaeKiljU1ApZoS8Pjdk_xrI4creyehVD15kBLaX33hvOvRDMVdvd_pGVQR1DacTmPCDvVgowK7Me0xeuglsn_vnCD3x9HkFAW3IFi6RWHokzitS1BnAK7b7g08FW5Df52ISjzg3jXOSy4hbnJs27T0trjcJUA8CXiPWzuSdLgmzappRhF_tw_1HG5PJTOCt8BV67UlFtEUisSFjCdKFLC-nuldoiD1KmS_tUZsnjq6aG_Vj1hGZg6TQJPirB19iKGSiK0SNnou3qUt1Oo-J7g8PQmLX96uWHMwm6rxHzzrpEAc6q2I3MY0N0VuYizh1_l9A8Ui7FcQEbyR2-2R7yvi9FKzhxgcmmvSA7io8mgNP9YwAhqHqeFqcGOF3u9NqMH4ft9IFkpr6p7LVp6Tiuqoc1Y17jwt3Jg5pUthYaqSQWXJKFf4YWzA9-Su0vRgSInYXKDgN959qpc8Kwa7SUx7AAo3oUUrNtR6NWkrmYjMhxIy0C3I0jmAzE2VIKQdCXT77YsDlkWUC7Ul_k6rPQhKL",
+          "item_id": "rs_0f57d96465e5a564016abf0f7f10e887d1a77676d42f1b88fd"
+        }
+      },
+      "text": "**Getting weather for Paris**\n\nI need to call the weather tool to get the current weather for Paris. I'll make sure to use the correct function for that. After I gather the information, I’ll craft a concise sentence to share the details. I’m focused on providing a clear and straightforward response. Let's proceed with getting that information!",
+      "type": "reasoning"
+    },
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "call_a3I2fW98HVSBU7ZFtOFGhcPy",
+      "name": "get_weather",
+      "provider_data": {
+        "openai": {
+          "item_id": "fc_0f57d96465e5a564016abf0f802f4c87d19b94978073d9a423"
+        }
+      },
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "completed",
+  "id": "resp_0f57d96465e5a564016abf0f7e325087d1ad6e9f7f55511e95",
+  "model": "gpt-5-nano-2025-08-07",
+  "provider": "openai",
+  "provider_data": {
+    "openai": {
+      "service_tier": "default"
+    }
+  },
+  "request_id": "req_recorded",
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "input_tokens": 61,
+    "output_tokens": 57,
+    "reasoning_tokens": 0,
+    "total_tokens": 118
+  }
+}

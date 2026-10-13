@@ -1,0 +1,4 @@
+data: {"candidates":[{"content":{"parts":[{"text":"Once upon "}],"role":"model"},"index":0}],"usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":4,"totalTokenCount":16,"promptTokensDetails":[{"modality":"TEXT","tokenCount":12}],"serviceTier":"standard"},"modelVersion":"gemini-3.5-flash","responseId":"agreeLengthR3"}
+
+data: {"candidates":[{"content":{"parts":[{"text":"a time, in a land far"}],"role":"model"},"index":0,"finishReason":"MAX_TOKENS"}],"usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":8,"totalTokenCount":20,"promptTokensDetails":[{"modality":"TEXT","tokenCount":12}],"serviceTier":"standard"},"modelVersion":"gemini-3.5-flash","responseId":"agreeLengthR3"}
+

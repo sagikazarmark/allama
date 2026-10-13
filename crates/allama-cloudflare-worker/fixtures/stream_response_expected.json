@@ -1,0 +1,16 @@
+{
+  "content": [
+    {
+      "text": "Hello world",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "stop",
+  "provider": "cloudflare",
+  "usage": {
+    "input_tokens": 24,
+    "output_tokens": 2,
+    "total_tokens": 26
+  }
+}

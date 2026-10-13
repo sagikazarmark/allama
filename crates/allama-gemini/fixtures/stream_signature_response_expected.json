@@ -1,0 +1,32 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "google-ai": {
+          "thought_signature": "EoICCv8BAWkUfRM/FTM71I/JXHAXlEyxn1rysPBHYO62pxbmqahOLSyQIL20lP1l2DovJfu0aaioFnHzvupC/SuV6O7e7gLmv2+pcW+RyI9DaW+aoKd/TOiDevioATEGVlOF159sOlNGKJpd2MknpA1Rn+9jelU1jE6Qwbddf4qUXFjcvQziLoTuo16l8zUfYaDKVejGQEiC0s/Glzbssp8vMKfXI2X+GXcu52wMJJ/b2bAYguMlSsdvOgAdtV1kRZ9XPEGnpgZvtRqIgT7jEhPBaYgfDlWte6FaBPW2NPP5t3oI4Y/i+vxIY/En5aIquXoeFd5yYDTfj7Z3ozwqH5ilqE99"
+        }
+      },
+      "text": "391",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "STOP",
+  "id": "5P--aomeKbygxN8PrdmS8AY",
+  "model": "gemini-3.5-flash-lite",
+  "provider": "gemini",
+  "provider_data": {
+    "google-ai": {
+      "service_tier": "standard"
+    }
+  },
+  "usage": {
+    "breakdowns": {
+      "text_input_tokens": 18
+    },
+    "input_tokens": 18,
+    "output_tokens": 71,
+    "reasoning_tokens": 68,
+    "total_tokens": 89
+  }
+}

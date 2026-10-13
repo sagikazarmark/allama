@@ -1,0 +1,36 @@
+{
+  "document": {
+    "body": {
+      "input": [
+        "Weather in Paris?"
+      ],
+      "model": "model-x"
+    },
+    "warnings": [
+      {
+        "kind": "unsupported",
+        "subject": {
+          "field": "input_type",
+          "type": "field"
+        }
+      }
+    ]
+  },
+  "query": {
+    "body": {
+      "input": [
+        "Weather in Paris?"
+      ],
+      "model": "model-x"
+    },
+    "warnings": [
+      {
+        "kind": "unsupported",
+        "subject": {
+          "field": "input_type",
+          "type": "field"
+        }
+      }
+    ]
+  }
+}

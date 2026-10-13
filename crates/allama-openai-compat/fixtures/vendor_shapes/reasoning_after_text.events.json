@@ -1,0 +1,93 @@
+[
+  {
+    "event": "response_start",
+    "id": "c-r",
+    "model": "m"
+  },
+  {
+    "event": "response_metadata",
+    "provider": "vendor"
+  },
+  {
+    "block_type": "reasoning",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "block_provider_data",
+    "index": 0,
+    "provider_data": {
+      "openai-compat:vendor": {
+        "reasoning_field": "reasoning_content"
+      }
+    }
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": "First thought."
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 1
+  },
+  {
+    "event": "text_delta",
+    "index": 1,
+    "text": "Partial answer."
+  },
+  {
+    "event": "block_stop",
+    "index": 1
+  },
+  {
+    "block_type": "reasoning",
+    "event": "block_start",
+    "index": 2
+  },
+  {
+    "event": "block_provider_data",
+    "index": 2,
+    "provider_data": {
+      "openai-compat:vendor": {
+        "reasoning_field": "reasoning_content"
+      }
+    }
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 2,
+    "text": "Second thought."
+  },
+  {
+    "event": "block_stop",
+    "index": 2
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 3
+  },
+  {
+    "event": "text_delta",
+    "index": 3,
+    "text": "Final answer."
+  },
+  {
+    "event": "block_stop",
+    "index": 3
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "stop",
+    "finish_reason_raw": "stop"
+  },
+  {
+    "event": "response_stop"
+  }
+]

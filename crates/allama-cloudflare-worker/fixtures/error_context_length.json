@@ -1,0 +1,8 @@
+{
+  "context_window": 32768,
+  "message": "Workers AI error",
+  "message_origin": "authored",
+  "provider": "cloudflare",
+  "type": "context_length_exceeded",
+  "upstream_message": "This model's maximum context length is 32768 tokens"
+}

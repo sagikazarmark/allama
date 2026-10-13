@@ -1,0 +1,17 @@
+error: expected one of `lowercase`, `UPPERCASE`, `snake_case`, `kebab-case`, `SCREAMING_SNAKE_CASE`, `camelCase`, `PascalCase`
+ --> tests/ui/choices_bad_attributes.rs:4:25
+  |
+4 | #[decision(rename_all = "Title Case")]
+  |                         ^^^^^^^^^^^^
+
+error: unknown attribute `describe`, expected `rename` or `description`
+  --> tests/ui/choices_bad_attributes.rs:12:16
+   |
+12 |     #[decision(describe = "typo")]
+   |                ^^^^^^^^
+
+error: duplicate attribute
+  --> tests/ui/choices_bad_attributes.rs:19:35
+   |
+19 |     #[decision(description = "a", description = "b")]
+   |                                   ^^^^^^^^^^^

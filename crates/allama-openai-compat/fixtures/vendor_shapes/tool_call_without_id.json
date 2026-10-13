@@ -1,0 +1,19 @@
+{
+  "id": "chatcmpl:x9",
+  "model": "local-model",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {"type": "function", "function": {"name": "get_weather", "arguments": "{\"city\":\"Paris\"}"}},
+          {"id": "", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\":\"Tokyo\"}"}}
+        ]
+      }
+    }
+  ],
+  "usage": {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}
+}

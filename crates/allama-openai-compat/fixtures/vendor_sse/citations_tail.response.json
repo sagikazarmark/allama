@@ -1,0 +1,41 @@
+{
+  "content": [
+    {
+      "text": "Rust is memory safe [1] and fast [2].",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "stop",
+  "id": "p1",
+  "model": "sonar",
+  "provider": "vendor",
+  "provider_data": {
+    "openai-compat:vendor": {
+      "citations": [
+        "https://a.example",
+        "https://b.example"
+      ],
+      "search_results": [
+        {
+          "date": "2024-01-01",
+          "title": "A",
+          "url": "https://a.example"
+        },
+        {
+          "date": null,
+          "title": "B",
+          "url": "https://b.example"
+        }
+      ],
+      "usage": {
+        "search_context_size": "low"
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 7,
+    "output_tokens": 11,
+    "total_tokens": 18
+  }
+}

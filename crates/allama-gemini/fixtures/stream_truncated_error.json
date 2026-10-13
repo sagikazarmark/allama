@@ -1,0 +1,7 @@
+{
+  "message": "Gemini stream ended without a finishReason",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "stream_kind": "incomplete",
+  "type": "stream"
+}

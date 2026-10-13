@@ -1,0 +1,29 @@
+{
+  "id": "gen-r2",
+  "provider": "Google",
+  "model": "google/gemini-3-pro-preview",
+  "object": "chat.completion",
+  "created": 1791350000,
+  "choices": [
+    {
+      "logprobs": null,
+      "finish_reason": "tool_calls",
+      "native_finish_reason": "STOP",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "",
+        "refusal": null,
+        "reasoning": "Looking up the weather.",
+        "reasoning_details": [
+          {"type": "reasoning.text", "text": "Looking up the weather.", "format": "google-gemini-v1", "index": 0},
+          {"type": "reasoning.encrypted", "data": "CiQB0e2Kb1x", "id": "tool_get_weather_1", "format": "google-gemini-v1", "index": 1}
+        ],
+        "tool_calls": [
+          {"index": 0, "id": "tool_get_weather_1", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\":\"Paris\"}"}}
+        ]
+      }
+    }
+  ],
+  "usage": {"prompt_tokens": 80, "completion_tokens": 30, "total_tokens": 110, "cost": 0.0004}
+}

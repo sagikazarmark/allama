@@ -1,0 +1,5 @@
+error: `ChoiceSet` cannot be derived for generic enums
+ --> tests/ui/choices_generic_enum.rs:4:11
+  |
+4 | enum Label<T> {
+  |           ^^^

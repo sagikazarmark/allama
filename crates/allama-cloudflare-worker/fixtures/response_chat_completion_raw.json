@@ -1,0 +1,28 @@
+{
+  "id": "chatcmpl-5c2e8d",
+  "object": "chat.completion",
+  "created": 1790000000,
+  "model": "@cf/qwen/qwen3-30b-a3b-fp8",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Rust's docs live at doc.rust-lang.org.",
+        "reasoning_content": "The user wants the Rust documentation URL."
+      },
+      "finish_reason": "stop",
+      "stop_reason": null,
+      "logprobs": null
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 30,
+    "completion_tokens": 25,
+    "total_tokens": 55,
+    "prompt_tokens_details": {
+      "cached_tokens": 16
+    }
+  },
+  "prompt_logprobs": null
+}

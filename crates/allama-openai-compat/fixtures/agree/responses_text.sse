@@ -1,0 +1,42 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_agree_text_01","object":"response","created_at":1790906350,"status":"in_progress","background":false,"error":null,"incomplete_details":null,"model":"gpt-4.1-nano-2025-04-14","output":[],"parallel_tool_calls":true,"service_tier":"default","store":false,"usage":null,"metadata":{}},"sequence_number":0}
+
+event: response.in_progress
+data: {"type":"response.in_progress","response":{"id":"resp_agree_text_01","object":"response","created_at":1790906350,"status":"in_progress","background":false,"error":null,"incomplete_details":null,"model":"gpt-4.1-nano-2025-04-14","output":[],"parallel_tool_calls":true,"service_tier":"default","store":false,"usage":null,"metadata":{}},"sequence_number":1}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_agree_text_01","type":"message","status":"in_progress","role":"assistant","content":[]},"sequence_number":2}
+
+event: response.content_part.added
+data: {"type":"response.content_part.added","item_id":"msg_agree_text_01","output_index":0,"content_index":0,"part":{"type":"output_text","annotations":[],"logprobs":[],"text":""},"sequence_number":3}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_agree_text_01","output_index":0,"content_index":0,"delta":"One","logprobs":[],"sequence_number":4}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_agree_text_01","output_index":0,"content_index":0,"delta":",","logprobs":[],"sequence_number":5}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_agree_text_01","output_index":0,"content_index":0,"delta":" two","logprobs":[],"sequence_number":6}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_agree_text_01","output_index":0,"content_index":0,"delta":",","logprobs":[],"sequence_number":7}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_agree_text_01","output_index":0,"content_index":0,"delta":" three","logprobs":[],"sequence_number":8}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_agree_text_01","output_index":0,"content_index":0,"delta":".","logprobs":[],"sequence_number":9}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","item_id":"msg_agree_text_01","output_index":0,"content_index":0,"text":"One, two, three.","logprobs":[],"sequence_number":10}
+
+event: response.content_part.done
+data: {"type":"response.content_part.done","item_id":"msg_agree_text_01","output_index":0,"content_index":0,"part":{"type":"output_text","annotations":[],"logprobs":[],"text":"One, two, three."},"sequence_number":11}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_agree_text_01","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","annotations":[],"logprobs":[],"text":"One, two, three."}]},"sequence_number":12}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_agree_text_01","object":"response","created_at":1790906350,"status":"completed","background":false,"error":null,"incomplete_details":null,"model":"gpt-4.1-nano-2025-04-14","output":[{"id":"msg_agree_text_01","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","annotations":[],"logprobs":[],"text":"One, two, three."}]}],"parallel_tool_calls":true,"service_tier":"default","store":false,"usage":{"input_tokens":21,"input_tokens_details":{"cached_tokens":0},"output_tokens":6,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":27},"metadata":{}},"sequence_number":13}
+

@@ -1,0 +1,12 @@
+{
+  "body_len": 163,
+  "body_present": true,
+  "context_window": 1048576,
+  "message": "HTTP 400",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_type": "INVALID_ARGUMENT",
+  "status": 400,
+  "type": "context_length_exceeded",
+  "upstream_message": "The input token count (1200000) exceeds the maximum number of tokens allowed (1048576)."
+}

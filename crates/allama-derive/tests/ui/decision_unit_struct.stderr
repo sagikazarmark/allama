@@ -1,0 +1,5 @@
+error: `Decision` can only be derived for structs with named fields
+ --> tests/ui/decision_unit_struct.rs:4:8
+  |
+4 | struct Triage;
+  |        ^^^^^^

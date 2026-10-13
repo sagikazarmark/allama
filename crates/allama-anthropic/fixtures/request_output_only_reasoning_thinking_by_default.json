@@ -1,0 +1,23 @@
+{
+  "body": {
+    "max_tokens": 4096,
+    "messages": [
+      {
+        "content": [
+          {
+            "text": "Hello",
+            "type": "text"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "model": "claude-sonnet-5-5",
+    "stream": false,
+    "thinking": {
+      "display": "omitted",
+      "type": "adaptive"
+    }
+  },
+  "warnings": []
+}

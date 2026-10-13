@@ -1,0 +1,43 @@
+{
+  "content": [
+    {
+      "text": "Hi",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "stop",
+  "id": "gen-u1",
+  "model": "openai/gpt-4.1-nano",
+  "provider": "vendor",
+  "provider_data": {
+    "openai-compat:vendor": {
+      "logprobs": {
+        "content": [
+          {
+            "bytes": [
+              72,
+              105
+            ],
+            "logprob": -0.01,
+            "token": "Hi",
+            "top_logprobs": []
+          }
+        ],
+        "refusal": null
+      },
+      "native_finish_reason": "stop",
+      "provider": "OpenAI",
+      "usage": {
+        "cost": 2.1e-6,
+        "is_byok": false
+      }
+    }
+  },
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5,
+    "output_tokens": 0,
+    "total_tokens": 6
+  }
+}

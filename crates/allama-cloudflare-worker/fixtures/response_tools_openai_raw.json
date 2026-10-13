@@ -1,0 +1,28 @@
+{
+  "response": null,
+  "tool_calls": [
+    {
+      "id": "chatcmpl-tool-8f3a",
+      "type": "function",
+      "function": {
+        "name": "lookup_weather",
+        "arguments": "{\"city\":\"London\"}"
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_weather",
+        "arguments": {
+          "city": "Paris"
+        }
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 210,
+    "completion_tokens": 31,
+    "total_tokens": 241
+  },
+  "finish_reason": "tool_calls"
+}

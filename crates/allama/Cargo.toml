@@ -1,0 +1,127 @@
+[package]
+name = "allama"
+version = { workspace = true }
+description = "Low-level, provider-agnostic LLM abstractions for Rust"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+keywords = ["llm", "ai", "chat", "embeddings", "streaming"]
+categories = ["api-bindings", "artificial-intelligence", "asynchronous"]
+# The collector test checks the observability guide's config, which lives
+# outside the package, so it runs in the workspace only.
+exclude = ["tests/fixtures/otlp", "tests/otelcol.rs"]
+
+[features]
+default = ["warning-events"]
+derive = ["dep:allama-derive"]
+extract = ["schema"]
+mock = []
+# `serde_path_to_error` names the field a tool call or extracted value got
+# wrong.
+schema = ["dep:schemars", "dep:serde_path_to_error"]
+tracing = ["dep:tracing"]
+# Every warning a call reports is also a `tracing` event (targets
+# `allama::warning::<kind>`, deduplicated by code), and retries and
+# failovers are `allama::retry` and `allama::fallback` events. Libraries
+# depend on allama without it, so the application alone decides.
+warning-events = ["dep:tracing"]
+
+[dependencies]
+allama-derive = { workspace = true, optional = true }
+
+futures-core = { workspace = true }
+futures-timer = { workspace = true }
+futures-util = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_path_to_error = { workspace = true, optional = true }
+tracing = { workspace = true, features = ["std"], optional = true }
+web-time = { workspace = true }
+
+# Retry backoff and `TimeoutProvider` timers go through the host's
+# `setTimeout` there; the native backend would panic ("timer has gone
+# away").
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+futures-timer = { workspace = true, features = ["wasm-bindgen"] }
+
+[dev-dependencies]
+# The crate docs' quick start and the examples return `anyhow::Result` from
+# `main`, so a failure prints the error's message (`Display`), which
+# `allama::Error`'s `Debug` withholds.
+anyhow = { workspace = true }
+criterion = { workspace = true }
+opentelemetry = { workspace = true, features = ["trace"] }
+opentelemetry_sdk = { workspace = true, features = ["testing", "trace"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+# The exporter tests pin the `otel.*` field names this layer reads; the
+# `otel.status_description` field needs 0.32 or later.
+tracing-opentelemetry = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[[example]]
+name = "dyn_provider"
+
+[[example]]
+name = "provider_impl"
+
+[[example]]
+name = "chat"
+required-features = ["mock"]
+
+[[example]]
+name = "embedding"
+required-features = ["mock"]
+
+[[example]]
+name = "decision"
+required-features = ["mock", "derive"]
+
+[[example]]
+name = "stream"
+required-features = ["mock"]
+
+[[example]]
+name = "tool_calling"
+required-features = ["mock", "schema"]
+
+[[example]]
+name = "retry"
+required-features = ["mock"]
+
+[[example]]
+name = "fallback"
+required-features = ["mock"]
+
+[[example]]
+name = "extract"
+required-features = ["mock", "extract"]
+
+[[example]]
+name = "tracing"
+required-features = ["mock", "tracing"]
+
+[[example]]
+name = "otel"
+required-features = ["mock", "tracing"]
+
+[[example]]
+name = "extractor"
+required-features = ["mock", "extract"]
+
+[[example]]
+name = "exchange_log"
+required-features = ["mock"]
+
+[[bench]]
+name = "stream_collect"
+harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+# Marks feature-gated items with the feature they need.
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true

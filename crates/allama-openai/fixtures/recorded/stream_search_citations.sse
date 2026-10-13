@@ -1,0 +1,10 @@
+data: {"id":"chatcmpl-d081b9ab-c846-4470-8ee1-373d7ffe7929","object":"chat.completion.chunk","created":1790953037,"model":"gpt-5-search-api-2025-10-14","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":"The latest stable Rust release is","refusal":null},"finish_reason":null}],"obfuscation":"6386"}
+
+data: {"id":"chatcmpl-5ee24297-8e7d-4df4-9980-e6dd0134963a","object":"chat.completion.chunk","created":1790953037,"model":"gpt-5-search-api-2025-10-14","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":" **Rust 1.99.0**, announced on October 1, 2026. "},"finish_reason":null}],"obfuscation":"9JsXzsM"}
+
+data: {"id":"chatcmpl-ff96c7ad-4e7b-4b0a-a052-bd08984c8f25","object":"chat.completion.chunk","created":1790953037,"model":"gpt-5-search-api-2025-10-14","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"([rust.dev](https://rust.dev/updates?utm_source=openai))"},"finish_reason":null}],"obfuscation":"FwjCYNcKvDucuKf"}
+
+data: {"id":"chatcmpl-d12d7e1b-897d-40e6-a3db-cdc40c8d5a48","object":"chat.completion.chunk","created":1790953038,"model":"gpt-5-search-api-2025-10-14","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"annotations":[{"type":"url_citation","url_citation":{"end_index":137,"start_index":81,"title":"Rust Updates — rust.dev","url":"https://rust.dev/updates?utm_source=openai"}}]},"finish_reason":"stop"}],"obfuscation":"qPh"}
+
+data: [DONE]
+

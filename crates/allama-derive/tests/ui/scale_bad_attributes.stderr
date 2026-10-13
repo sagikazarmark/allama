@@ -1,0 +1,5 @@
+error: descriptions must not be blank
+  --> tests/ui/scale_bad_attributes.rs:12:30
+   |
+12 |     #[decision(description = " ")]
+   |                              ^^^

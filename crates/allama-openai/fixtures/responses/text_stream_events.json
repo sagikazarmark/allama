@@ -1,0 +1,351 @@
+[
+  {
+    "event": "response_start",
+    "id": "resp_00d905906f94ef59016abf0feeb1a087d1a41464f751b55e91",
+    "model": "gpt-4.1-nano-2025-04-14"
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "Sure"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "!"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Here"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " are"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " the"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " numbers"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " from"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " "
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "1"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " to"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " "
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "12"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " in"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " words"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": ":\n\n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "1"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " One"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "2"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Two"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "3"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Three"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "4"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Four"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "5"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Five"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "6"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Six"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "7"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Seven"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "8"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Eight"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "9"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Nine"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "10"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Ten"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "11"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Eleven"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "  \n"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "12"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " Twelve"
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "stop",
+    "finish_reason_raw": "completed",
+    "id": "resp_00d905906f94ef59016abf0feeb1a087d1a41464f751b55e91",
+    "model": "gpt-4.1-nano-2025-04-14",
+    "provider": "openai",
+    "provider_data": {
+      "openai": {
+        "service_tier": "default"
+      }
+    },
+    "request_id": "req_stream",
+    "usage": {
+      "cache_read_input_tokens": 0,
+      "cache_write_input_tokens": 0,
+      "input_tokens": 17,
+      "output_tokens": 63,
+      "reasoning_tokens": 0,
+      "total_tokens": 80
+    }
+  },
+  {
+    "event": "response_stop"
+  }
+]

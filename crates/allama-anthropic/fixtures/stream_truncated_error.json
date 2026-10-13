@@ -1,0 +1,7 @@
+{
+  "message": "SSE stream ended before message_stop",
+  "message_origin": "authored",
+  "provider": "anthropic",
+  "stream_kind": "incomplete",
+  "type": "stream"
+}

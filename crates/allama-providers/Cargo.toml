@@ -1,0 +1,81 @@
+[package]
+name = "allama-providers"
+version = { workspace = true }
+description = "Build allama providers from a provider key or a provider:model address"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+keywords = ["llm", "ai", "providers", "config", "registry"]
+categories = ["api-bindings", "artificial-intelligence", "config"]
+
+[features]
+default = ["anthropic", "default-tls", "gemini", "openai", "openai-compat", "systemone", "warning-events"]
+# Providers are built from configuration (`from_env`), so each one comes
+# with its default `reqwest` transport.
+anthropic = ["dep:allama-anthropic", "allama-anthropic/reqwest"]
+gemini = ["dep:allama-gemini", "allama-gemini/reqwest"]
+openai = ["dep:allama-openai", "allama-openai/reqwest"]
+openai-compat = ["dep:allama-openai-compat", "allama-openai-compat/reqwest"]
+systemone = ["dep:allama-systemone", "allama-systemone/reqwest"]
+# Every warning a call reports is also a `tracing` event (see `allama`'s
+# feature of the same name). Turn default features off to leave it out.
+warning-events = ["allama/warning-events"]
+# TLS backend of the enabled providers' `reqwest` transport. Pick one when
+# disabling default features, or HTTPS endpoints cannot be reached.
+default-tls = [
+    "allama-anthropic?/default-tls",
+    "allama-gemini?/default-tls",
+    "allama-openai?/default-tls",
+    "allama-openai-compat?/default-tls",
+    "allama-systemone?/default-tls",
+]
+native-tls = [
+    "allama-anthropic?/native-tls",
+    "allama-gemini?/native-tls",
+    "allama-openai?/native-tls",
+    "allama-openai-compat?/native-tls",
+    "allama-systemone?/native-tls",
+]
+rustls = [
+    "allama-anthropic?/rustls",
+    "allama-gemini?/rustls",
+    "allama-openai?/rustls",
+    "allama-openai-compat?/rustls",
+    "allama-systemone?/rustls",
+]
+# rustls with the `ring` crypto provider instead of `aws-lc-rs`: no
+# `aws-lc-sys`, so static musl builds need no cmake.
+rustls-ring = [
+    "allama-anthropic?/rustls-ring",
+    "allama-gemini?/rustls-ring",
+    "allama-openai?/rustls-ring",
+    "allama-openai-compat?/rustls-ring",
+    "allama-systemone?/rustls-ring",
+]
+
+[dependencies]
+allama = { workspace = true }
+
+# Provider crates without their default features: this crate forwards the
+# TLS backend choice and leaves `extract` to the application (`allama/extract`).
+allama-anthropic = { workspace = true, optional = true }
+allama-gemini = { workspace = true, optional = true }
+allama-openai = { workspace = true, optional = true }
+allama-openai-compat = { workspace = true, optional = true }
+allama-systemone = { workspace = true, optional = true }
+
+[dev-dependencies]
+allama = { workspace = true, features = ["mock", "tracing"] }
+allama-conformance = { workspace = true, features = ["server"] }
+
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[package.metadata.docs.rs]
+all-features = true
+# Marks feature-gated items with the feature they need.
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true

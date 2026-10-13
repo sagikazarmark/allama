@@ -1,0 +1,11 @@
+{
+  "body_len": 167,
+  "body_present": true,
+  "message": "HTTP 404",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_type": "NOT_FOUND",
+  "status": 404,
+  "type": "model_not_found",
+  "upstream_message": "models/gemini-9-nope is not found for API version v1beta, or is not supported for generateContent."
+}

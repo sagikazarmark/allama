@@ -1,0 +1,31 @@
+{
+  "content": [
+    {
+      "text": "Hello there!",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "end_turn",
+  "id": "msg_011CfcWeU2crCdXJ11qM23v5",
+  "model": "claude-haiku-4-5-20251001",
+  "provider": "anthropic",
+  "provider_data": {
+    "anthropic": {
+      "service_tier": "standard",
+      "usage": {
+        "inference_geo": "not_available"
+      }
+    }
+  },
+  "usage": {
+    "breakdowns": {
+      "cache_write_5m_input_tokens": 7201
+    },
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 7201,
+    "input_tokens": 7213,
+    "output_tokens": 6,
+    "total_tokens": 7219
+  }
+}

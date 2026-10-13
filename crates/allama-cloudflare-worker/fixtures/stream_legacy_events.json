@@ -1,0 +1,35 @@
+[
+  {
+    "event": "response_start"
+  },
+  {
+    "event": "response_metadata",
+    "provider": "cloudflare"
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "Hello"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": " world"
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "stop"
+  },
+  {
+    "event": "response_stop"
+  }
+]

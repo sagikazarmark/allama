@@ -1,0 +1,350 @@
+{
+  "format_version": 1,
+  "messages": [
+    {
+      "role": "user",
+      "content": "What changed in Rust 1.99?",
+      "app_data": {"myapp.message_id": "msg_01", "myapp.created_at": "2026-10-03T09:00:00Z"}
+    },
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "Compare the release notes with this chart."},
+        {
+          "type": "image",
+          "source": {"type": "url", "url": "https://example.com/charts/compile-times"},
+          "media_type": "image/png",
+          "detail": "low"
+        },
+        {
+          "type": "image",
+          "source": {"type": "base64", "media_type": "image/jpeg", "data": "/9j/4AAQSkZJRg=="},
+          "detail": "high"
+        },
+        {
+          "type": "file",
+          "media_type": "application/pdf",
+          "source": {"type": "base64", "media_type": "application/pdf", "data": "JVBERi0xLjcK"},
+          "filename": "release-notes.pdf"
+        },
+        {
+          "type": "file",
+          "media_type": "text/plain",
+          "source": {"type": "url", "url": "https://example.com/CHANGELOG.txt"},
+          "filename": "CHANGELOG.txt"
+        },
+        {
+          "type": "other",
+          "type_name": "search_result",
+          "origin": "anthropic",
+          "data": {
+            "source": "https://example.com/blog/rust-1-99",
+            "title": "Rust 1.99 in review",
+            "content": [{"type": "text", "text": "Async closures in traits are stable."}]
+          }
+        },
+        {
+          "type": "other",
+          "type_name": "transcript",
+          "origin": "openai-compat:acme",
+          "data": {
+            "type": "meeting",
+            "type_name": "minutes",
+            "origin": "zoom",
+            "provider_data": {"speaker": "mark"},
+            "text": "Ship the release notes on Friday."
+          },
+          "provider_data": {"openai-compat:acme": {"attachment_id": "att_01"}}
+        },
+        {
+          "type": "file",
+          "media_type": "application/pdf",
+          "source": {"type": "provider_file", "origin": "anthropic", "id": "file_011CNha8iCJcU1wXNR6q4V8w"}
+        }
+      ],
+      "cache": {"retention": "short"}
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "reasoning",
+          "text": "The user wants the highlights; search first.",
+          "provider_data": {"anthropic": {"signature": "EqQBCkYIBxgCKkA"}}
+        },
+        {
+          "type": "reasoning",
+          "text": "",
+          "provider_data": {"anthropic": {"redacted_data": "EmwKAhgBEgy3va"}}
+        },
+        {
+          "type": "provider_tool_call",
+          "id": "srvtoolu_01",
+          "name": "web_search",
+          "arguments": "{\"query\":\"Rust 1.99 release\"}",
+          "origin": "anthropic"
+        },
+        {
+          "type": "provider_tool_result",
+          "call_id": "srvtoolu_01",
+          "output": [
+            {
+              "type": "web_search_result",
+              "url": "https://blog.rust-lang.org/2026/09/18/Rust-1.99.0/",
+              "title": "Announcing Rust 1.99.0",
+              "encrypted_content": "Eo8BCioIBxgC"
+            }
+          ],
+          "origin": "anthropic"
+        },
+        {
+          "type": "text",
+          "text": "Rust 1.99 stabilizes async closures in traits.",
+          "citations": [
+            {
+              "source": {
+                "type": "url",
+                "url": "https://blog.rust-lang.org/2026/09/18/Rust-1.99.0/",
+                "title": "Announcing Rust 1.99.0"
+              },
+              "span": {"start": 0, "end": 9},
+              "cited_text": "Announcing Rust 1.99.0"
+            },
+            {
+              "source": {"type": "document", "index": 0, "title": "release-notes.pdf"},
+              "provider_data": {"anthropic": {"start_page_number": 1, "end_page_number": 2}}
+            }
+          ],
+          "provider_data": {
+            "anthropic": {
+              "citations": [
+                {
+                  "type": "web_search_result_location",
+                  "url": "https://blog.rust-lang.org/2026/09/18/Rust-1.99.0/",
+                  "cited_text": "Announcing Rust 1.99.0",
+                  "encrypted_index": "Eo8BCioIBxgC"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "other",
+          "type_name": "container_upload",
+          "origin": "anthropic",
+          "data": {"file_id": "file_011CNha8iCJcU1wXNR6q4V8w"}
+        },
+        {
+          "type": "tool_call",
+          "id": "toolu_01",
+          "name": "get_weather",
+          "arguments": "{\"city\":\"Paris\"}"
+        },
+        {
+          "type": "tool_call",
+          "id": "toolu_02",
+          "name": "lookup_docs",
+          "arguments": "{\"topic\":\"async closures\"}"
+        },
+        {
+          "type": "other",
+          "type_name": "compaction",
+          "origin": "anthropic",
+          "data": {"content": "The user asked what changed in Rust 1.99."},
+          "provider_data": {"anthropic": {"signature": "EpIBCkgIBxgC-compaction"}}
+        }
+      ],
+      "cache": {},
+      "app_data": {
+        "myapp.message_id": "msg_02",
+        "myapp.usage": {"input_tokens": 1200, "output_tokens": 310}
+      }
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01",
+      "name": "get_weather",
+      "content": "Sunny, 18 C",
+      "app_data": {"myapp.duration_ms": 412}
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_02",
+      "name": "lookup_docs",
+      "content": {"topic": "async closures", "stable_since": "1.99", "links": ["https://doc.rust-lang.org/"]}
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "reasoning",
+          "text": "Check the issue tracker, then fetch the benchmark.",
+          "provider_data": {"openai": {"item_id": "rs_01", "encrypted_content": "gAAAAABo1xyz"}}
+        },
+        {
+          "type": "provider_tool_call",
+          "id": "ws_01",
+          "name": "web_search",
+          "arguments": "{\"action\":{\"type\":\"search\",\"query\":\"rust 1.99 regressions\"}}",
+          "origin": "openai",
+          "provider_data": {"openai": {"type": "web_search_call"}}
+        },
+        {
+          "type": "provider_tool_result",
+          "call_id": "ws_01",
+          "output": {"status": "failed"},
+          "is_error": true,
+          "origin": "openai",
+          "provider_data": {"openai": {"type": "web_search_call"}}
+        },
+        {
+          "type": "text",
+          "text": "The search failed; the notes file covers regressions.",
+          "citations": [
+            {
+              "source": {"type": "file", "file_id": "file-abc123", "filename": "notes.md"},
+              "span": {"start": 23, "end": 33}
+            }
+          ],
+          "provider_data": {
+            "openai": {
+              "item_id": "msg_01",
+              "annotations": [
+                {"type": "file_citation", "file_id": "file-abc123", "filename": "notes.md", "index": 32}
+              ]
+            }
+          }
+        },
+        {
+          "type": "tool_call",
+          "id": "call_01",
+          "name": "fetch_benchmark",
+          "arguments": "{\"suite\":\"compile\"}",
+          "provider_data": {"openai": {"item_id": "fc_01"}}
+        },
+        {
+          "type": "tool_call",
+          "id": "call_02",
+          "name": "render_chart",
+          "arguments": "{\"suite\":\"compile\""
+        }
+      ],
+      "provider_data": {"openai": {"response_id": "resp_01"}}
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_01",
+      "name": "fetch_benchmark",
+      "content": "benchmark service unavailable",
+      "is_error": true
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_02",
+      "name": "render_chart",
+      "content": [
+        {"type": "text", "text": "Rendered chart:"},
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="}}
+      ],
+      "cache": {"retention": "short"}
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "reasoning",
+          "text": "Summarize, then compute the speedup.",
+          "provider_data": {"google-ai": {"thought": true, "thought_signature": "CiQB0e2Kb3-thought"}}
+        },
+        {
+          "type": "text",
+          "text": "Compile times improved.",
+          "provider_data": {"google-ai": {"thought_signature": "CiQB0e2Kb3-text"}}
+        },
+        {
+          "type": "image",
+          "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="},
+          "provider_data": {"google-ai": {"thought_signature": "CiQB0e2Kb3-image"}}
+        },
+        {
+          "type": "provider_tool_call",
+          "id": "gemini_resp-g1_code_0",
+          "name": "code_execution",
+          "arguments": "{\"code\":\"print(round(41.2 / 37.9, 2))\",\"language\":\"PYTHON\"}",
+          "origin": "google-ai",
+          "provider_data": {"google-ai": {"thought_signature": "CiQB0e2Kb3-code"}}
+        },
+        {
+          "type": "provider_tool_result",
+          "call_id": "gemini_resp-g1_code_0",
+          "output": {"outcome": "OUTCOME_OK", "output": "1.09\n"},
+          "origin": "google-ai"
+        },
+        {
+          "type": "other",
+          "type_name": "inline_data",
+          "origin": "google-ai",
+          "data": {
+            "inlineData": {"mimeType": "audio/wav", "data": "UklGRiQAAABXQVZF"},
+            "thoughtSignature": "CiQB0e2Kb3-wire"
+          }
+        },
+        {
+          "type": "other",
+          "type_name": "inline_data",
+          "origin": "google-ai",
+          "data": {"inlineData": {"mimeType": "audio/wav", "data": "UklGRigAAABXQVZF"}},
+          "provider_data": {"google-ai": {"thought_signature": "CiQB0e2Kb3-other"}}
+        },
+        {
+          "type": "tool_call",
+          "id": "fc_g1",
+          "name": "publish_summary",
+          "arguments": "{\"speedup\":1.09}",
+          "provider_data": {
+            "allama": {"note": "kept on every provider"},
+            "google-ai": {"thought_signature": "CiQB0e2Kb3-call"}
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "fc_g1",
+      "name": "publish_summary",
+      "content": {"published": true}
+    },
+    {
+      "role": "assistant",
+      "content": [{"type": "text", "text": "Published."}]
+    },
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "Who wrote the regressing commit? Find their home address."},
+        {
+          "type": "image",
+          "source": {"type": "url", "url": "https://example.com/charts/regressions"},
+          "media_type": "image/png",
+          "detail": "auto"
+        }
+      ],
+      "cache": {"retention": "long"}
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "refusal",
+          "text": "I can't help with finding someone's home address.",
+          "provider_data": {"openai": {"phase": "final_answer"}}
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks!",
+      "app_data": {"myapp.ui": {"collapsed": false, "reactions": ["thumbs_up"]}}
+    }
+  ]
+}

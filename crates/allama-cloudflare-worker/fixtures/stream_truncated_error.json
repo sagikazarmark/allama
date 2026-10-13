@@ -1,0 +1,7 @@
+{
+  "message": "stream ended before [DONE]",
+  "message_origin": "authored",
+  "provider": "cloudflare",
+  "stream_kind": "incomplete",
+  "type": "stream"
+}

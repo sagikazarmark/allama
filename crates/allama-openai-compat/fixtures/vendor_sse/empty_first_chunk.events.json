@@ -1,0 +1,76 @@
+[
+  {
+    "event": "response_start"
+  },
+  {
+    "event": "response_metadata",
+    "provider": "vendor"
+  },
+  {
+    "event": "response_provider_data",
+    "provider_data": {
+      "openai-compat:vendor": {
+        "prompt_filter_results": [
+          {
+            "content_filter_results": {
+              "hate": {
+                "filtered": false,
+                "severity": "safe"
+              },
+              "violence": {
+                "filtered": false,
+                "severity": "safe"
+              }
+            },
+            "prompt_index": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "event": "response_metadata",
+    "id": "chatcmpl-A1",
+    "model": "gpt-4o-2024-08-06",
+    "provider_data": {
+      "openai-compat:vendor": {
+        "system_fingerprint": "fp_1"
+      }
+    }
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "Hi"
+  },
+  {
+    "event": "response_provider_data",
+    "provider_data": {
+      "openai-compat:vendor": {
+        "content_filter_results": {
+          "hate": {
+            "filtered": false,
+            "severity": "safe"
+          }
+        }
+      }
+    }
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "stop",
+    "finish_reason_raw": "stop"
+  },
+  {
+    "event": "response_stop"
+  }
+]

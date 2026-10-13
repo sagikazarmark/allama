@@ -1,0 +1,7 @@
+{
+  "message": "the request timed out",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "type": "timeout",
+  "upstream_message": "request timed out"
+}

@@ -1,0 +1,36 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "google-ai": {
+          "thought": true
+        }
+      },
+      "text": "**Analyzing Sky Color**\n\nI'm now focusing on explaining why the sky appears blue. I've broken down the explanation into key concepts. First, sunlight comprises all colors. Next, the atmosphere scatters this light. I'm building on this foundation to emphasize the crucial role of wavelength dependence.\n\n\n**Refining Explanation Details**\n\nI've crafted a three-sentence explanation: Sunlight includes all colors. Atmospheric molecules scatter blue light more efficiently. This scattered light then creates the blue sky we see. I focused on concise phrasing. I'm satisfied.\n\n\n",
+      "type": "reasoning"
+    },
+    {
+      "text": "The sky appears blue because sunlight, which contains all colors, enters Earth's atmosphere. Tiny air molecules primarily scatter shorter, bluer wavelengths of light much more effectively than longer, redder wavelengths. This scattered blue light disperses across the sky, making it appear blue to our eyes.",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "STOP",
+  "id": "7P--auiIKuTT28oP1pSZ8Qk",
+  "model": "gemini-2.5-flash",
+  "provider": "gemini",
+  "provider_data": {
+    "google-ai": {
+      "service_tier": "standard"
+    }
+  },
+  "usage": {
+    "breakdowns": {
+      "text_input_tokens": 13
+    },
+    "input_tokens": 13,
+    "output_tokens": 281,
+    "reasoning_tokens": 225,
+    "total_tokens": 294
+  }
+}

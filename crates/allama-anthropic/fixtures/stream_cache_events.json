@@ -1,0 +1,63 @@
+[
+  {
+    "event": "response_start",
+    "id": "msg_011CfcWeXB7vb7t8f1Zq4tCC",
+    "model": "claude-haiku-4-5-20251001"
+  },
+  {
+    "event": "response_metadata",
+    "id": "msg_011CfcWeXB7vb7t8f1Zq4tCC",
+    "model": "claude-haiku-4-5-20251001",
+    "provider": "anthropic",
+    "usage": {
+      "cache_read_input_tokens": 7201,
+      "cache_write_input_tokens": 0,
+      "input_tokens": 7213,
+      "output_tokens": 2,
+      "total_tokens": 7215
+    }
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "Hello there"
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "!"
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "stop",
+    "finish_reason_raw": "end_turn",
+    "provider": "anthropic",
+    "provider_data": {
+      "anthropic": {
+        "service_tier": "standard",
+        "usage": {
+          "inference_geo": "not_available"
+        }
+      }
+    },
+    "usage": {
+      "cache_read_input_tokens": 7201,
+      "cache_write_input_tokens": 0,
+      "input_tokens": 7213,
+      "output_tokens": 6,
+      "total_tokens": 7219
+    }
+  },
+  {
+    "event": "response_stop"
+  }
+]

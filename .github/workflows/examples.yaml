@@ -1,0 +1,218 @@
+name: Examples
+
+on:
+  schedule:
+    # Weekly, Monday 06:30 UTC (after the e2e run).
+    - cron: "30 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Provider to run examples against"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - anthropic
+          - gemini
+          - openai
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    # Every step runs in the devenv shell, with the project's toolchain.
+    shell: devenv shell -- bash -e {0}
+
+jobs:
+  credentials:
+    name: Credentials
+    runs-on: ubuntu-latest
+    outputs:
+      anthropic: ${{ steps.check.outputs.anthropic }}
+      gemini: ${{ steps.check.outputs.gemini }}
+      openai: ${{ steps.check.outputs.openai }}
+
+    steps:
+      # Provider jobs skip when their credentials are missing on manual runs,
+      # and fail on the scheduled run (which must have every secret).
+      - name: Check which provider secrets are configured
+        id: check
+        shell: bash
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          {
+            echo "anthropic=${ANTHROPIC_API_KEY:+true}"
+            echo "gemini=${GEMINI_API_KEY:+true}"
+            echo "openai=${OPENAI_API_KEY:+true}"
+          } >> "$GITHUB_OUTPUT"
+
+  anthropic:
+    name: Anthropic
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'anthropic') &&
+      (needs.credentials.outputs.anthropic == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ALLAMA_MODEL: anthropic:claude-haiku-4-5
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run provider_chat
+        run: cargo run --locked -p allama-examples --example provider_chat -- "Reply with the exact token examples-chat-ok."
+
+      - name: Run provider_stream
+        run: cargo run --locked -p allama-examples --example provider_stream -- "Reply with the exact token examples-stream-ok."
+
+      - name: Run tool_loop
+        run: cargo run --locked -p allama-examples --example tool_loop -- "What is the weather and the local time in San Francisco?"
+
+      - name: Run provider_extract
+        run: cargo run --locked -p allama-examples --example provider_extract -- "Summarize why Rust is good for agents."
+
+      - name: Run history_persistence
+        run: cargo run --locked -p allama-examples --example history_persistence -- "Summarize this failure briefly."
+
+      - name: Run web_backend
+        run: cargo run --locked -p allama-examples --example web_backend -- "Do I need an umbrella in Lisbon tomorrow?"
+
+  gemini:
+    name: Gemini
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'gemini') &&
+      (needs.credentials.outputs.gemini == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ALLAMA_MODEL: gemini:gemini-3.5-flash
+      ALLAMA_EMBEDDING_MODEL: gemini:gemini-embedding-001
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run provider_chat
+        run: cargo run --locked -p allama-examples --example provider_chat -- "Reply with the exact token examples-chat-ok."
+
+      - name: Run provider_stream
+        run: cargo run --locked -p allama-examples --example provider_stream -- "Reply with the exact token examples-stream-ok."
+
+      - name: Run tool_loop
+        run: cargo run --locked -p allama-examples --example tool_loop -- "What is the weather and the local time in San Francisco?"
+
+      - name: Run provider_extract
+        run: cargo run --locked -p allama-examples --example provider_extract -- "Summarize why Rust is good for agents."
+
+      - name: Run history_persistence
+        run: cargo run --locked -p allama-examples --example history_persistence -- "Summarize this failure briefly."
+
+      - name: Run web_backend
+        run: cargo run --locked -p allama-examples --example web_backend -- "Do I need an umbrella in Lisbon tomorrow?"
+
+      - name: Run provider_embedding
+        run: cargo run --locked -p allama-examples --example provider_embedding -- "Rust makes ownership explicit." "Embedding models turn text into vectors."
+
+      - name: Run provider_multimodal_embedding
+        env:
+          ALLAMA_EMBEDDING_MODEL: gemini:gemini-embedding-2
+        run: cargo run --locked -p allama-examples --example provider_multimodal_embedding -- "something red"
+
+  openai:
+    name: OpenAI
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'openai') &&
+      (needs.credentials.outputs.openai == 'true' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # `openai` is the Responses API; the Chat Completions step overrides it.
+      ALLAMA_MODEL: openai:gpt-5-mini
+      ALLAMA_EMBEDDING_MODEL: openai:text-embedding-3-small
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run provider_chat
+        run: cargo run --locked -p allama-examples --example provider_chat -- "Reply with the exact token examples-chat-ok."
+
+      - name: Run provider_stream
+        run: cargo run --locked -p allama-examples --example provider_stream -- "Reply with the exact token examples-stream-ok."
+
+      - name: Run tool_loop
+        run: cargo run --locked -p allama-examples --example tool_loop -- "What is the weather and the local time in San Francisco?"
+
+      - name: Run provider_extract
+        run: cargo run --locked -p allama-examples --example provider_extract -- "Summarize why Rust is good for agents."
+
+      - name: Run history_persistence
+        run: cargo run --locked -p allama-examples --example history_persistence -- "Summarize this failure briefly."
+
+      - name: Run web_backend
+        run: cargo run --locked -p allama-examples --example web_backend -- "Do I need an umbrella in Lisbon tomorrow?"
+
+      - name: Run provider_embedding
+        run: cargo run --locked -p allama-examples --example provider_embedding -- "Rust makes ownership explicit." "Embedding models turn text into vectors."
+
+      - name: Run provider_chat (Chat Completions)
+        env:
+          ALLAMA_MODEL: openai-chat:gpt-5-mini
+        run: cargo run --locked -p allama-examples --example provider_chat -- "Reply with the exact token examples-chat-ok."

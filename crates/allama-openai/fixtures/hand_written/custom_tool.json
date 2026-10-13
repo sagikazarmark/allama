@@ -1,0 +1,38 @@
+{
+  "id": "chatcmpl-EUMcT7qZk2Vb9Rw4Lp1Hn6Ds3Fg8J",
+  "object": "chat.completion",
+  "created": 1790906495,
+  "model": "gpt-5.1-2025-11-13",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "annotations": [],
+        "tool_calls": [
+          {
+            "id": "call_Rk3XbQ1mZc7Vn2Pq8Ld5Ws0Y",
+            "type": "custom",
+            "custom": {
+              "name": "sql",
+              "input": "SELECT count(*) FROM users WHERE created_at >= date('now')"
+            }
+          }
+        ]
+      },
+      "logprobs": null,
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 96,
+    "completion_tokens": 40,
+    "total_tokens": 136,
+    "prompt_tokens_details": {"cached_tokens": 0, "audio_tokens": 0},
+    "completion_tokens_details": {"reasoning_tokens": 18, "audio_tokens": 0, "accepted_prediction_tokens": 0, "rejected_prediction_tokens": 0}
+  },
+  "service_tier": "default",
+  "system_fingerprint": null
+}

@@ -1,0 +1,80 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "allama-fixture" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "allama-fixture" },
+          "spans": [
+            {
+              "traceId": "5b8efff798038103d269b633813fc60c",
+              "spanId": "eee19b7ec3c1b174",
+              "name": "chat claude-sonnet",
+              "kind": 3,
+              "startTimeUnixNano": "1790000000000000000",
+              "endTimeUnixNano": "1790000001500000000",
+              "attributes": [
+                { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
+                { "key": "gen_ai.provider.name", "value": { "stringValue": "anthropic" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-sonnet" } },
+                { "key": "allama.request.provider", "value": { "stringValue": "anthropic" } },
+                { "key": "gen_ai.response.model", "value": { "stringValue": "gpt-5-mini" } },
+                { "key": "gen_ai.usage.input_tokens", "value": { "intValue": "120" } },
+                { "key": "gen_ai.usage.output_tokens", "value": { "intValue": "40" } },
+                { "key": "allama.response.provider", "value": { "stringValue": "openai" } },
+                { "key": "allama.attempts", "value": { "intValue": "2" } },
+                { "key": "allama.fallback.used", "value": { "boolValue": true } },
+                { "key": "allama.fallback.attempts", "value": { "intValue": "1" } },
+                { "key": "allama.fallback.error_type", "value": { "stringValue": "overloaded" } }
+              ]
+            },
+            {
+              "traceId": "5b8efff798038103d269b633813fc60d",
+              "spanId": "eee19b7ec3c1b175",
+              "name": "chat gemini-flash",
+              "kind": 3,
+              "startTimeUnixNano": "1790000002000000000",
+              "endTimeUnixNano": "1790000002400000000",
+              "attributes": [
+                { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
+                { "key": "gen_ai.provider.name", "value": { "stringValue": "gcp.gemini" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "gemini-flash" } },
+                { "key": "gen_ai.request.stream", "value": { "boolValue": true } },
+                { "key": "allama.request.provider", "value": { "stringValue": "gcp.gemini" } },
+                { "key": "gen_ai.usage.input_tokens", "value": { "intValue": "80" } },
+                { "key": "allama.response.provider", "value": { "stringValue": "gcp.gemini" } },
+                { "key": "allama.response.cancelled", "value": { "boolValue": true } },
+                { "key": "allama.attempts", "value": { "intValue": "1" } }
+              ]
+            },
+            {
+              "traceId": "5b8efff798038103d269b633813fc60e",
+              "spanId": "eee19b7ec3c1b176",
+              "name": "chat claude-sonnet",
+              "kind": 3,
+              "startTimeUnixNano": "1790000003000000000",
+              "endTimeUnixNano": "1790000003300000000",
+              "status": { "code": 2, "message": "provider=openai status=401" },
+              "attributes": [
+                { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
+                { "key": "gen_ai.provider.name", "value": { "stringValue": "anthropic" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-sonnet" } },
+                { "key": "allama.request.provider", "value": { "stringValue": "anthropic" } },
+                { "key": "error.type", "value": { "stringValue": "auth" } },
+                { "key": "allama.response.provider", "value": { "stringValue": "openai" } },
+                { "key": "allama.attempts", "value": { "intValue": "2" } },
+                { "key": "allama.fallback.used", "value": { "boolValue": true } },
+                { "key": "allama.fallback.attempts", "value": { "intValue": "2" } },
+                { "key": "allama.fallback.error_type", "value": { "stringValue": "overloaded" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "chatcmpl-agree-1",
+  "object": "chat.completion",
+  "model": "@cf/qwen/qwen3-30b-a3b-fp8",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {"id": "chatcmpl-tool-a", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"Paris\"}"}},
+          {"id": "chatcmpl-tool-b", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"Tokyo\"}"}}
+        ]
+      }
+    }
+  ],
+  "response": null,
+  "tool_calls": [
+    {"name": "get_weather", "arguments": {"city": "Paris"}},
+    {"name": "get_weather", "arguments": {"city": "Tokyo"}}
+  ],
+  "usage": {"prompt_tokens": 156, "completion_tokens": 40, "total_tokens": 196}
+}

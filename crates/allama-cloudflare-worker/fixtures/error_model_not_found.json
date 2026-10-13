@@ -1,0 +1,7 @@
+{
+  "message": "Workers AI error",
+  "message_origin": "authored",
+  "provider": "cloudflare",
+  "type": "model_not_found",
+  "upstream_message": "Model not found: @cf/meta/missing"
+}

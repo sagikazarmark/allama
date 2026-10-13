@@ -1,0 +1,7 @@
+{
+  "message": "Workers AI error",
+  "message_origin": "authored",
+  "provider": "cloudflare",
+  "type": "auth",
+  "upstream_message": "Unauthorized request"
+}

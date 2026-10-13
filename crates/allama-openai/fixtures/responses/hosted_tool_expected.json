@@ -1,0 +1,72 @@
+{
+  "content": [
+    {
+      "arguments": "{\"action\":{\"queries\":[\"official website of Rust programming language\"],\"query\":\"official website of Rust programming language\",\"type\":\"search\"}}",
+      "id": "ws_00a7698265c66dd2016abf107fc8a087d18cc4aa6c7e542d2e",
+      "name": "web_search",
+      "origin": "openai",
+      "provider_data": {
+        "openai": {
+          "type": "web_search_call"
+        }
+      },
+      "type": "provider_tool_call"
+    },
+    {
+      "call_id": "ws_00a7698265c66dd2016abf107fc8a087d18cc4aa6c7e542d2e",
+      "origin": "openai",
+      "output": {
+        "status": "completed"
+      },
+      "provider_data": {
+        "openai": {
+          "type": "web_search_call"
+        }
+      },
+      "type": "provider_tool_result"
+    },
+    {
+      "text": "The official website of the Rust programming language is [www.rust-lang.org](https://www.rust-lang.org/). ",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "completed",
+  "id": "resp_00a7698265c66dd2016abf107ee10087d185b62670cc976f72",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "provider": "openai",
+  "provider_data": {
+    "openai": {
+      "service_tier": "default",
+      "tool_usage": {
+        "image_gen": {
+          "input_tokens": 0,
+          "input_tokens_details": {
+            "image_tokens": 0,
+            "text_tokens": 0
+          },
+          "output_tokens": 0,
+          "output_tokens_details": {
+            "image_tokens": 0,
+            "text_tokens": 0
+          },
+          "total_tokens": 0
+        },
+        "web_search": {
+          "num_requests": 1
+        }
+      }
+    }
+  },
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "input_tokens": 8174,
+    "output_tokens": 43,
+    "reasoning_tokens": 0,
+    "tool_requests": {
+      "web_search": 1
+    },
+    "total_tokens": 8217
+  }
+}

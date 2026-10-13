@@ -1,0 +1,17 @@
+error: missing instructions: add a doc comment or `#[decision(instructions = "...")]`
+ --> tests/ui/decision_missing_instructions.rs:5:5
+  |
+5 |     refund: YesNoAnswer,
+  |     ^^^^^^
+
+error: instructions must not be blank
+  --> tests/ui/decision_missing_instructions.rs:10:31
+   |
+10 |     #[decision(instructions = "  ")]
+   |                               ^^^^
+
+error: missing instructions: add a doc comment or `#[decision(instructions = "...")]`
+  --> tests/ui/decision_missing_instructions.rs:17:5
+   |
+17 |     refund: YesNoAnswer,
+   |     ^^^^^^

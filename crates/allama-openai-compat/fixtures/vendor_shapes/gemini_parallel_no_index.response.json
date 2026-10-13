@@ -1,0 +1,21 @@
+{
+  "content": [
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "function-call-7709560096072903355",
+      "name": "get_weather",
+      "type": "tool_call"
+    },
+    {
+      "arguments": "{\"city\":\"Tokyo\"}",
+      "id": "function-call-7709560096072902848",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "tool_calls",
+  "id": "p-PFapKGBsjFnsEPlpfS0Ak",
+  "model": "gemini-2.5-flash",
+  "provider": "vendor"
+}

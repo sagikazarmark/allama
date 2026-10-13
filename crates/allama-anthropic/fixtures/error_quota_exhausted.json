@@ -1,0 +1,13 @@
+{
+  "body_len": 206,
+  "body_present": true,
+  "message": "HTTP 429",
+  "message_origin": "authored",
+  "provider": "anthropic",
+  "provider_code": "enforced_spend_limit_reached",
+  "provider_type": "rate_limit_error",
+  "request_id": "req_011CquotaExample",
+  "status": 429,
+  "type": "quota_exhausted",
+  "upstream_message": "You have reached your organization's spend limit."
+}

@@ -1,0 +1,12 @@
+{
+  "content": [
+    {
+      "arguments": "{\"city\":\"London\"}",
+      "id": "cf_call_1_0",
+      "name": "lookup_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "provider": "cloudflare"
+}

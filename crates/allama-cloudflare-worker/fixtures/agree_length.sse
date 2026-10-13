@@ -1,0 +1,10 @@
+data: {"response":"The docs cover"}
+
+data: {"response":" ownership,"}
+
+data: {"response":" borrowing and"}
+
+data: {"response":"","usage":{"prompt_tokens":18,"completion_tokens":8,"total_tokens":26},"finish_reason":"length"}
+
+data: [DONE]
+

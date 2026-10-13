@@ -1,0 +1,123 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_06581d87e9a135ba016abfab50559887d18969ce826eae2c78","object":"response","created_at":1790946128,"status":"in_progress","access_programs":null,"background":false,"completed_at":null,"error":null,"frequency_penalty":0.0,"incomplete_details":null,"instructions":null,"max_output_tokens":300,"max_tool_calls":null,"model":"gpt-4.1-mini-2025-04-14","moderation":null,"output":[],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_retention":"in_memory","reasoning":{"context":null,"effort":null,"summary":null},"safety_identifier":null,"service_tier":"auto","store":false,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"web_search","return_token_budget":"default","search_content_types":["text"],"search_context_size":"medium","user_location":{"type":"approximate","city":null,"country":"US","region":null,"timezone":null}}],"top_logprobs":0,"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":0}
+
+event: response.in_progress
+data: {"type":"response.in_progress","response":{"id":"resp_06581d87e9a135ba016abfab50559887d18969ce826eae2c78","object":"response","created_at":1790946128,"status":"in_progress","access_programs":null,"background":false,"completed_at":null,"error":null,"frequency_penalty":0.0,"incomplete_details":null,"instructions":null,"max_output_tokens":300,"max_tool_calls":null,"model":"gpt-4.1-mini-2025-04-14","moderation":null,"output":[],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_retention":"in_memory","reasoning":{"context":null,"effort":null,"summary":null},"safety_identifier":null,"service_tier":"auto","store":false,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"web_search","return_token_budget":"default","search_content_types":["text"],"search_context_size":"medium","user_location":{"type":"approximate","city":null,"country":"US","region":null,"timezone":null}}],"top_logprobs":0,"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":1}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","item":{"id":"ws_06581d87e9a135ba016abfab51546487d19a70745f53d5ac7d","type":"web_search_call","status":"in_progress","action":{"type":"search"}},"output_index":0,"sequence_number":2}
+
+event: response.web_search_call.in_progress
+data: {"type":"response.web_search_call.in_progress","item_id":"ws_06581d87e9a135ba016abfab51546487d19a70745f53d5ac7d","output_index":0,"sequence_number":3}
+
+event: response.web_search_call.searching
+data: {"type":"response.web_search_call.searching","item_id":"ws_06581d87e9a135ba016abfab51546487d19a70745f53d5ac7d","output_index":0,"sequence_number":4}
+
+event: response.web_search_call.completed
+data: {"type":"response.web_search_call.completed","item_id":"ws_06581d87e9a135ba016abfab51546487d19a70745f53d5ac7d","output_index":0,"sequence_number":5}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","item":{"id":"ws_06581d87e9a135ba016abfab51546487d19a70745f53d5ac7d","type":"web_search_call","status":"completed","action":{"type":"search","queries":["latest stable Rust release official announcement"],"query":"latest stable Rust release official announcement"}},"output_index":0,"sequence_number":6}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","item":{"id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","type":"message","status":"in_progress","content":[],"role":"assistant"},"output_index":1,"sequence_number":7}
+
+event: response.content_part.added
+data: {"type":"response.content_part.added","content_index":0,"item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","output_index":1,"part":{"type":"output_text","annotations":[],"logprobs":[],"text":""},"sequence_number":8}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":"The","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"ddv3yXRyGnYXf","output_index":1,"sequence_number":9}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" latest","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"HIyUbvqOP","output_index":1,"sequence_number":10}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" stable","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"QATMZjlsZ","output_index":1,"sequence_number":11}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" Rust","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"1CMam7aQNJt","output_index":1,"sequence_number":12}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" release","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"3aJykmDt","output_index":1,"sequence_number":13}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" is","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"95M9rTPqHldQd","output_index":1,"sequence_number":14}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" version","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"oX1W5knN","output_index":1,"sequence_number":15}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" ","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"XMCn9I0dLzjQhe7","output_index":1,"sequence_number":16}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":"1","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"nrWjs4aEAYS51dl","output_index":1,"sequence_number":17}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":".","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"AajcGyurWDl99GZ","output_index":1,"sequence_number":18}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":"99","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"ZbHL377ch8iwog","output_index":1,"sequence_number":19}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":".","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"EbbbT0MaMJFQwWL","output_index":1,"sequence_number":20}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":"0","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"77x7gKELd2pLykk","output_index":1,"sequence_number":21}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":",","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"IaMVSEe1YtmerUA","output_index":1,"sequence_number":22}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" announced","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"OPMtCi","output_index":1,"sequence_number":23}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" on","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"RZ6JMTDDfIhWv","output_index":1,"sequence_number":24}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" October","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"VmGr6vj6","output_index":1,"sequence_number":25}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" ","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"covlhkuLMkOnTYQ","output_index":1,"sequence_number":26}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":"1","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"LC6dyWEi1iGFkUA","output_index":1,"sequence_number":27}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":",","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"cVdFEFiEE45RvqD","output_index":1,"sequence_number":28}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" ","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"YUYfQy7U5ToH7gF","output_index":1,"sequence_number":29}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":"202","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"ath2spcsMLgb4","output_index":1,"sequence_number":30}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":"6","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"HdJervW0q8c2JIA","output_index":1,"sequence_number":31}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":".","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"AXxdPbKItX60NBm","output_index":1,"sequence_number":32}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" ","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"34dX026jFPKLSF9","output_index":1,"sequence_number":33}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":"([blog.rust-lang.org](https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai))","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"hI31","output_index":1,"sequence_number":34}
+
+event: response.output_text.annotation.added
+data: {"type":"response.output_text.annotation.added","annotation":{"type":"url_citation","end_index":172,"start_index":80,"title":"Announcing Rust 1.99.0 | Rust Blog","url":"https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai"},"annotation_index":0,"content_index":0,"item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","output_index":1,"sequence_number":35}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" ","item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"obfuscation":"sJTVTgMU2IBcY9y","output_index":1,"sequence_number":36}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","content_index":0,"item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","logprobs":[],"output_index":1,"sequence_number":37,"text":"The latest stable Rust release is version 1.99.0, announced on October 1, 2026. ([blog.rust-lang.org](https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai)) "}
+
+event: response.content_part.done
+data: {"type":"response.content_part.done","content_index":0,"item_id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","output_index":1,"part":{"type":"output_text","annotations":[{"type":"url_citation","end_index":172,"start_index":80,"title":"Announcing Rust 1.99.0 | Rust Blog","url":"https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai"}],"logprobs":[],"text":"The latest stable Rust release is version 1.99.0, announced on October 1, 2026. ([blog.rust-lang.org](https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai)) "},"sequence_number":38}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","item":{"id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","type":"message","status":"completed","content":[{"type":"output_text","annotations":[{"type":"url_citation","end_index":172,"start_index":80,"title":"Announcing Rust 1.99.0 | Rust Blog","url":"https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai"}],"logprobs":[],"text":"The latest stable Rust release is version 1.99.0, announced on October 1, 2026. ([blog.rust-lang.org](https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai)) "}],"role":"assistant"},"output_index":1,"sequence_number":39}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_06581d87e9a135ba016abfab50559887d18969ce826eae2c78","object":"response","created_at":1790946128,"status":"completed","access_programs":null,"background":false,"completed_at":1790946130,"error":null,"frequency_penalty":0.0,"incomplete_details":null,"instructions":null,"max_output_tokens":300,"max_tool_calls":null,"model":"gpt-4.1-mini-2025-04-14","moderation":null,"output":[{"id":"ws_06581d87e9a135ba016abfab51546487d19a70745f53d5ac7d","type":"web_search_call","status":"completed","action":{"type":"search","queries":["latest stable Rust release official announcement"],"query":"latest stable Rust release official announcement"}},{"id":"msg_06581d87e9a135ba016abfab5265e887d1a2447dd195e7f01e","type":"message","status":"completed","content":[{"type":"output_text","annotations":[{"type":"url_citation","end_index":172,"start_index":80,"title":"Announcing Rust 1.99.0 | Rust Blog","url":"https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai"}],"logprobs":[],"text":"The latest stable Rust release is version 1.99.0, announced on October 1, 2026. ([blog.rust-lang.org](https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai)) "}],"role":"assistant"}],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_retention":"in_memory","reasoning":{"context":null,"effort":null,"summary":null},"safety_identifier":null,"service_tier":"default","store":false,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":1}},"tools":[{"type":"web_search","return_token_budget":"default","search_content_types":["text"],"search_context_size":"medium","user_location":{"type":"approximate","city":null,"country":"US","region":null,"timezone":null}}],"top_logprobs":0,"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":8174,"input_tokens_details":{"cache_write_tokens":0,"cached_tokens":0},"output_tokens":77,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":8251},"user":null,"metadata":{}},"sequence_number":40}
+

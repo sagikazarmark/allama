@@ -1,0 +1,11 @@
+error: unknown attribute `maybe`, expected `instructions`, `rename`, `yes`, or `no`
+ --> tests/ui/decision_unknown_attribute.rs:5:42
+  |
+5 |     #[decision(instructions = "Refund?", maybe = "Unsure")]
+  |                                          ^^^^^
+
+error: unknown attribute `rename_all`, expected `crate`
+  --> tests/ui/decision_unknown_attribute.rs:10:12
+   |
+10 | #[decision(rename_all = "lowercase")]
+   |            ^^^^^^^^^^

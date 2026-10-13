@@ -1,0 +1,43 @@
+{
+  "id": "resp_agree_tools_01",
+  "object": "response",
+  "created_at": 1790906350,
+  "status": "completed",
+  "background": false,
+  "error": null,
+  "incomplete_details": null,
+  "model": "gpt-4.1-nano-2025-04-14",
+  "output": [
+    {
+      "id": "fc_agree_01",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "call_agree_paris",
+      "name": "get_weather",
+      "arguments": "{\"city\": \"Paris\"}"
+    },
+    {
+      "id": "fc_agree_02",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "call_agree_tokyo",
+      "name": "get_weather",
+      "arguments": "{\"city\": \"Tokyo\"}"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "service_tier": "default",
+  "store": false,
+  "usage": {
+    "input_tokens": 43,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 44,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 87
+  },
+  "metadata": {}
+}

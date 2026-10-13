@@ -1,0 +1,303 @@
+[
+  {
+    "event": "response_start",
+    "id": "resp_06581d87e9a135ba016abfab50559887d18969ce826eae2c78",
+    "model": "gpt-4.1-mini-2025-04-14"
+  },
+  {
+    "block_type": "provider_tool_call",
+    "event": "block_start",
+    "id": "ws_06581d87e9a135ba016abfab51546487d19a70745f53d5ac7d",
+    "index": 0,
+    "name": "web_search",
+    "origin": "openai",
+    "provider_data": {
+      "openai": {
+        "type": "web_search_call"
+      }
+    }
+  },
+  {
+    "event": "provider_delta",
+    "index": 0,
+    "origin": "openai",
+    "type_name": "web_search_call.in_progress"
+  },
+  {
+    "event": "provider_delta",
+    "index": 0,
+    "origin": "openai",
+    "type_name": "web_search_call.searching"
+  },
+  {
+    "event": "provider_delta",
+    "index": 0,
+    "origin": "openai",
+    "type_name": "web_search_call.completed"
+  },
+  {
+    "arguments": "{\"action\":{\"queries\":[\"latest stable Rust release official announcement\"],\"query\":\"latest stable Rust release official announcement\",\"type\":\"search\"}}",
+    "event": "tool_call_delta",
+    "index": 0
+  },
+  {
+    "event": "block_provider_data",
+    "index": 0,
+    "provider_data": {
+      "openai": {
+        "type": "web_search_call"
+      }
+    }
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "block_type": "provider_tool_result",
+    "data": {
+      "output": {
+        "status": "completed"
+      }
+    },
+    "event": "block_start",
+    "id": "ws_06581d87e9a135ba016abfab51546487d19a70745f53d5ac7d",
+    "index": 1,
+    "origin": "openai",
+    "provider_data": {
+      "openai": {
+        "type": "web_search_call"
+      }
+    }
+  },
+  {
+    "event": "block_stop",
+    "index": 1
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 2
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "The"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " latest"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " stable"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " Rust"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " release"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " is"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " version"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " "
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "1"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "99"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "0"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": ","
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " announced"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " on"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " October"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " "
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "1"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": ","
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " "
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "202"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "6"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "."
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " "
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": "([blog.rust-lang.org](https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai))"
+  },
+  {
+    "event": "text_delta",
+    "index": 2,
+    "text": " "
+  },
+  {
+    "citation": {
+      "provider_data": {
+        "openai": {
+          "type": "url_citation"
+        }
+      },
+      "source": {
+        "title": "Announcing Rust 1.99.0 | Rust Blog",
+        "type": "url",
+        "url": "https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai"
+      },
+      "span": {
+        "end": 172,
+        "start": 80
+      }
+    },
+    "event": "citation",
+    "index": 2
+  },
+  {
+    "event": "block_provider_data",
+    "index": 2,
+    "provider_data": {
+      "openai": {
+        "annotations": [
+          {
+            "end_index": 172,
+            "start_index": 80,
+            "title": "Announcing Rust 1.99.0 | Rust Blog",
+            "type": "url_citation",
+            "url": "https://blog.rust-lang.org/2026/10/01/Rust-1.99.0/?utm_source=openai"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "event": "block_stop",
+    "index": 2
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "stop",
+    "finish_reason_raw": "completed",
+    "id": "resp_06581d87e9a135ba016abfab50559887d18969ce826eae2c78",
+    "model": "gpt-4.1-mini-2025-04-14",
+    "provider": "openai",
+    "provider_data": {
+      "openai": {
+        "service_tier": "default",
+        "tool_usage": {
+          "image_gen": {
+            "input_tokens": 0,
+            "input_tokens_details": {
+              "image_tokens": 0,
+              "text_tokens": 0
+            },
+            "output_tokens": 0,
+            "output_tokens_details": {
+              "image_tokens": 0,
+              "text_tokens": 0
+            },
+            "total_tokens": 0
+          },
+          "web_search": {
+            "num_requests": 1
+          }
+        }
+      }
+    },
+    "usage": {
+      "cache_read_input_tokens": 0,
+      "cache_write_input_tokens": 0,
+      "input_tokens": 8174,
+      "output_tokens": 77,
+      "reasoning_tokens": 0,
+      "tool_requests": {
+        "web_search": 1
+      },
+      "total_tokens": 8251
+    }
+  },
+  {
+    "event": "response_stop"
+  }
+]

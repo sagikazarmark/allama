@@ -1,0 +1,8 @@
+{
+  "dimensions": 256,
+  "inputs": [
+    "hello world",
+    "gemini embeddings"
+  ],
+  "model": "gemini-embedding-001"
+}

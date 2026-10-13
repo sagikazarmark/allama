@@ -1,0 +1,151 @@
+# OpenTelemetry Collector config that derives the GenAI client metrics from
+# allama's spans.
+#
+# allama emits spans (`TracingProvider`, feature `tracing`), not OpenTelemetry
+# metrics. Every value the GenAI metrics need is on the span, so the
+# collector can compute them:
+#
+# - `gen_ai.client.operation.duration` (histogram, s): the span duration.
+# - `gen_ai.client.token.usage` (histogram, {token}): the span's
+#   `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`, with
+#   `gen_ai.token.type` set to `input` or `output`.
+#
+# Names, units, attributes, and bucket boundaries follow the GenAI metrics
+# semantic conventions v1.41.0, the version allama's spans follow. One
+# optional dimension is allama's own: `allama.response.cancelled`, set on
+# calls the consumer abandoned, so their latency and tokens can be told
+# apart.
+#
+# Provider attribution: allama sets `gen_ai.provider.name` to the provider
+# the request was addressed to, when the span starts, and records the
+# provider that served the call as `allama.response.provider` when it
+# finishes (when every side of a fallback failed, the provider whose error
+# ended the call). They differ after a `FallbackProvider` failed over. The
+# `transform/genai_provider` processor below copies that provider into
+# `gen_ai.provider.name`, so the metric dimension keeps its semantic
+# conventions name and attributes the call, and its `error.type`, to the
+# provider that served or failed it.
+# Order matters: processors before it (a `tail_sampling` processor, for
+# example) see the addressed provider, which is often what sampling wants;
+# connectors and exporters after it see the serving provider.
+#
+# To send the spans on to a tracing backend that reads `gen_ai.provider.name`
+# (Datadog LLM Observability, Langfuse, OpenInference mappings), add its
+# exporter to the `traces` pipeline next to `signal_to_metrics`; it then
+# receives the spans with the serving provider too.
+#
+# It uses the `signal_to_metrics` connector because it reads span attribute
+# values: the `spanmetrics` connector only counts spans and measures their
+# duration, so it can derive operation durations (as
+# `traces.span.metrics.duration`) but not token usage. Both connectors are
+# alpha and ship in OpenTelemetry Collector Contrib.
+#
+# Requires an OpenTelemetry Collector Contrib build with the `otlp` receiver,
+# the `signal_to_metrics` connector, the `transform` and `batch` processors,
+# and the `debug` exporter. It is checked with `otelcol-contrib validate`
+# and run against an exported span in allama's CI (v0.161.0). Run it with:
+#
+#   otelcol-contrib --config docs/guides/observability/otelcol-genai-metrics.yaml
+#
+# and export allama's spans to it over OTLP (for example with
+# `tracing-opentelemetry` and `opentelemetry-otlp`). Metrics go to the
+# `debug` exporter; replace it with your metrics backend's exporter. The
+# connector emits delta temporality; for a cumulative backend such as
+# Prometheus, add the `deltatocumulative` processor to the metrics pipeline.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Attribute each span to the provider that served it (see above). A span
+  # without `allama.response.provider` keeps its `gen_ai.provider.name`.
+  transform/genai_provider:
+    error_mode: ignore
+    trace_statements:
+      - set(span.attributes["gen_ai.provider.name"], span.attributes["allama.response.provider"]) where span.attributes["allama.response.provider"] != nil
+  batch:
+
+connectors:
+  signal_to_metrics:
+    error_mode: ignore
+    spans:
+      - name: gen_ai.client.operation.duration
+        description: GenAI operation duration.
+        unit: s
+        conditions:
+          - span.attributes["gen_ai.operation.name"] != nil
+        attributes:
+          - key: gen_ai.operation.name
+          - key: gen_ai.provider.name
+          - key: gen_ai.request.model
+            optional: true
+          - key: gen_ai.response.model
+            optional: true
+          - key: error.type
+            optional: true
+          - key: allama.response.cancelled
+            optional: true
+        histogram:
+          value: Seconds(span.end_time - span.start_time)
+          buckets: [0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28, 2.56, 5.12, 10.24, 20.48, 40.96, 81.92]
+
+      - name: gen_ai.client.token.usage
+        description: Number of input and output tokens used.
+        unit: "{token}"
+        conditions:
+          - span.attributes["gen_ai.usage.input_tokens"] != nil
+        attributes:
+          - key: gen_ai.operation.name
+          - key: gen_ai.provider.name
+          - key: gen_ai.request.model
+            optional: true
+          - key: gen_ai.response.model
+            optional: true
+          - key: allama.response.cancelled
+            optional: true
+          # Spans do not carry `gen_ai.token.type`, so the default sets it.
+          - key: gen_ai.token.type
+            default_value: input
+        histogram:
+          value: Int(span.attributes["gen_ai.usage.input_tokens"])
+          buckets: &token_buckets [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216, 67108864]
+
+      - name: gen_ai.client.token.usage
+        description: Number of input and output tokens used.
+        unit: "{token}"
+        conditions:
+          - span.attributes["gen_ai.usage.output_tokens"] != nil
+        attributes:
+          - key: gen_ai.operation.name
+          - key: gen_ai.provider.name
+          - key: gen_ai.request.model
+            optional: true
+          - key: gen_ai.response.model
+            optional: true
+          - key: allama.response.cancelled
+            optional: true
+          - key: gen_ai.token.type
+            default_value: output
+        histogram:
+          value: Int(span.attributes["gen_ai.usage.output_tokens"])
+          buckets: *token_buckets
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transform/genai_provider, batch]
+      exporters: [signal_to_metrics]
+    metrics:
+      receivers: [signal_to_metrics]
+      processors: [batch]
+      exporters: [debug]

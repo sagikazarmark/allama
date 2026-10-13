@@ -1,0 +1,55 @@
+{
+  "content": [
+    {
+      "arguments": "{\"code\":\"def is_prime(n):\\n    if n < 2:\\n        return False\\n    for i in range(2, int(n**0.5) + 1):\\n        if n % i == 0:\\n            return False\\n    return True\\n\\nprimes = []\\nnum = 2\\nwhile len(primes) < 20:\\n    if is_prime(num):\\n        primes.append(num)\\n    num += 1\\n\\nprint(\\\"Primes:\\\", primes)\\nprint(\\\"Sum:\\\", sum(primes))\\n\",\"id\":\"call_147517\",\"language\":\"PYTHON\"}",
+      "id": "gemini_RMa_arq9Eu7gnsEPocqEkQk_code_0",
+      "name": "code_execution",
+      "origin": "google-ai",
+      "provider_data": {
+        "google-ai": {
+          "thought_signature": "EpADCo0DAWkUfRMwef+nMOWcvmU1bIooeIg1eylTl/YGVBhd3hdz3jJirs/q04mo7fqst/9ACJMrWcNFGZ5Ltd2cL7tiUd/817S3vs7vH9KmjRQHdZ1gyCS9dlByXChuhwRmKV2NRS4VGZ4GFUH1Hn4EeKyao/1fQk1yZ/uQQ1IEhXRg+SQQ3ieVldORIxiLxw04CshHUbdEtDUpf0enrmvzcV8MtVVauuMHf3sLtJphyD+fir3kf/v59VIzfEyILv4lU2mRAW3+GQssi+W2aqLPly74fyrpUkHHzwAoP6f3skM7Pn2d8jCgitL7M8R118T9I+4lwGKHo26lUpqL9uq9Wa3/pvWREfVb+sNwjPTMXEYNjxe3CskHNNJZEWkj/DJf5nR35wkEUpu7ubxSjXCQ2w7zjtfAdFaCrb2A7xu7kGOEXNU4fHVp59cLv4L3zlGReyndOCNRinYiKwE0wm92npkHaAqEoPYhzCh/6IwYu6w9uInUPyeI1IOn0qGFfNXaD99qwkoZ0I6vaWbH62kNRg=="
+        }
+      },
+      "type": "provider_tool_call"
+    },
+    {
+      "call_id": "gemini_RMa_arq9Eu7gnsEPocqEkQk_code_0",
+      "origin": "google-ai",
+      "output": {
+        "id": "call_147517",
+        "outcome": "OUTCOME_OK",
+        "output": "Primes: [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]\nSum: 639\n"
+      },
+      "type": "provider_tool_result"
+    },
+    {
+      "provider_data": {
+        "google-ai": {
+          "thought_signature": "Ev0CCvoCAWkUfRMne5NnyVGUZfaq+xcxhrc2nD9Hi7IX9MWRzXRFb58u3zQAANQEyHb91xStKrxXP82TEXwgFZeoTAi1SAj+DvI0aHcEnnFn/PXcXCGv7WkrU0djOSQ32m1fASrfXHVkgO5r2xthd9BA2Noj85aHjJ2eMdaybzUQUdssk3oMSUDR7wpSYFq0XJrjMcpbV25qJQSgwqxoKzXYlRpfZhvg5TS4zQitWKMzfghovfObPhL4iTAjIKIwrtbAxcK94rBXNGHbB8L3sPyD4xiG19KFclUtLRVow3M53cY7MxaREYLkVeOPeIAIms6TVk85i0vvdO2Jj+XbK4jEKlsILlg7vpaNhq8+iC8SNGPKFqq8/c5YW17apueHa0CcYmlRPCgEKCEP6fRXb2BHa4q8779ofum52Jmm6CgHOPciajurrHEkQX+HnxzRo7LhwEmgC6ywgLm5Hmk9rcOTKBw+2gfW/sx/cOTn2NdvRBfk9N8KWKP4aFGFiqM6"
+        }
+      },
+      "text": "The sum of the first 20 prime numbers is **639**.\n\nHere are the first 20 prime numbers that were summed:\n2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, and 71.\n\n### Python Code Used:\n```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True\n\nprimes = []\nnum = 2\nwhile len(primes) < 20:\n    if is_prime(num):\n        primes.append(num)\n    num += 1\n\nprint(\"First 20 primes:\", primes)\nprint(\"Sum:\", sum(primes))\n# Output: Sum: 639\n```",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "STOP",
+  "id": "RMa_arq9Eu7gnsEPocqEkQk",
+  "model": "gemini-3.5-flash",
+  "provider": "gemini",
+  "provider_data": {
+    "google-ai": {
+      "service_tier": "standard"
+    }
+  },
+  "usage": {
+    "breakdowns": {
+      "text_input_tokens": 421,
+      "tool_use_input_tokens": 319
+    },
+    "input_tokens": 421,
+    "output_tokens": 642,
+    "reasoning_tokens": 261,
+    "total_tokens": 1063
+  }
+}

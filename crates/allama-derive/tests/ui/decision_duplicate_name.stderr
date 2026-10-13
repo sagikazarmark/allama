@@ -1,0 +1,6 @@
+error: duplicate question name "refund"
+ --> tests/ui/decision_duplicate_name.rs:7:5
+  |
+7 | /     #[decision(rename = "refund", instructions = "Refund again?")]
+8 | |     refund_again: YesNoAnswer,
+  | |_____________________________^

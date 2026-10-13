@@ -1,0 +1,11 @@
+{
+  "body_len": 123,
+  "body_present": true,
+  "message": "HTTP 403: the cached content does not exist or has expired; create it again and update `ChatRequestOptions::cached_content`",
+  "message_origin": "authored",
+  "provider": "gemini",
+  "provider_type": "PERMISSION_DENIED",
+  "status": 403,
+  "type": "invalid_request",
+  "upstream_message": "CachedContent not found (or permission denied)"
+}

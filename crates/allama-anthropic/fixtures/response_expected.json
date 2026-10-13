@@ -1,0 +1,40 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "anthropic": {
+          "signature": "EpAECrgBCBIYAipA8POXiuWCZHWbSzrzE18Bv5iG7l3U17Sl4nS2zxzyng37sWyXIXH4erzmSXTZw9WXNnnLP/kA8mbfcznJIrrF+zIZY2xhdWRlLWhhaWt1LTQtNS0yMDI1MTAwMTgAQgh0aGlua2luZ1okODVhOTU1ZmEtMmY5OS00NGQ4LWJjMTUtNDcyNWY0YmFjYzMzmgEbChljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxqAGuhvzVBhIMlQlNIBy5vrOgzo4xGgy8nx+NqZCezbnDzIgiMGGIpAz/dEsr96A4Xe9Ueacrc26VaUe0soLAXLtlqBe0vKUMZl2UOavXdmkj5KC8wiqEAqkR/angWyAyTrKcZCNeizf65HiWUZIST0KaMZ9aI734Mkiz2/kfl863hUBCAVg696CO6jLnHULqpGVm1bF7eC/k0+DSp1Wt7mPEe0qJ/EZRvf2V8NkWCo708XmYNXL6NyoGuwRIrDNlFE13/HPbp+rSD0y8+OuStMajlVmZ3AmkWWwG7xMHLLGp0bylxxyVr27L8cruLr2SUe+taK/knhcCom4ZL14kpu16p/7Dhj0lzutu30jCV7lK5Gcu3uuUUnGS5un0SQ9+o3MYgp+Bp3mQsNin7JTuEA5pofjA+O66AAYG51rhIGNVSpkLSeXXnWvU9SCV7PrCsI7GXqb08XrL9JWzGAE="
+        }
+      },
+      "text": "The user is asking me to get the weather in Paris and explicitly asked me to use the tool. I have the get_weather function available, and the user has provided the city name \"Paris\". I have all the required parameters to make the function call.",
+      "type": "reasoning"
+    },
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "toolu_01E1R6AMsEMZ58RwQnHCAaB1",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "tool_use",
+  "id": "msg_011CfcWdSPN3SEwKZUmnC2xg",
+  "model": "claude-haiku-4-5-20251001",
+  "provider": "anthropic",
+  "provider_data": {
+    "anthropic": {
+      "service_tier": "standard",
+      "usage": {
+        "inference_geo": "not_available"
+      }
+    }
+  },
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "input_tokens": 613,
+    "output_tokens": 113,
+    "reasoning_tokens": 57,
+    "total_tokens": 726
+  }
+}

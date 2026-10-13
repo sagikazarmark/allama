@@ -1,0 +1,48 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "functionCall": {
+              "name": "get_weather",
+              "args": {
+                "city": "Paris"
+              },
+              "id": "call_234181"
+            },
+            "thoughtSignature": "EpcDCpQDAWkUfRMTzyV2rkatng7zfWtN+3qYACFXQ1wNJfYwF3qzLMYEwOvaVPhMjnG7+c+QSiHqGqckueyX6OUiykhYRXtVzeJubMofdWgjOcxlMlQkWrNFukhYZ+9zSQmEK+iJgjv8ASNwWH4cAsXy0Gmjnr15avFiNhwFyJSo6/XNkWfYwgkRDR4GQxbe1Dng7rDT7evIKnX8Kc9Dog3LDbStm+VfK62hBKMf5K6VMlBTFU7UrX1/1SGVY1WLVq3Z4/dR+de0gXV5ugOrTVENRV1DH9L0v9u/7CQtxz58orvQytDSilxpP5uwgh9vYd01g1ehSxkgS9yIz4nn1wzG3bl0+3xOemcmgdKPEH88Z5TgOEoV+9qirsKoBoHMJHCPz8BGQ1jEJSmxOKfX/rvOh+eBZXrkVx9OQT1/5o8o/8eZBqHLgWpdrrNQTUH5mIbqqu8HYKZwIoOUBWqNpj9YqOm9Jo2Xsucw4JNe/A1K0j+/wbITBRLL/dykQNbK7V0Jq448QowC7a7QcILEInX1++atP7mE+sg="
+          },
+          {
+            "functionCall": {
+              "name": "get_weather",
+              "args": {
+                "city": "Tokyo"
+              },
+              "id": "call_234182"
+            }
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0,
+      "finishMessage": "Model generated function call(s)."
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 56,
+    "candidatesTokenCount": 32,
+    "totalTokenCount": 162,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 56
+      }
+    ],
+    "thoughtsTokenCount": 74,
+    "serviceTier": "standard"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "responseId": "_fW-aqmPIfG_nsEP4tcj"
+}

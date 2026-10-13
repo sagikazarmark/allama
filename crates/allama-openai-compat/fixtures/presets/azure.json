@@ -1,0 +1,43 @@
+{
+  "body": {
+    "max_completion_tokens": 256,
+    "messages": [
+      {
+        "content": "Be brief.",
+        "role": "developer"
+      },
+      {
+        "content": "Weather in Paris?",
+        "role": "user"
+      }
+    ],
+    "model": "model-x",
+    "parallel_tool_calls": false,
+    "prompt_cache_key": "session-1",
+    "reasoning_effort": "low",
+    "seed": 7,
+    "stream": false,
+    "tools": [
+      {
+        "function": {
+          "name": "get_weather",
+          "parameters": {
+            "additionalProperties": false,
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "city"
+            ],
+            "type": "object"
+          },
+          "strict": true
+        },
+        "type": "function"
+      }
+    ]
+  },
+  "warnings": []
+}

@@ -1,0 +1,29 @@
+[package]
+name = "allama-derive"
+version = { workspace = true }
+description = "Derive macros for allama's typed decisions"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+keywords = ["llm", "decision", "derive", "ai"]
+categories = ["development-tools::procedural-macro-helpers", "artificial-intelligence"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+heck = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+
+[dev-dependencies]
+# Unversioned so `cargo publish` strips it: `allama` depends on this crate.
+allama = { path = "../allama", features = ["derive"] }
+
+serde_json = { workspace = true }
+trybuild = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,74 @@
+{
+  "body": {
+    "max_tokens": 256,
+    "messages": [
+      {
+        "content": "Be brief.",
+        "role": "system"
+      },
+      {
+        "content": "Weather in Paris?",
+        "role": "user"
+      }
+    ],
+    "model": "model-x",
+    "seed": 7,
+    "stream": false,
+    "tools": [
+      {
+        "function": {
+          "name": "get_weather",
+          "parameters": {
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "city"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "function"
+      }
+    ]
+  },
+  "warnings": [
+    {
+      "kind": "unsupported",
+      "subject": {
+        "index": 0,
+        "type": "system"
+      }
+    },
+    {
+      "kind": "unsupported",
+      "subject": {
+        "field": "tools",
+        "type": "field"
+      }
+    },
+    {
+      "kind": "unsupported",
+      "subject": {
+        "field": "reasoning",
+        "type": "field"
+      }
+    },
+    {
+      "kind": "unsupported",
+      "subject": {
+        "field": "parallel_tool_calls",
+        "type": "field"
+      }
+    },
+    {
+      "kind": "unsupported",
+      "subject": {
+        "field": "cache",
+        "type": "field"
+      }
+    }
+  ]
+}

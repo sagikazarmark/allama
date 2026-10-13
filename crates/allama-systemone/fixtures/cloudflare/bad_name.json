@@ -1,0 +1,11 @@
+{
+  "errors": [
+    {
+      "message": "AiError: AiError: {\"error\":{\"type\":\"invalid_request\",\"message\":\"Request body failed validation\",\"details\":{\"formErrors\":[],\"fieldErrors\":{\"questions\":[\"String should match pattern '^[A-Za-z0-9_.-]{1,100}$'\"]}}}} (d1e4c94b-3dca-45ad-b1af-e5866e6e30d5)",
+      "code": 5012
+    }
+  ],
+  "success": false,
+  "result": {},
+  "messages": []
+}

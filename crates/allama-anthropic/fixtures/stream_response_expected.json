@@ -1,0 +1,40 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "anthropic": {
+          "signature": "EuUECrgBCBIYAipAUOFmSZnsey0+m7GmQtZlgbi5L2y/Vghztmc1tK2PZYXAGd8bllTYQydb1Xft06FHGpT1uouWCJYY5Jd2D05g0jIZY2xhdWRlLWhhaWt1LTQtNS0yMDI1MTAwMTgAQgh0aGlua2luZ1okODVhOTU1ZmEtMmY5OS00NGQ4LWJjMTUtNDcyNWY0YmFjYzMzmgEbChljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxqAGvhvzVBhIM8g8hG91+mGAJC9V4GgxL7KU6a4UqR28/sbMiMJvIL+XIEa9l758NaY7BdqLAJXcZ8QCwDPcZljY1fWxUH5X5FgKXlcNP6Dc0mCkCkSrZAoNnVsVksXeE43xQwvSETG++vZpHirTPaK08Dn2AS9rNBmGq3AGuRe3UY3YiFcs7a+TE/D0xG+2yieMA+1vBx0QVivMgDRqJGv1n+E205zpIjcoYG7m1ftZ7Qj3wBBRvm2JU2Z7KIBwITgQwR8zjxvbfJsu/ze0I4LiwL/tYZIQ2AMwfKb5TwFfjela5AQftozBOVRM5J10W9oAlAcSXH6nVcWh6NVSKgmRtWgjt50fPSYFNoSs5Q/ctOfy7KwwNhZhAd4bduKXo8Z5zmaW9RjKOUBQ5zfDWxHY6oUg5pk4gQPmYVyIqkno3rRNkIgZzzUiT2VPiVmWqTTL12gnYHE8w8/hb1kAK+Jir28thsEO9qfJzBXoz2XOVohMn1DPkWxMBLyVkVoSs42VYn7EvjxxtR9pgehaB77INvwcEgRqo1YSySOIxg6nd1A9YEFuZlydWyfM5Re3qmhgB"
+        }
+      },
+      "text": "The user is asking for the weather in Paris and explicitly wants me to use the tool. I have the `get_weather` function available, which requires a \"city\" parameter. The user has specified \"Paris\" as the city, so I have all the information I need to make the function call.\n\nLet me call the get_weather function with city=\"Paris\".",
+      "type": "reasoning"
+    },
+    {
+      "arguments": "{\"city\": \"Paris\"}",
+      "id": "toolu_01JsmfTGtaXgB7BcvHuVEYRs",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "tool_use",
+  "id": "msg_011CfcWdYeeD2GNQg2mBNkU3",
+  "model": "claude-haiku-4-5-20251001",
+  "provider": "anthropic",
+  "provider_data": {
+    "anthropic": {
+      "service_tier": "standard",
+      "usage": {
+        "inference_geo": "not_available"
+      }
+    }
+  },
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "input_tokens": 613,
+    "output_tokens": 137,
+    "reasoning_tokens": 82,
+    "total_tokens": 750
+  }
+}

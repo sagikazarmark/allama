@@ -1,0 +1,10 @@
+data: {"id":"cmpl-m1","object":"chat.completion.chunk","created":1791350000,"model":"magistral-medium-2509","choices":[{"index":0,"delta":{"role":"assistant","content":[{"type":"thinking","thinking":[{"type":"text","text":"The user asks for "}]}]},"finish_reason":null}]}
+
+data: {"id":"cmpl-m1","object":"chat.completion.chunk","created":1791350000,"model":"magistral-medium-2509","choices":[{"index":0,"delta":{"content":[{"type":"thinking","thinking":[{"type":"text","text":"a greeting."}]}]},"finish_reason":null}]}
+
+data: {"id":"cmpl-m1","object":"chat.completion.chunk","created":1791350000,"model":"magistral-medium-2509","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
+
+data: {"id":"cmpl-m1","object":"chat.completion.chunk","created":1791350000,"model":"magistral-medium-2509","choices":[{"index":0,"delta":{"content":[{"type":"text","text":" there!"}]},"finish_reason":"stop"}],"usage":{"prompt_tokens":9,"completion_tokens":14,"total_tokens":23}}
+
+data: [DONE]
+

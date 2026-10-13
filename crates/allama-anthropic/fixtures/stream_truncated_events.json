@@ -1,0 +1,51 @@
+[
+  {
+    "event": "response_start",
+    "id": "msg_stream_trunc_1",
+    "model": "claude-sonnet-4-20250514"
+  },
+  {
+    "event": "response_metadata",
+    "id": "msg_stream_trunc_1",
+    "model": "claude-sonnet-4-20250514",
+    "provider": "anthropic",
+    "usage": {
+      "input_tokens": 12
+    }
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "text_delta",
+    "index": 0,
+    "text": "Partial answer"
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "block_type": "tool_call",
+    "event": "block_start",
+    "id": "toolu_trunc_1",
+    "index": 1,
+    "name": "read_file"
+  },
+  {
+    "arguments": "{\"path\": \"foo",
+    "event": "tool_call_delta",
+    "index": 1
+  },
+  {
+    "error": {
+      "message": "SSE stream ended before message_stop",
+      "message_origin": "authored",
+      "provider": "anthropic",
+      "stream_kind": "incomplete",
+      "type": "stream"
+    }
+  }
+]

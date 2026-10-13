@@ -1,0 +1,54 @@
+{
+  "content": [
+    {
+      "text": "Rust is fast [1].",
+      "type": "text"
+    }
+  ],
+  "finish_reason": "stop",
+  "finish_reason_raw": "stop",
+  "id": "c1",
+  "model": "m-large",
+  "provider": "vendor",
+  "provider_data": {
+    "openai-compat:vendor": {
+      "search_results": [
+        {
+          "results": [
+            {
+              "title": "A",
+              "url": "https://a.example"
+            },
+            {
+              "title": "B",
+              "url": "https://b.example"
+            }
+          ]
+        },
+        {
+          "results": [
+            {
+              "title": "C",
+              "url": "https://c.example"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "usage": {
+    "input_tokens": 12,
+    "output_tokens": 5,
+    "total_tokens": 17
+  },
+  "warnings": [
+    {
+      "kind": "other",
+      "message": "unrecognized stream event `search_results`; its data is kept in the response's provider data under `openai-compat:vendor`",
+      "provider": "vendor",
+      "subject": {
+        "type": "response"
+      }
+    }
+  ]
+}

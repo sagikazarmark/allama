@@ -1,0 +1,51 @@
+[
+  {
+    "event": "response_start",
+    "id": "p-PFapKGBsjFnsEPlpfS0Ak",
+    "model": "gemini-2.5-flash"
+  },
+  {
+    "event": "response_metadata",
+    "provider": "vendor"
+  },
+  {
+    "block_type": "tool_call",
+    "event": "block_start",
+    "id": "function-call-7709560096072903355",
+    "index": 0,
+    "name": "get_weather"
+  },
+  {
+    "arguments": "{\"city\":\"Paris\"}",
+    "event": "tool_call_delta",
+    "index": 0
+  },
+  {
+    "block_type": "tool_call",
+    "event": "block_start",
+    "id": "function-call-7709560096072902848",
+    "index": 1,
+    "name": "get_weather"
+  },
+  {
+    "arguments": "{\"city\":\"Tokyo\"}",
+    "event": "tool_call_delta",
+    "index": 1
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "event": "block_stop",
+    "index": 1
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "tool_calls",
+    "finish_reason_raw": "tool_calls"
+  },
+  {
+    "event": "response_stop"
+  }
+]

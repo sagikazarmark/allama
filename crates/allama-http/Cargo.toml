@@ -1,0 +1,80 @@
+[package]
+name = "allama-http"
+version = { workspace = true }
+description = "HTTP transport seam for allama provider crates"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+keywords = ["llm", "http", "sse", "transport", "streaming"]
+categories = ["web-programming::http-client", "artificial-intelligence"]
+
+[features]
+default = ["default-tls", "reqwest"]
+reqwest = ["dep:reqwest", "dep:send_wrapper"]
+# TLS backends of `ReqwestTransport`, forwarded to `reqwest`. No effect on
+# `wasm32`, where the host's `fetch` does TLS.
+default-tls = ["reqwest", "reqwest/default-tls"]
+native-tls = ["reqwest", "reqwest/native-tls"]
+rustls = ["reqwest", "reqwest/rustls"]
+# rustls with the `ring` crypto provider instead of `aws-lc-rs`: no
+# `aws-lc-sys`, so static musl builds need no cmake.
+rustls-ring = ["reqwest", "reqwest/rustls-no-provider", "dep:rustls"]
+# Send through a `reqwest-middleware` client (`ReqwestTransport::from_middleware`).
+reqwest-middleware = ["reqwest", "dep:reqwest-middleware"]
+# `reqwest-tracing` spans for every request.
+http-tracing = ["reqwest-middleware", "dep:reqwest-tracing"]
+
+[dependencies]
+allama = { workspace = true }
+
+bytes = { workspace = true }
+futures-core = { workspace = true }
+futures-timer = { workspace = true }
+futures-util = { workspace = true }
+reqwest = { workspace = true, optional = true }
+reqwest-middleware = { workspace = true, optional = true }
+reqwest-tracing = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+web-time = { workspace = true }
+
+# The `ring` crypto provider for `rustls-ring`, installed by
+# `ReqwestTransport::new`. Native only: on `wasm32` the host does TLS.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rustls = { workspace = true, features = ["ring", "std", "tls12"], optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+send_wrapper = { workspace = true, features = ["futures"], optional = true }
+
+# `StreamTimeouts` timers go through the host's `setTimeout` there.
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+futures-timer = { workspace = true, features = ["wasm-bindgen"] }
+
+# Path only, so publishing strips it: `allama-conformance` depends on
+# `allama-http`.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+allama = { workspace = true, features = ["mock", "tracing"] }
+allama-conformance = { path = "../allama-conformance", default-features = false, features = ["server"] }
+
+criterion = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tracing = { workspace = true, features = ["default"] }
+tracing-subscriber = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+wasm-bindgen-test = { workspace = true }
+
+[[bench]]
+name = "sse"
+harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+# Marks feature-gated items with the feature they need.
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true

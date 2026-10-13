@@ -1,0 +1,44 @@
+{
+  "id": "chatcmpl-58aa6ff2-3b6e-4ae5-9f96-bb2693dde832",
+  "object": "chat.completion",
+  "created": 1790953172,
+  "model": "gpt-5-search-api-2025-10-14",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "🦀🚀🎉 A legutolsó stabil Rust-verzió a **Rust 1.99.0**, melyet hivatalosan az “Announcing Rust 1.99.0” címmel jelentettek be. ([blog.rust-lang.org](https://blog.rust-lang.org/?utm_source=openai))",
+        "refusal": null,
+        "annotations": [
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 193,
+              "start_index": 124,
+              "title": "The Rust Programming Language Blog",
+              "url": "https://blog.rust-lang.org/?utm_source=openai"
+            }
+          }
+        ]
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 16385,
+    "completion_tokens": 77,
+    "total_tokens": 16462,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "system_fingerprint": null
+}
