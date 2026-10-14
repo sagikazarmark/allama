@@ -8,17 +8,21 @@
 //! is what notices when a new model words its refusal differently, which
 //! would degrade it to `InvalidRequest` and stop fallback from failing over.
 //!
-//! Ignored by default. The weekly `e2e.yaml` jobs resolve the newest model
-//! id from each vendor's models API and pass it in:
+//! Ignored by default. The weekly `e2e.yaml` job (`newest`, one matrix
+//! entry per vendor) resolves the newest model id from each vendor's models
+//! API with `scripts/newest-model.sh` and passes it in:
 //!
 //! ```sh
-//! ANTHROPIC_API_KEY=... ANTHROPIC_NEWEST_MODEL=claude-haiku-5-5 \
+//! ANTHROPIC_NEWEST_MODEL=$(scripts/newest-model.sh anthropic) \
 //!     cargo test -p allama-examples --test newest_models anthropic -- --ignored
-//! GEMINI_API_KEY=... GEMINI_NEWEST_MODEL=gemini-3.8-flash \
+//! GEMINI_NEWEST_MODEL=$(scripts/newest-model.sh gemini) \
 //!     cargo test -p allama-examples --test newest_models gemini -- --ignored
-//! OPENAI_API_KEY=... OPENAI_NEWEST_MODEL=gpt-6.1-sol \
+//! OPENAI_NEWEST_MODEL=$(scripts/newest-model.sh openai) \
 //!     cargo test -p allama-examples --test newest_models openai -- --ignored
 //! ```
+//!
+//! The script reads the vendor's key from the environment or `.env`; the
+//! test needs it in the environment.
 
 use allama::{ChatProvider, ChatRequest, Error, Subject, UnsupportedStage};
 

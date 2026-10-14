@@ -22,6 +22,7 @@ on:
           - gemini
           - openai
           - openai-compat/all
+          - openai-compat/azure
           - openai-compat/cloudflare
           - openai-compat/generic
           - openai-compat/presets
@@ -46,24 +47,46 @@ jobs:
       gemini: ${{ steps.check.outputs.gemini }}
       openai: ${{ steps.check.outputs.openai }}
       cloudflare: ${{ steps.check.outputs.cloudflare }}
+      azure: ${{ steps.check.outputs.azure }}
+      newest: ${{ steps.check.outputs.newest }}
 
     steps:
       # Provider jobs skip when their credentials are missing on manual runs,
-      # and fail on the scheduled run (which must have every secret).
+      # and fail on the scheduled run (which must have every secret); Azure
+      # is optional and skips on every run.
+      #
+      # The expressions are evaluated by GitHub, so only `true` or `false`
+      # reaches the runner, never a secret: a mistake in this step cannot
+      # write one to the job outputs.
       - name: Check which provider secrets are configured
         id: check
         shell: bash
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ANTHROPIC: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          GEMINI: ${{ secrets.GEMINI_API_KEY != '' }}
+          OPENAI: ${{ secrets.OPENAI_API_KEY != '' }}
+          CLOUDFLARE: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+          AZURE: ${{ secrets.AZURE_OPENAI_API_KEY != '' && secrets.AZURE_OPENAI_RESOURCE != '' }}
+          EVENT: ${{ github.event_name }}
+          SELECTED: ${{ inputs.provider }}
         run: |
+          # The vendors whose newest model the `newest` matrix checks: those
+          # selected and configured, and every one on the scheduled run.
+          newest=()
+          for vendor in anthropic gemini openai; do
+            configured=${vendor^^}
+            if [[ $EVENT == schedule ]] ||
+              [[ ($SELECTED == all || $SELECTED == "$vendor") && ${!configured} == true ]]; then
+              newest+=("$vendor")
+            fi
+          done
           {
-            echo "anthropic=${ANTHROPIC_API_KEY:+true}"
-            echo "gemini=${GEMINI_API_KEY:+true}"
-            echo "openai=${OPENAI_API_KEY:+true}"
-            echo "cloudflare=${CLOUDFLARE_API_TOKEN:+true}"
+            echo "anthropic=$ANTHROPIC"
+            echo "gemini=$GEMINI"
+            echo "openai=$OPENAI"
+            echo "cloudflare=$CLOUDFLARE"
+            echo "azure=$AZURE"
+            echo "newest=$(jq -cn '$ARGS.positional' --args ${newest[@]+"${newest[@]}"})"
           } >> "$GITHUB_OUTPUT"
 
   anthropic:
@@ -163,18 +186,21 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   # The sampling drift check (ADR 0015 decision 4): `temperature(0.2)` on
-  # each vendor's newest model, resolved from its models API, must be
-  # answered or refused as `Unsupported { stage: Provider, subject: Field }`,
-  # never `InvalidRequest`. A failure means a new refusal wording the
-  # adapter's error mapping does not recognize. One short call per endpoint.
-  anthropic-newest:
-    name: Anthropic (newest model)
+  # each vendor's newest model, resolved from its models API by
+  # scripts/newest-model.sh, must be answered or refused as
+  # `Unsupported { stage: Provider, subject: Field }`, never
+  # `InvalidRequest`. A failure means a new refusal wording the adapter's
+  # error mapping does not recognize. One short call per endpoint.
+  newest:
+    name: Newest model (${{ matrix.provider }})
     needs: credentials
-    if: |
-      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'anthropic') &&
-      (needs.credentials.outputs.anthropic == 'true' || github.event_name == 'schedule')
+    if: needs.credentials.outputs.newest != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: ${{ fromJSON(needs.credentials.outputs.newest) }}
 
     steps:
       - name: Checkout repository
@@ -194,112 +220,18 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
           cmd-format: devenv shell -- {0}
 
-      # The models API lists the most recently released model first.
-      - name: Resolve the newest model
-        run: |
-          model=$(curl -fsS "https://api.anthropic.com/v1/models?limit=1" \
-            -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" \
-            | jq -er '.data[0].id')
-          echo "Newest model: $model"
-          echo "ANTHROPIC_NEWEST_MODEL=$model" >> "$GITHUB_ENV"
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-
       - name: Sampling on the newest model
-        run: cargo test --locked -p allama-examples --test newest_models anthropic -- --ignored --nocapture
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-
-  gemini-newest:
-    name: Gemini (newest model)
-    needs: credentials
-    if: |
-      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'gemini') &&
-      (needs.credentials.outputs.gemini == 'true' || github.event_name == 'schedule')
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up devenv
-        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
-        with:
-          # Leaves out the services the shell runs locally.
-          profile: ci
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-          cmd-format: devenv shell -- {0}
-
-      # The highest numbered `gemini-X.Y-flash` or `-pro` model.
-      - name: Resolve the newest model
         run: |
-          model=$(curl -fsS "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000" \
-            -H "x-goog-api-key: $GEMINI_API_KEY" \
-            | jq -er '[.models[].name | ltrimstr("models/") | select(test("^gemini-[0-9]+(\\.[0-9]+)?-(flash|pro)$"))]
-                | sort_by(capture("^gemini-(?<v>[0-9.]+)").v | split(".") | map(tonumber)) | last')
+          model=$(scripts/newest-model.sh "$PROVIDER")
           echo "Newest model: $model"
-          echo "GEMINI_NEWEST_MODEL=$model" >> "$GITHUB_ENV"
+          export "${PROVIDER^^}_NEWEST_MODEL=$model"
+          cargo test --locked -p allama-examples --test newest_models "$PROVIDER" -- --ignored --nocapture
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
-      - name: Sampling on the newest model
-        run: cargo test --locked -p allama-examples --test newest_models gemini -- --ignored --nocapture
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
-  openai-newest:
-    name: OpenAI (newest model)
-    needs: credentials
-    if: |
-      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'openai') &&
-      (needs.credentials.outputs.openai == 'true' || github.event_name == 'schedule')
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up devenv
-        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
-        with:
-          # Leaves out the services the shell runs locally.
-          profile: ci
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-          cmd-format: devenv shell -- {0}
-
-      # The most recently created `gpt-N[.M][-variant]` text model; pro,
-      # chat, codex, audio, realtime, image, search, speech and live
-      # variants are skipped.
-      - name: Resolve the newest model
-        run: |
-          model=$(curl -fsS "https://api.openai.com/v1/models" \
-            -H "Authorization: Bearer $OPENAI_API_KEY" \
-            | jq -er '[.data[] | select(.id | test("^gpt-[0-9]+(\\.[0-9]+)*(-[a-z]+)?$"))
-                | select(.id | test("-(pro|chat|codex|audio|realtime|image|search|transcribe|tts|live)$") | not)]
-                | sort_by(.created) | last | .id')
-          echo "Newest model: $model"
-          echo "OPENAI_NEWEST_MODEL=$model" >> "$GITHUB_ENV"
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      - name: Sampling on the newest model
-        run: cargo test --locked -p allama-examples --test newest_models openai -- --ignored --nocapture
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PROVIDER: ${{ matrix.provider }}
+          # Each matrix entry gets its own vendor's key only.
+          ANTHROPIC_API_KEY: ${{ matrix.provider == 'anthropic' && secrets.ANTHROPIC_API_KEY || '' }}
+          GEMINI_API_KEY: ${{ matrix.provider == 'gemini' && secrets.GEMINI_API_KEY || '' }}
+          OPENAI_API_KEY: ${{ matrix.provider == 'openai' && secrets.OPENAI_API_KEY || '' }}
 
   cross-provider:
     name: Cross-provider history
@@ -374,6 +306,52 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  # Azure OpenAI, on both of its chat APIs. Optional: skipped whenever its
+  # secrets are missing, the scheduled run included. Model names are
+  # deployment names on the configured resource.
+  openai-compat-azure:
+    name: OpenAI Compatible (Azure)
+    needs: credentials
+    if: |
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'openai-compat/all' || inputs.provider == 'openai-compat/azure') &&
+      needs.credentials.outputs.azure == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up devenv
+        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        with:
+          # Leaves out the services the shell runs locally.
+          profile: ci
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cmd-format: devenv shell -- {0}
+
+      - name: Run e2e tests
+        run: cargo test --locked -p allama-openai-compat --test e2e_azure -- --ignored --nocapture
+        env:
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
+          AZURE_E2E_MODEL: gpt-5.6-luna
+
+      # Chat Completions refuses gpt-6-luna's function tools at its default
+      # reasoning effort, so only the Responses tests run on it.
+      - name: Run Responses e2e tests on GPT-6
+        run: cargo test --locked -p allama-openai-compat --test e2e_azure responses -- --ignored --nocapture
+        env:
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
+          AZURE_E2E_MODEL: gpt-6-luna
 
   openai-compat-generic:
     name: OpenAI Compatible (generic)
