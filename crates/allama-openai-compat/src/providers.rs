@@ -6,6 +6,9 @@
 //! [`ProviderBuilder`] from `builder(..)` for further
 //! customization.
 //!
+//! Presets build Chat Completions providers. [`Azure`] also builds a
+//! [`ResponsesProvider`] for the Responses API (`Azure::responses_builder`).
+//!
 //! Each preset's credential scope defaults to its provider name (its
 //! `DEFAULT_CREDENTIAL_SCOPE`), so a per-request
 //! `allama_http::Credential` addressed to `"groq"` reaches Groq only.
@@ -70,8 +73,8 @@ use allama_http::CredentialPlacement;
 use crate::schema::SchemaDialect;
 use crate::{
     ChatModelRules, CompatQuirks, EmbeddingInputTypeField, MaxTokensField, Provider,
-    ProviderBuilder, ReasoningReplayField, SchemaConstraint, SeedField, StreamTimeouts,
-    ToolCallIdFormat,
+    ProviderBuilder, ReasoningReplayField, ResponsesProvider, ResponsesProviderBuilder,
+    ResponsesQuirks, SchemaConstraint, SeedField, StreamTimeouts, ToolCallIdFormat,
 };
 
 /// A Workers AI model id of a Mistral model: `@cf/mistralai/…`,
@@ -236,6 +239,20 @@ fn ollama_capabilities() -> [(ChatCapability, CapabilitySupport); 4] {
 }
 
 impl ProviderBuilder {
+    /// Declare each of a preset's chat capability answers, in order.
+    fn declare_chat_capabilities(
+        self,
+        answers: impl IntoIterator<Item = (ChatCapability, CapabilitySupport)>,
+    ) -> Self {
+        answers
+            .into_iter()
+            .fold(self, |builder, (capability, support)| {
+                builder.chat_capability(capability, support)
+            })
+    }
+}
+
+impl ResponsesProviderBuilder {
     /// Declare each of a preset's chat capability answers, in order.
     fn declare_chat_capabilities(
         self,
@@ -804,6 +821,14 @@ impl Vllm {
 /// usual address, `new_with_*` and `builder_with_*` for an explicit URL
 /// (compare `allama_openai::Provider::new_with_base_url`).
 ///
+/// The same resource serves two chat APIs. The constructors above build a
+/// Chat Completions [`Provider`]; their `responses` twins
+/// ([`responses`][Self::responses], [`responses_builder`](Self::responses_builder),
+/// [`responses_from_env`][Self::responses_from_env], ...) build a
+/// [`ResponsesProvider`] for the Responses API at the same address, with the
+/// same key and the same [`NAMESPACE`](Self::NAMESPACE), so a conversation
+/// can move between the two (each replays only the state its API knows).
+///
 /// Strict schemas use [`SchemaDialect::AzureStrict`] on every deployment,
 /// and a request with a strict tool turns parallel tool calls off unless the
 /// caller set them. A reasoning deployment that rejects
@@ -819,9 +844,33 @@ impl Vllm {
 /// # let _ = builder;
 /// # Ok::<(), allama::Error>(())
 /// ```
+///
+/// Model names are deployment names, which say nothing about the model
+/// behind them, so the Responses provider assumes nothing per model
+/// ([`ResponsesModelRules::new`](crate::ResponsesModelRules::new)).
+/// Describe a reasoning deployment with
+/// [`ResponsesProviderBuilder::model_rules`]:
+///
+/// ```
+/// use allama::{CapabilitySupport, ReasoningEffort};
+/// use allama_openai_compat::ResponsesModelRules;
+/// use allama_openai_compat::providers::Azure;
+///
+/// let builder = Azure::responses_builder("my-resource", "key")?.model_rules(|deployment: &str| {
+///     match deployment {
+///         "my-reasoning-deployment" => ResponsesModelRules::new()
+///             .reasoning(CapabilitySupport::Supported)
+///             .effort_levels(&[ReasoningEffort::Low, ReasoningEffort::Medium, ReasoningEffort::High]),
+///         _ => ResponsesModelRules::new(),
+///     }
+/// });
+/// # let _ = builder;
+/// # Ok::<(), allama::Error>(())
+/// ```
 #[cfg_attr(
     not(feature = "reqwest"),
-    doc = "[Self::from_env]: crate#transport\n[Self::new]: crate#transport"
+    doc = "[Self::from_env]: crate#transport\n[Self::new]: crate#transport\n\
+           [Self::responses]: crate#transport\n[Self::responses_from_env]: crate#transport"
 )]
 #[derive(Debug, Clone, Copy)]
 pub struct Azure;
@@ -863,15 +912,7 @@ impl Azure {
     /// and hyphens, starting and ending with a letter or digit. Anything
     /// else would change the host the key is sent to.
     pub fn builder(resource: &str, api_key: &str) -> Result<ProviderBuilder> {
-        let resource = required("resource", resource)?;
-        if !is_dns_label(&resource) {
-            return Err(Error::configuration(
-                "the Azure resource name must be 2 to 63 letters, digits and hyphens, \
-                 starting and ending with a letter or digit",
-            )
-            .authored());
-        }
-        Self::builder_with_endpoint(&format!("https://{resource}.openai.azure.com"), api_key)
+        Self::builder_with_endpoint(&Self::resource_endpoint(resource)?, api_key)
     }
 
     /// A provider for an Azure OpenAI endpoint URL. See
@@ -904,14 +945,8 @@ impl Azure {
     /// endpoint is not an absolute `http(s)` URL without a query
     /// ([`allama_http::config::base_url`]).
     pub fn builder_with_endpoint(endpoint: &str, api_key: &str) -> Result<ProviderBuilder> {
-        let endpoint = allama_http::config::base_url("endpoint", endpoint)?;
-        let base_url = if endpoint.ends_with("/openai/v1") {
-            endpoint
-        } else {
-            format!("{endpoint}/openai/v1")
-        };
         Ok(Provider::builder()
-            .base_url(base_url)
+            .base_url(Self::v1_base_url(endpoint)?)
             .auth_header("api-key", required("api_key", api_key)?)
             // A per-request key always goes in `api-key`, replacing an
             // Entra ID token configured with `bearer_token`.
@@ -948,16 +983,131 @@ impl Azure {
     /// or both address variables are missing, or a value is malformed.
     #[cfg(feature = "reqwest")]
     pub fn from_env() -> Result<Provider> {
+        let (endpoint, api_key) = Self::env()?;
+        Self::new_with_endpoint(&endpoint, &api_key)
+    }
+
+    /// A Responses API provider for an Azure OpenAI resource. Model names
+    /// are deployment names.
+    ///
+    /// # Errors
+    ///
+    /// See [`responses_builder`](Self::responses_builder).
+    #[cfg(feature = "reqwest")]
+    pub fn responses(resource: &str, api_key: &str) -> Result<ResponsesProvider> {
+        Self::responses_builder(resource, api_key)?.build()
+    }
+
+    /// A pre-configured Responses API builder for the resource named
+    /// `resource`, sending to
+    /// `https://{resource}.openai.azure.com/openai/v1/responses`.
+    ///
+    /// # Errors
+    ///
+    /// As for [`builder`](Self::builder).
+    pub fn responses_builder(resource: &str, api_key: &str) -> Result<ResponsesProviderBuilder> {
+        Self::responses_builder_with_endpoint(&Self::resource_endpoint(resource)?, api_key)
+    }
+
+    /// A Responses API provider for an Azure OpenAI endpoint URL. See
+    /// [`responses_builder_with_endpoint`](Self::responses_builder_with_endpoint).
+    ///
+    /// # Errors
+    ///
+    /// See [`responses_builder_with_endpoint`](Self::responses_builder_with_endpoint).
+    #[cfg(feature = "reqwest")]
+    pub fn responses_with_endpoint(endpoint: &str, api_key: &str) -> Result<ResponsesProvider> {
+        Self::responses_builder_with_endpoint(endpoint, api_key)?.build()
+    }
+
+    /// A pre-configured Responses API builder for the endpoint `endpoint`,
+    /// as [`builder_with_endpoint`](Self::builder_with_endpoint) takes it.
+    /// Requests go to `{endpoint}/openai/v1/responses`.
+    ///
+    /// # Errors
+    ///
+    /// As for [`builder_with_endpoint`](Self::builder_with_endpoint).
+    pub fn responses_builder_with_endpoint(
+        endpoint: &str,
+        api_key: &str,
+    ) -> Result<ResponsesProviderBuilder> {
+        Ok(ResponsesProvider::builder()
+            .base_url(Self::v1_base_url(endpoint)?)
+            .auth_header("api-key", required("api_key", api_key)?)
+            // A per-request key always goes in `api-key`, replacing an
+            // Entra ID token configured with `bearer_token`.
+            .credential_placement(CredentialPlacement::Header(Cow::Borrowed("api-key")))
+            .request_id_header_name("apim-request-id")
+            .provider_name(Self::PROVIDER_NAME)
+            .quirks(Self::responses_quirks())
+            .declare_chat_capabilities(streaming()))
+    }
+
+    /// The Responses dialect this preset configures: OpenAI's, under
+    /// [`NAMESPACE`](Self::NAMESPACE), with the
+    /// [`AzureStrict`](SchemaDialect::AzureStrict) schema dialect for every
+    /// deployment, as [`quirks`](Self::quirks) sets for Chat Completions.
+    #[must_use]
+    pub fn responses_quirks() -> ResponsesQuirks {
+        ResponsesQuirks {
+            namespace: Self::NAMESPACE.into(),
+            schema_dialect: Some(SchemaDialect::AzureStrict),
+            fine_tuned_dialect: false,
+            ..ResponsesQuirks::openai()
+        }
+    }
+
+    /// Create a Responses API provider from the variables
+    /// [`from_env`][Self::from_env] reads.
+    ///
+    /// # Errors
+    ///
+    /// As for [`from_env`][Self::from_env].
+    #[cfg(feature = "reqwest")]
+    pub fn responses_from_env() -> Result<ResponsesProvider> {
+        let (endpoint, api_key) = Self::env()?;
+        Self::responses_with_endpoint(&endpoint, &api_key)
+    }
+
+    /// The endpoint URL of the resource named `resource`, checked so that
+    /// it cannot change the host the key is sent to.
+    fn resource_endpoint(resource: &str) -> Result<String> {
+        let resource = required("resource", resource)?;
+        if !is_dns_label(&resource) {
+            return Err(Error::configuration(
+                "the Azure resource name must be 2 to 63 letters, digits and hyphens, \
+                 starting and ending with a letter or digit",
+            )
+            .authored());
+        }
+        Ok(format!("https://{resource}.openai.azure.com"))
+    }
+
+    /// The v1 API base URL of an endpoint URL: `{endpoint}/openai/v1`.
+    fn v1_base_url(endpoint: &str) -> Result<String> {
+        let endpoint = allama_http::config::base_url("endpoint", endpoint)?;
+        Ok(if endpoint.ends_with("/openai/v1") {
+            endpoint
+        } else {
+            format!("{endpoint}/openai/v1")
+        })
+    }
+
+    /// The endpoint URL and the key from the environment:
+    /// `AZURE_OPENAI_ENDPOINT` (which wins) or `AZURE_OPENAI_RESOURCE`, and
+    /// `AZURE_OPENAI_API_KEY`.
+    #[cfg(feature = "reqwest")]
+    fn env() -> Result<(String, String)> {
         let api_key = env_secret("AZURE_OPENAI_API_KEY")?;
         if let Some(endpoint) = optional_env_var("AZURE_OPENAI_ENDPOINT") {
             let endpoint = allama_http::config::base_url("AZURE_OPENAI_ENDPOINT", &endpoint)?;
-            return Self::new_with_endpoint(&endpoint, &api_key);
+            return Ok((endpoint, api_key));
         }
         let resource = optional_env_var("AZURE_OPENAI_RESOURCE").ok_or_else(|| {
             Error::configuration("AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_RESOURCE not set")
                 .authored()
         })?;
-        Self::new(&resource, &api_key)
+        Ok((Self::resource_endpoint(&resource)?, api_key))
     }
 }
 

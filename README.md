@@ -43,17 +43,20 @@
 
 | Provider | Crate | Model address key | Chat | Embeddings | Decisions |
 | --- | --- | --- | :---: | :---: | :---: |
-| OpenAI Responses API | [`allama-openai`](crates/allama-openai) | `openai` | ✓ | | |
+| OpenAI Responses API | [`allama-openai`](crates/allama-openai) | `openai`, `openai-responses` | ✓ | | |
 | OpenAI Chat Completions | [`allama-openai`](crates/allama-openai) | `openai-chat` (chat), `openai` (embeddings) | ✓ | ✓ | |
 | Anthropic | [`allama-anthropic`](crates/allama-anthropic) | `anthropic` | ✓ | | |
 | Gemini | [`allama-gemini`](crates/allama-gemini) | `gemini` | ✓ | ✓ | |
-| OpenAI-compatible endpoints | [`allama-openai-compat`](crates/allama-openai-compat) | `groq`, `ollama`, `openrouter`, … | ✓ | ✓ | |
+| OpenAI-compatible endpoints | [`allama-openai-compat`](crates/allama-openai-compat) | `azure`, `groq`, `ollama`, `openrouter`, … | ✓ | ✓ | |
+| Azure OpenAI Responses API | [`allama-openai-compat`](crates/allama-openai-compat) | `azure-responses` | ✓ | | |
 | Cloudflare Workers AI (inside a Worker) | [`allama-cloudflare-worker`](crates/allama-cloudflare-worker) | | ✓ | ✓ | |
 | System One (TypeSafe, Ollama, gateways) | [`allama-systemone`](crates/allama-systemone) | `typesafe`, `ollama`, … | | | ✓ |
 
 `openai:` is the Responses API, the default for chat and the right choice for
 reasoning models; `openai-chat:` is Chat Completions, for when you need that
-wire format.
+wire format. `openai-responses:` is the same as `openai:`, so Pydantic AI
+model strings work unchanged. On Azure, `azure:` is Chat Completions and
+`azure-responses:` the Responses API.
 
 ## Quick start
 
