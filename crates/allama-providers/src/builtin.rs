@@ -27,7 +27,21 @@ const BUILTINS: &[Builtin] = &[
         cfg!(feature = "openai"),
     ),
     Builtin::new("openai-chat", &[Chat], "openai", cfg!(feature = "openai")),
+    // The Responses API under the name Pydantic AI also accepts for it,
+    // so its model strings resolve unchanged (ADR 0016).
+    Builtin::new(
+        "openai-responses",
+        &[Chat],
+        "openai",
+        cfg!(feature = "openai"),
+    ),
     Builtin::compat("azure"),
+    Builtin::new(
+        "azure-responses",
+        &[Chat],
+        "openai-compat",
+        cfg!(feature = "openai-compat"),
+    ),
     Builtin::compat("cloudflare"),
     Builtin::compat("deepinfra"),
     Builtin::compat("deepseek"),
@@ -82,17 +96,18 @@ pub(crate) fn register(registry: &mut Registry) {
                 allama_openai::Provider::with_chat_capabilities,
             )
         };
-        registry
-            .register_chat_with(
-                "openai",
-                configured(
-                    allama_openai::ResponsesProvider::from_env,
-                    allama_openai::ResponsesProvider::with_credential_scope,
-                    allama_openai::ResponsesProvider::with_chat_capabilities,
-                ),
+        let responses = || {
+            configured(
+                allama_openai::ResponsesProvider::from_env,
+                allama_openai::ResponsesProvider::with_credential_scope,
+                allama_openai::ResponsesProvider::with_chat_capabilities,
             )
+        };
+        registry
+            .register_chat_with("openai", responses())
             .register_embedding_with("openai", chat())
-            .register_chat_with("openai-chat", chat());
+            .register_chat_with("openai-chat", chat())
+            .register_chat_with("openai-responses", responses());
     }
 
     #[cfg(feature = "openai-compat")]
@@ -130,6 +145,15 @@ pub(crate) fn register(registry: &mut Registry) {
                 .register_chat_with(key, preset())
                 .register_embedding_with(key, preset());
         }
+
+        registry.register_chat_with(
+            "azure-responses",
+            configured(
+                Azure::responses_from_env,
+                allama_openai_compat::ResponsesProvider::with_credential_scope,
+                allama_openai_compat::ResponsesProvider::with_chat_capabilities,
+            ),
+        );
     }
 
     #[cfg(feature = "systemone")]
@@ -464,7 +488,17 @@ mod tests {
             ("openai", allama_openai::PROVIDER_NAME, Some("openai")),
             ("openai-chat", allama_openai::PROVIDER_NAME, Some("openai")),
             (
+                "openai-responses",
+                allama_openai::PROVIDER_NAME,
+                Some("openai"),
+            ),
+            (
                 "azure",
+                compat::Azure::PROVIDER_NAME,
+                Some("azure.ai.openai"),
+            ),
+            (
+                "azure-responses",
                 compat::Azure::PROVIDER_NAME,
                 Some("azure.ai.openai"),
             ),

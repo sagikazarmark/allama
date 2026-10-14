@@ -139,6 +139,8 @@ an allowlist of addresses you configured, and never pass their string to
 | `gemini` | Gemini API | yes | no | `gemini` |
 | `openai` | Responses API | yes | no | `openai` |
 | `openai-chat` | Chat Completions | no | no | `openai` |
+| `openai-responses` | Responses API, as `openai` | no | no | `openai` |
+| `azure-responses` | Azure OpenAI Responses API | no | no | `openai-compat` |
 | `azure`, `cloudflare`, `deepinfra`, `deepseek`, `fireworks`, `groq`, `mistral`, `together`, `vllm`, `xai` | `allama-openai-compat` presets | yes | no | `openai-compat` |
 | `ollama`, `openrouter` | `allama-openai-compat` presets | yes | `allama-systemone` presets | `openai-compat`, `systemone` |
 | `digitalocean`, `litellm`, `typesafe` | no | no | `allama-systemone` presets | `systemone` |
@@ -153,7 +155,17 @@ builds `allama_openai::Provider` (Chat Completions). Embeddings under
 `openai` come from `allama_openai::Provider`, the only OpenAI embedding API.
 Pick `openai` by default, and always for reasoning models, whose reasoning
 it carries across tool calls; pick `openai-chat` when you need the Chat
-Completions wire format.
+Completions wire format. `openai-responses` is `openai` under the name
+Pydantic AI also accepts, so its model strings (`openai-responses:gpt-5.5`)
+resolve unchanged.
+
+**Azure has both APIs too.** `azure` is Azure OpenAI's Chat Completions
+API, and `azure-responses` its Responses API, at the same resource with
+the same environment (`AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_ENDPOINT`
+or `AZURE_OPENAI_RESOURCE`). The model is the deployment name:
+`azure-responses:my-deployment`. Embeddings stay under `azure`; the keys
+named after an API (`openai-chat`, `openai-responses`, `azure-responses`)
+offer chat only.
 
 **A key keeps its API.** A built-in key reaches the same adapter and
 endpoint in every 0.x release, so a configured address never changes
@@ -197,8 +209,9 @@ built-in provider's default scope is its provider name:
 |---|---|
 | `anthropic` | `anthropic` |
 | `gemini` | `gemini` |
-| `openai`, `openai-chat` | `openai` |
-| `openai-compat` and `systemone` presets | the key (`groq`, `azure`, `ollama`, `typesafe`, ...) |
+| `openai`, `openai-chat`, `openai-responses` | `openai` |
+| `azure`, `azure-responses` | `azure` |
+| other `openai-compat` and `systemone` presets | the key (`groq`, `ollama`, `typesafe`, ...) |
 
 Each provider crate publishes its default as `DEFAULT_CREDENTIAL_SCOPE` (on
 each preset type for presets). The `_with` functions build a provider with

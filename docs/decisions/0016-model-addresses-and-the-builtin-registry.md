@@ -82,3 +82,20 @@ lookup's return shape and the meaning of each key are decided with it.
 - **Registering `gemini-generate-content` as an alias now**, so `gemini`
   could move to Interactions later: it adds a key with no user and still
   leaves `gemini` to change meaning.
+
+## Amendment: `azure-responses` and `openai-responses`
+
+- **`azure-responses`** is Azure OpenAI's Responses API, at the resource
+  `azure` reaches (same environment, same credential scope `azure`).
+  Decision 5 applies: `azure` was settled as Chat Completions, so the
+  newer API gets a new key rather than taking over `azure`.
+- **`openai-responses`** builds what `openai` builds. It is the one key
+  that duplicates another, accepted because it has users: Pydantic AI
+  accepts `openai-responses:` (alongside `openai:` and `openai-chat:`, with
+  the same meanings as here) and `azure-responses:`, so its model strings
+  resolve unchanged. This is unlike the rejected `gemini-generate-content`
+  alias, which had no users. Further aliases need the same evidence.
+- Keys named after an API (`openai-chat`, `openai-responses`,
+  `azure-responses`) offer chat only. Embeddings stay under the vendor's
+  bare key (`openai`, `azure`), whose embedding API does not depend on the
+  chat API chosen.

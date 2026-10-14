@@ -96,6 +96,8 @@
 //! | `gemini` | `allama_gemini::Provider` | `allama_gemini::Provider` | | `gemini` |
 //! | `openai` | `allama_openai::ResponsesProvider` | `allama_openai::Provider` | | `openai` |
 //! | `openai-chat` | `allama_openai::Provider` (Chat Completions) | | | `openai` |
+//! | `openai-responses` | `allama_openai::ResponsesProvider`, as `openai` | | | `openai` |
+//! | `azure-responses` | `allama_openai_compat::ResponsesProvider` (`Azure::responses_from_env`) | | | `openai-compat` |
 //! | `azure`, `deepinfra`, `deepseek`, `fireworks`, `groq`, `mistral`, `together`, `vllm`, `xai` | `allama_openai_compat` preset | same preset | | `openai-compat` |
 //! | `cloudflare`, `ollama`, `openrouter` | `allama_openai_compat` preset | same preset | `allama_systemone` preset | `openai-compat`, `systemone` |
 //! | `digitalocean`, `litellm`, `typesafe` | | | `allama_systemone` preset | `systemone` |
@@ -105,6 +107,13 @@
 //! chat, embeddings, and decisions, and `cloudflare` the same Workers AI
 //! account (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`), with Clef
 //! models (`cloudflare:@cf/cloudflare/clef`) for decisions.
+//!
+//! Azure, like OpenAI, has two chat APIs: `azure` is Chat Completions and
+//! `azure-responses` the Responses API, at the same resource with the same
+//! key. `openai-responses` is `openai` under the name Pydantic AI also
+//! accepts, so its model strings resolve unchanged. The keys named after an
+//! API (`openai-chat`, `openai-responses`, `azure-responses`) offer chat
+//! only.
 //!
 //! A built-in key reaches the same adapter and endpoint in every 0.x
 //! release. `gemini` is Gemini's `generateContent` API, which Google now
@@ -125,8 +134,9 @@
 //! |---|---|
 //! | `anthropic` | `anthropic` |
 //! | `gemini` | `gemini` |
-//! | `openai`, `openai-chat` | `openai` |
-//! | `openai-compat` and `systemone` presets | the key (`groq`, `azure`, `ollama`, `typesafe`, ...) |
+//! | `openai`, `openai-chat`, `openai-responses` | `openai` |
+//! | `azure`, `azure-responses` | `azure` |
+//! | other `openai-compat` and `systemone` presets | the key (`groq`, `ollama`, `typesafe`, ...) |
 //!
 //! Each provider crate publishes its default as `DEFAULT_CREDENTIAL_SCOPE`
 //! (on each preset type for presets). The `_with` functions build a provider
