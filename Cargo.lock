@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "allama"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama-derive",
  "anyhow",
@@ -36,7 +36,7 @@ dependencies = [
 
 [[package]]
 name = "allama-anthropic"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-conformance",
@@ -52,7 +52,7 @@ dependencies = [
 
 [[package]]
 name = "allama-cloudflare-worker"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-conformance",
@@ -74,7 +74,7 @@ dependencies = [
 
 [[package]]
 name = "allama-conformance"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-http",
@@ -91,7 +91,7 @@ dependencies = [
 
 [[package]]
 name = "allama-derive"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "heck",
@@ -104,7 +104,7 @@ dependencies = [
 
 [[package]]
 name = "allama-examples"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-anthropic",
@@ -134,7 +134,7 @@ dependencies = [
 
 [[package]]
 name = "allama-gemini"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-conformance",
@@ -152,7 +152,7 @@ dependencies = [
 
 [[package]]
 name = "allama-http"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-conformance",
@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "allama-openai"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-conformance",
@@ -194,7 +194,7 @@ dependencies = [
 
 [[package]]
 name = "allama-openai-compat"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-conformance",
@@ -213,7 +213,7 @@ dependencies = [
 
 [[package]]
 name = "allama-providers"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-anthropic",
@@ -228,7 +228,7 @@ dependencies = [
 
 [[package]]
 name = "allama-systemone"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allama",
  "allama-conformance",
