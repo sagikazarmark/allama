@@ -71,7 +71,9 @@ Known gaps for 0.1, recorded so you can weigh them:
   builds: they pin the dialect against changes in this crate, not against
   the vendor. The weekly key-gated job (`tests/e2e_presets.rs`) calls
   DeepInfra, DeepSeek, Fireworks, Groq, Mistral, OpenRouter, Together and
-  xAI when their keys are set. Azure and vLLM have no live job.
+  xAI when their keys are set, and Azure, on both of its APIs
+  (`tests/e2e_azure.rs`), when its key and resource are. vLLM has no live
+  job.
 - The Mistral (`thinking` parts) and OpenRouter (`reasoning_details`)
   response fixtures are built from the vendors' documentation, not
   recorded. So is what the `Mistral` preset sends: `reasoning_effort`,
@@ -250,11 +252,16 @@ async fn hello() -> allama::Result<String> {
 }
 ```
 
-There are no Responses presets yet: endpoint dialects become presets only
-after live verification through this provider.
+Endpoint dialects become presets only after live verification through this
+provider. Azure is the one preset with a Responses constructor:
+`Azure::responses_builder(resource, key)` (and `responses`,
+`responses_with_endpoint`, `responses_from_env`) builds a
+`ResponsesProvider` for the same resource, key and namespace as the Chat
+Completions preset, so a conversation can move between the two APIs.
 
 | Endpoint | Base URL | Quirks | Status |
 | --- | --- | --- | --- |
+| Azure OpenAI | `https://{resource}.openai.azure.com/openai/v1`, or `{endpoint}/openai/v1` | `Azure::responses_quirks()`: OpenAI's dialect under `openai-compat:azure`, with the `AzureStrict` schema dialect on every deployment. Deployment names are not model ids, so no model rules are assumed; set them per deployment with `model_rules`. | Verified live (2026-10-14, deployments `gpt-5.6-luna` and `gpt-6-luna`, whose function tools Chat Completions refuses at its default reasoning effort; chat, streaming, tools, strict structured output, and encrypted reasoning replayed across a tool call): `tests/e2e_azure.rs` |
 | Ollama | `http://localhost:11434/v1` | `ResponsesQuirks::new("openai-compat:ollama")` with `supports_tool_choice = false` (Ollama echoes `"auto"` and never forces a call). Reasoning comes back as summary text plus a plaintext `encrypted_content`, replayed as received; `reasoning_tokens` is always reported as 0. | Verified live (Ollama 0.34, `qwen3:1.7b`): `tests/e2e_responses_ollama.rs` |
 | LiteLLM proxy | `http://127.0.0.1:4000/v1` | none needed: message items streamed without `response.output_item.added` and raw reasoning as `output_text` parts are accepted by the decoder. Requests with `reasoning` fail inside LiteLLM 1.98's Ollama bridge (a LiteLLM bug). | Verified live (LiteLLM 1.98 in front of Ollama `qwen3:1.7b`): `allama-examples/tests/e2e_litellm.rs`, recorded `fixtures/responses/litellm_*` |
 | vLLM | `http://localhost:8000/v1` | `ResponsesQuirks::new("openai-compat:vllm")`; set `function_call_status_null` for releases that require `"status": null` on replayed function calls | Not yet verified |

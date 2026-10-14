@@ -80,6 +80,39 @@ fn azure_reads_the_endpoint_before_the_resource() {
     assert!(err.to_string().contains("AZURE_OPENAI_RESOURCE"), "{err}");
 }
 
+/// The Responses provider reads the same variables, the same way.
+#[test]
+fn azure_responses_reads_the_same_variables() {
+    let _lock = ENV_LOCK.lock().unwrap();
+    let _env = Env::set(&[
+        ("AZURE_OPENAI_API_KEY", Some("key")),
+        (
+            "AZURE_OPENAI_ENDPOINT",
+            Some("https://proj.services.ai.azure.com/"),
+        ),
+        ("AZURE_OPENAI_RESOURCE", Some("ignored")),
+    ]);
+    assert_eq!(
+        Azure::responses_from_env().unwrap().responses_url(),
+        "https://proj.services.ai.azure.com/openai/v1/responses"
+    );
+
+    set("AZURE_OPENAI_ENDPOINT", None);
+    assert_eq!(
+        Azure::responses_from_env().unwrap().responses_url(),
+        "https://ignored.openai.azure.com/openai/v1/responses"
+    );
+
+    set("AZURE_OPENAI_RESOURCE", Some("not.a.name"));
+    let err = Azure::responses_from_env().unwrap_err();
+    assert!(matches!(err, Error::Configuration { .. }), "{err:?}");
+
+    set("AZURE_OPENAI_RESOURCE", Some("res"));
+    set("AZURE_OPENAI_API_KEY", None);
+    let err = Azure::responses_from_env().unwrap_err();
+    assert!(err.to_string().contains("AZURE_OPENAI_API_KEY"), "{err}");
+}
+
 /// A blank `VLLM_BASE_URL` is unset; a malformed one is named.
 #[test]
 fn vllm_names_a_bad_base_url() {
