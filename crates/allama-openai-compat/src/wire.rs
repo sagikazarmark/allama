@@ -191,6 +191,14 @@ pub(crate) struct ApiMessage {
     /// [`ReasoningReplayField::ReasoningDetails`]).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_details: Option<Vec<serde_json::Value>>,
+    /// Assistant reasoning text (dialects with
+    /// [`ReasoningReplayField::ReasoningText`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_text: Option<String>,
+    /// The signature of the assistant reasoning, replayed verbatim
+    /// (dialects with [`ReasoningReplayField::ReasoningText`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_opaque: Option<String>,
     /// Assistant refusal text (dialects with
     /// [`replay_refusal`](CompatQuirks::replay_refusal)).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -212,6 +220,8 @@ impl ApiMessage {
             && self.reasoning_content.is_none()
             && self.reasoning.is_none()
             && self.reasoning_details.is_none()
+            && self.reasoning_text.is_none()
+            && self.reasoning_opaque.is_none()
             && self.refusal.is_none()
     }
 }
@@ -378,6 +388,12 @@ pub(crate) struct ChatCompletionMessage {
     /// reasoning, with their signatures.
     #[serde(default)]
     pub reasoning_details: Option<Vec<serde_json::Value>>,
+    /// Reasoning text (GitHub Copilot).
+    #[serde(default)]
+    pub reasoning_text: Option<String>,
+    /// The signature of the reasoning (GitHub Copilot).
+    #[serde(default)]
+    pub reasoning_opaque: Option<String>,
     /// Annotations (e.g. URL citations).
     #[serde(default)]
     pub annotations: Option<Vec<serde_json::Value>>,
@@ -520,6 +536,12 @@ pub(crate) struct ChunkDelta {
     /// Structured reasoning fragments (OpenRouter).
     #[serde(default)]
     pub reasoning_details: Option<Vec<serde_json::Value>>,
+    /// Reasoning text (GitHub Copilot).
+    #[serde(default)]
+    pub reasoning_text: Option<String>,
+    /// The signature of the reasoning so far, whole (GitHub Copilot).
+    #[serde(default)]
+    pub reasoning_opaque: Option<String>,
     /// Tool call fragments.
     #[serde(default)]
     pub tool_calls: Option<Vec<ChunkToolCall>>,
@@ -1456,6 +1478,7 @@ fn convert_assistant(
     let mut text = String::new();
     let mut reasoning = String::new();
     let mut details: Vec<serde_json::Value> = Vec::new();
+    let mut signature: Option<String> = None;
     let mut refusal = String::new();
     let mut tool_calls = Vec::new();
     for (block, content) in m.content.iter().enumerate() {
@@ -1536,6 +1559,23 @@ fn convert_assistant(
                              it sent, and this reasoning has none; it was dropped",
                         ),
                     },
+                    ReasoningReplayField::ReasoningText if own => {
+                        reasoning.push_str(&r.text);
+                        if let Some(own_signature) = r
+                            .provider_data
+                            .get_raw(ns, REASONING_OPAQUE_KEY)
+                            .and_then(serde_json::Value::as_str)
+                        {
+                            signature = Some(own_signature.to_owned());
+                        }
+                    }
+                    ReasoningReplayField::ReasoningText if r.text.is_empty() => {}
+                    ReasoningReplayField::ReasoningText => d.dropped_replay_state(
+                        ReplayState::Reasoning,
+                        subject(),
+                        "this endpoint takes reasoning back only with the `reasoning_opaque` \
+                         signature it sent, and this reasoning has none; it was dropped",
+                    ),
                     _ if own || r.text.is_empty() => {}
                     _ => d.dropped_replay_state(
                         ReplayState::Reasoning,
@@ -1607,7 +1647,7 @@ fn convert_assistant(
         name: participant_name(&m.provider_data, ns, index, d),
         tool_calls: (!tool_calls.is_empty()).then_some(tool_calls),
         refusal: (!refusal.is_empty()).then_some(refusal),
-        ..reasoning_replay(quirks.reasoning_replay, reasoning, details)
+        ..reasoning_replay(quirks.reasoning_replay, reasoning, details, signature)
     })
 }
 
@@ -1621,11 +1661,14 @@ fn replayed_call_fields(data: &allama::ProviderData, ns: &str) -> ExtraMap {
 }
 
 /// An assistant message carrying the replayed reasoning `text` or
-/// `details` (if any) in the dialect's field.
+/// `details` (if any) in the dialect's field. With
+/// [`ReasoningReplayField::ReasoningText`], the text goes back only with
+/// its `signature`, as the endpoint's own clients send it.
 fn reasoning_replay(
     field: ReasoningReplayField,
     text: String,
     details: Vec<serde_json::Value>,
+    signature: Option<String>,
 ) -> ApiMessage {
     let text = (!text.is_empty()).then_some(text);
     match field {
@@ -1639,6 +1682,11 @@ fn reasoning_replay(
         },
         ReasoningReplayField::ReasoningDetails => ApiMessage {
             reasoning_details: (!details.is_empty()).then_some(details),
+            ..ApiMessage::default()
+        },
+        ReasoningReplayField::ReasoningText if signature.is_some() => ApiMessage {
+            reasoning_text: text,
+            reasoning_opaque: signature,
             ..ApiMessage::default()
         },
         _ => ApiMessage::default(),
@@ -1931,15 +1979,20 @@ pub(crate) fn promote_stop(reason: FinishReason, calls: bool) -> FinishReason {
 
 /// The provider-data key, on a decoded [`Reasoning`] block, of the wire
 /// field the reasoning text arrived in (`reasoning_content`, `reasoning`,
-/// or Mistral's `thinking` content parts). It marks the reasoning as this
-/// endpoint's own, so an endpoint that takes no reasoning back drops it
-/// without a warning.
+/// Copilot's `reasoning_text`, or Mistral's `thinking` content parts). It
+/// marks the reasoning as this endpoint's own, so an endpoint that takes no
+/// reasoning back drops it without a warning.
 pub(crate) const REASONING_FIELD_KEY: &str = "reasoning_field";
 
 /// The provider-data key, on a decoded [`Reasoning`] block, of OpenRouter's
 /// `reasoning_details`, replayed verbatim with
 /// [`ReasoningReplayField::ReasoningDetails`].
 pub(crate) const REASONING_DETAILS_KEY: &str = "reasoning_details";
+
+/// The provider-data key, on a decoded [`Reasoning`] block, of GitHub
+/// Copilot's `reasoning_opaque` signature, replayed verbatim with
+/// [`ReasoningReplayField::ReasoningText`].
+pub(crate) const REASONING_OPAQUE_KEY: &str = "reasoning_opaque";
 
 /// The provider-data key, on a decoded [`Text`] block, of the raw Chat
 /// Completions annotations (`{"type": "url_citation", "url_citation":
@@ -1948,16 +2001,20 @@ pub(crate) const REASONING_DETAILS_KEY: &str = "reasoning_details";
 pub(crate) const ANNOTATIONS_KEY: &str = "chat_annotations";
 
 /// A decoded reasoning block: `text` from the wire `field`, with the
-/// reasoning details, when the endpoint sent them.
+/// reasoning details and signature, when the endpoint sent them.
 pub(crate) fn reasoning_block(
     text: String,
     field: &str,
     details: Option<Vec<serde_json::Value>>,
+    signature: Option<String>,
     ns: &str,
 ) -> Reasoning {
     let mut data = allama::ProviderData::new().with_raw(ns, REASONING_FIELD_KEY, field.into());
     if let Some(details) = details.filter(|details| !details.is_empty()) {
         data.insert_raw(ns, REASONING_DETAILS_KEY, details.into());
+    }
+    if let Some(signature) = signature.filter(|signature| !signature.is_empty()) {
+        data.insert_raw(ns, REASONING_OPAQUE_KEY, signature.into());
     }
     Reasoning::new(text).with_provider_data(data)
 }
@@ -2167,7 +2224,8 @@ pub(crate) fn usage_extra(usage: &ApiUsage) -> Option<serde_json::Value> {
 /// Convert a Chat Completions response.
 ///
 /// Content comes in this order: reasoning (`reasoning_content`,
-/// `reasoning`, `reasoning_details`), the message content (with Mistral's
+/// `reasoning`, `reasoning_text`, `reasoning_details`, with a
+/// `reasoning_opaque` signature), the message content (with Mistral's
 /// `thinking` parts as reasoning, in place), the refusal, then the tool
 /// calls. Message and choice fields this crate does not model (`logprobs`,
 /// …) are kept in the response's provider data.
@@ -2192,19 +2250,26 @@ pub(crate) fn from_api_response(
     let message = choice.message;
 
     let mut content = Vec::new();
-    let (reasoning, field) = match (message.reasoning_content, message.reasoning) {
-        (Some(text), _) if !text.is_empty() => (text, "reasoning_content"),
-        (_, Some(text)) if !text.is_empty() => (text, "reasoning"),
+    let (reasoning, field) = match (
+        message.reasoning_content,
+        message.reasoning,
+        message.reasoning_text,
+    ) {
+        (Some(text), _, _) if !text.is_empty() => (text, "reasoning_content"),
+        (_, Some(text), _) if !text.is_empty() => (text, "reasoning"),
+        (_, _, Some(text)) if !text.is_empty() => (text, "reasoning_text"),
         _ => (String::new(), "reasoning"),
     };
     let details = message.reasoning_details.filter(|d| !d.is_empty());
-    if !reasoning.is_empty() || details.is_some() {
+    let signature = message.reasoning_opaque.filter(|s| !s.is_empty());
+    if !reasoning.is_empty() || details.is_some() || signature.is_some() {
         let (text, field) = match (&details, reasoning.is_empty()) {
             (Some(details), true) => (reasoning_details_text(details), REASONING_DETAILS_KEY),
+            (None, true) => (reasoning, "reasoning_text"),
             _ => (reasoning, field),
         };
         content.push(ContentBlock::Reasoning(reasoning_block(
-            text, field, details, ns,
+            text, field, details, signature, ns,
         )));
     }
     let mut annotations = message.annotations.filter(|a| !a.is_empty());
@@ -2232,7 +2297,7 @@ pub(crate) fn from_api_response(
                 flush_text(&mut text, &mut annotations, &mut content);
                 if !thinking.is_empty() {
                     content.push(ContentBlock::Reasoning(reasoning_block(
-                        thinking, "thinking", None, ns,
+                        thinking, "thinking", None, None, ns,
                     )));
                 }
             }

@@ -16,7 +16,7 @@ fn make_provider() -> Provider {
         .bearer_token(api_key)
         .provider_name("openai-compat")
         // A generic endpoint answers `Unknown` for every capability. The CI
-        // target (GitHub Models, gpt-4o-mini) supports these, so declare
+        // target (OpenAI's API, gpt-5.6-luna) supports these, so declare
         // them; extraction's `Auto` mode only uses capabilities known to be
         // supported.
         .chat_capability(

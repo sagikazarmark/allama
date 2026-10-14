@@ -46,6 +46,13 @@ const BUILTINS: &[Builtin] = &[
     Builtin::compat("deepinfra"),
     Builtin::compat("deepseek"),
     Builtin::compat("fireworks"),
+    // Copilot serves no embeddings.
+    Builtin::new(
+        "github-copilot",
+        &[Chat],
+        "openai-compat",
+        cfg!(feature = "openai-compat"),
+    ),
     Builtin::compat("groq"),
     Builtin::compat("mistral"),
     Builtin::compat("ollama"),
@@ -113,8 +120,8 @@ pub(crate) fn register(registry: &mut Registry) {
     #[cfg(feature = "openai-compat")]
     {
         use allama_openai_compat::providers::{
-            Azure, Cloudflare, DeepInfra, DeepSeek, Fireworks, Groq, Mistral, Ollama, OpenRouter,
-            Together, Vllm, XAi,
+            Azure, Cloudflare, DeepInfra, DeepSeek, Fireworks, GitHubCopilot, Groq, Mistral,
+            Ollama, OpenRouter, Together, Vllm, XAi,
         };
 
         type FromEnv = fn() -> allama::Result<allama_openai_compat::Provider>;
@@ -152,6 +159,14 @@ pub(crate) fn register(registry: &mut Registry) {
                 Azure::responses_from_env,
                 allama_openai_compat::ResponsesProvider::with_credential_scope,
                 allama_openai_compat::ResponsesProvider::with_chat_capabilities,
+            ),
+        );
+        registry.register_chat_with(
+            "github-copilot",
+            configured(
+                GitHubCopilot::from_env,
+                allama_openai_compat::Provider::with_credential_scope,
+                allama_openai_compat::Provider::with_chat_capabilities,
             ),
         );
     }
@@ -510,6 +525,7 @@ mod tests {
                 Some("deepseek"),
             ),
             ("fireworks", compat::Fireworks::PROVIDER_NAME, None),
+            ("github-copilot", compat::GitHubCopilot::PROVIDER_NAME, None),
             ("groq", compat::Groq::PROVIDER_NAME, Some("groq")),
             (
                 "mistral",

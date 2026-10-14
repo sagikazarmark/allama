@@ -62,6 +62,7 @@ async fn unary(name: &str) -> allama::Result<ChatResponse> {
 }
 
 const STREAMS: &[&str] = &[
+    "copilot_reasoning_opaque",
     "gemini_parallel_no_index",
     "gemini3_thought_signature",
     "mistral_thinking",
@@ -70,6 +71,7 @@ const STREAMS: &[&str] = &[
 ];
 
 const UNARY: &[&str] = &[
+    "copilot_reasoning_opaque",
     "mistral_thinking",
     "openrouter_reasoning_details",
     "openrouter_usage_cost",
@@ -302,6 +304,90 @@ async fn reasoning_details_are_kept_and_replayed() {
         ])
     );
     assert!(body["messages"][1].get("reasoning").is_none());
+    let codes: Vec<_> = response
+        .warnings
+        .iter()
+        .filter_map(|w| w.code.as_deref())
+        .collect();
+    assert_eq!(
+        codes,
+        ["dropped.reasoning_replay"],
+        "{:?}",
+        response.warnings
+    );
+}
+
+/// GitHub Copilot's `reasoning_text` is reasoning, with its
+/// `reasoning_opaque` signature on the block. A signature that arrives
+/// after the reasoning closed (Copilot sends a new one before each tool
+/// call) is a block of its own, in place. Under
+/// `ReasoningReplayField::ReasoningText` the turn's text goes back joined,
+/// with its last signature; reasoning without a signature does not.
+#[tokio::test]
+async fn reasoning_text_and_signature_are_kept_and_replayed() {
+    let signature = |block: &ContentBlock| {
+        block
+            .provider_data()
+            .get_raw(NAMESPACE, "reasoning_opaque")
+            .cloned()
+    };
+    let streamed = streamed("copilot_reasoning_opaque.sse").await.unwrap();
+    assert_eq!(streamed.content.len(), 4, "{:?}", streamed.content);
+    assert!(matches!(&streamed.content[0], ContentBlock::Reasoning(r)
+        if r.text == "The user wants the weather in Paris."));
+    assert_eq!(signature(&streamed.content[0]), Some(json!("c2lnLTE=")));
+    assert_eq!(streamed.content[1].as_text(), Some("Let me check."));
+    assert!(matches!(&streamed.content[2], ContentBlock::Reasoning(r) if r.is_opaque()));
+    assert_eq!(signature(&streamed.content[2]), Some(json!("c2lnLTI=")));
+    assert!(matches!(streamed.content[3], ContentBlock::ToolCall(_)));
+    assert_eq!(streamed.finish_reason, Some(FinishReason::ToolCalls));
+
+    let unary = unary("copilot_reasoning_opaque.json").await.unwrap();
+    assert_eq!(
+        unary.reasoning_text().as_deref(),
+        Some("The user wants the weather in Paris.")
+    );
+    assert_eq!(signature(&unary.content[0]), Some(json!("c2lnLTE=")));
+    // Modeled, so not kept again as unmodeled message fields.
+    assert!(
+        unary
+            .provider_data
+            .get_raw(NAMESPACE, "reasoning_opaque")
+            .is_none()
+    );
+
+    let mut replay = quirks();
+    replay.reasoning_replay = ReasoningReplayField::ReasoningText;
+    let (provider, transport) = provider(
+        replay,
+        vec![ReplayResponse::json(
+            200,
+            r#"{"choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"#,
+        )],
+    );
+    let mut request = ChatRequest::new("m").user("q");
+    request.push_message(streamed.to_assistant_message());
+    request.push_message(Message::tool_result("toolu_01", "get_weather", "sunny"));
+    // Reasoning without a signature (written by hand) cannot be replayed.
+    request.push_message(Message::user("and?"));
+    request.push_message(Message::assistant_blocks(vec![ContentBlock::reasoning(
+        "hand-written",
+    )]));
+    request.push_message(Message::user("go on"));
+    let response = provider.chat(&request).await.unwrap();
+    let body: Value = serde_json::from_str(transport.requests()[0].body_text().unwrap()).unwrap();
+    let assistant = &body["messages"][1];
+    assert_eq!(
+        assistant["reasoning_text"],
+        "The user wants the weather in Paris."
+    );
+    assert_eq!(assistant["reasoning_opaque"], "c2lnLTI=");
+    assert_eq!(assistant["content"], "Let me check.");
+    let hand_written = &body["messages"][4];
+    assert!(
+        hand_written.get("reasoning_text").is_none(),
+        "{hand_written}"
+    );
     let codes: Vec<_> = response
         .warnings
         .iter()

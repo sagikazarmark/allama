@@ -1,0 +1,18 @@
+data: {"id":"msg_vrtx_01","model":"claude-sonnet-4.5","created":1791350000,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"reasoning_text":"The user wants"},"finish_reason":null}]}
+
+data: {"id":"msg_vrtx_01","model":"claude-sonnet-4.5","created":1791350000,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"reasoning_text":" the weather in Paris."},"finish_reason":null}]}
+
+data: {"id":"msg_vrtx_01","model":"claude-sonnet-4.5","created":1791350000,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"reasoning_opaque":"c2lnLTE="},"finish_reason":null}]}
+
+data: {"id":"msg_vrtx_01","model":"claude-sonnet-4.5","created":1791350000,"choices":[{"index":0,"delta":{"role":"assistant","content":"Let me check."},"finish_reason":null}]}
+
+data: {"id":"msg_vrtx_01","model":"claude-sonnet-4.5","created":1791350000,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"reasoning_opaque":"c2lnLTI="},"finish_reason":null}]}
+
+data: {"id":"msg_vrtx_01","model":"claude-sonnet-4.5","created":1791350000,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"tool_calls":[{"index":0,"id":"toolu_01","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"msg_vrtx_01","model":"claude-sonnet-4.5","created":1791350000,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"tool_calls":[{"index":0,"function":{"arguments":"{\"city\":\"Paris\"}"}}]},"finish_reason":"tool_calls"}]}
+
+data: {"id":"msg_vrtx_01","model":"claude-sonnet-4.5","created":1791350000,"choices":[],"usage":{"prompt_tokens":120,"completion_tokens":40,"total_tokens":160,"prompt_tokens_details":{"cached_tokens":0},"completion_tokens_details":{"reasoning_tokens":12}}}
+
+data: [DONE]
+

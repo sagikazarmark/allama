@@ -550,8 +550,9 @@ pub enum ReasoningReplay {
 /// text ([`CompatQuirks::reasoning_replay`]).
 ///
 /// Endpoints disagree on the field: DeepSeek and vLLM take
-/// `reasoning_content`, Ollama emits `reasoning`, and OpenRouter takes its
-/// structured `reasoning_details` back. Reasoning from another provider is
+/// `reasoning_content`, Ollama emits `reasoning`, OpenRouter takes its
+/// structured `reasoning_details` back, and GitHub Copilot takes
+/// `reasoning_text` with a `reasoning_opaque` signature. Reasoning from another provider is
 /// never replayed, whichever field is set, and reasoning this endpoint
 /// returned is dropped without a warning when no field is set.
 ///
@@ -583,6 +584,12 @@ pub enum ReasoningReplayField {
     /// back as it came. Reasoning without details (from elsewhere, or
     /// written by hand) is dropped with a warning.
     ReasoningDetails,
+    /// `reasoning_text`, with the `reasoning_opaque` signature the
+    /// endpoint returned (GitHub Copilot). The turn's reasoning text goes
+    /// back joined, with its last signature: the endpoint sends a new one
+    /// before each tool call, and its own editor clients replay only the
+    /// latest.
+    ReasoningText,
 }
 
 /// Which request modes an endpoint serves.

@@ -1,0 +1,33 @@
+{
+  "id": "msg_vrtx_01",
+  "model": "claude-sonnet-4.5",
+  "created": 1791350000,
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Let me check.",
+        "reasoning_text": "The user wants the weather in Paris.",
+        "reasoning_opaque": "c2lnLTE=",
+        "tool_calls": [
+          {
+            "id": "toolu_01",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"Paris\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 120,
+    "completion_tokens": 40,
+    "total_tokens": 160
+  }
+}

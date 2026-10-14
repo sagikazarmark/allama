@@ -40,6 +40,7 @@ async fn hello() -> allama::Result<String> {
 | `Azure` | `AZURE_OPENAI_RESOURCE`, `AZURE_OPENAI_API_KEY` |
 | `Cloudflare` | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` |
 | `DeepInfra`, `DeepSeek`, `Fireworks`, `Groq`, `Mistral`, `OpenRouter`, `Together`, `XAi` | `<NAME>_API_KEY` |
+| `GitHubCopilot` | `COPILOT_GITHUB_TOKEN`, optional `GITHUB_COPILOT_BASE_URL` |
 | `Ollama` | none (`OLLAMA_HOST`) |
 | `Vllm` | `VLLM_BASE_URL`, optional `VLLM_API_KEY` |
 
@@ -70,8 +71,8 @@ Known gaps for 0.1, recorded so you can weigh them:
 - `fixtures/presets/*.json` are snapshots of the requests each preset
   builds: they pin the dialect against changes in this crate, not against
   the vendor. The weekly key-gated job (`tests/e2e_presets.rs`) calls
-  DeepInfra, DeepSeek, Fireworks, Groq, Mistral, OpenRouter, Together and
-  xAI when their keys are set, and Azure, on both of its APIs
+  DeepInfra, DeepSeek, Fireworks, GitHub Copilot, Groq, Mistral,
+  OpenRouter, Together and xAI when their keys are set, and Azure, on both of its APIs
   (`tests/e2e_azure.rs`), when its key and resource are. vLLM has no live
   job.
 - The Mistral (`thinking` parts) and OpenRouter (`reasoning_details`)
@@ -81,6 +82,15 @@ Known gaps for 0.1, recorded so you can weigh them:
   Mistral's API reference documents; `zai-glm-5-3` is sent `low` or
   `high` only (`Mistral::model_rules`). No live Mistral call has checked
   it yet.
+- GitHub Copilot's endpoint is not a published GitHub API. The
+  `GitHubCopilot` preset's reasoning shapes (`reasoning_text` with a
+  `reasoning_opaque` signature) are built from what Copilot's own editor
+  clients (VS Code, Zed) read and send back, and the refusals it maps
+  (`invalid_reasoning_effort`, `unsupported_api_for_model`) from Pydantic
+  AI's recordings; a model the token's plan does not serve
+  (`model_not_supported`, `ModelNotFound`) was seen live. Models the host
+  serves only on its Responses API are out of reach. The weekly job calls
+  it when `COPILOT_GITHUB_TOKEN` is set.
 - Mistral reasoning is not replayed. Mistral asks for the assistant
   message back with its `thinking` chunks, but no `ReasoningReplayField`
   sends them, so the `Mistral` preset drops the reasoning it returned on

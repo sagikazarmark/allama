@@ -353,17 +353,18 @@ jobs:
           AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
           AZURE_E2E_MODEL: gpt-6-luna
 
+  # The generic provider (a base URL and a key, no preset dialect) against
+  # OpenAI's own API, the reference every compatible endpoint follows. It
+  # pointed at GitHub Models until GitHub retired that service on
+  # 2026-07-30.
   openai-compat-generic:
     name: OpenAI Compatible (generic)
+    needs: credentials
     if: |
-      github.event_name == 'schedule' ||
-      inputs.provider == 'all' ||
-      inputs.provider == 'openai-compat/all' ||
-      inputs.provider == 'openai-compat/generic'
+      (github.event_name == 'schedule' || inputs.provider == 'all' || inputs.provider == 'openai-compat/all' || inputs.provider == 'openai-compat/generic') &&
+      (needs.credentials.outputs.openai == 'true' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      models: read
 
     steps:
       - name: Checkout repository
@@ -386,14 +387,19 @@ jobs:
       - name: Run e2e tests
         run: cargo test --locked -p allama-openai-compat --test e2e -- --ignored --nocapture
         env:
-          OPENAI_COMPAT_BASE_URL: https://models.github.ai/inference
-          OPENAI_COMPAT_API_KEY: ${{ github.token }}
-          OPENAI_COMPAT_MODEL: openai/gpt-4o-mini
-          OPENAI_COMPAT_EMBEDDING_MODEL: openai/text-embedding-3-small
+          OPENAI_COMPAT_BASE_URL: https://api.openai.com/v1
+          OPENAI_COMPAT_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # gpt-4.1-nano shuts down on 2026-10-23; OpenAI names this its
+          # replacement.
+          OPENAI_COMPAT_MODEL: gpt-5.6-luna
+          OPENAI_COMPAT_EMBEDDING_MODEL: text-embedding-3-small
 
   # The hosted presets (Groq, OpenRouter, DeepSeek, Mistral, Together,
-  # Fireworks, DeepInfra, xAI). Optional: each preset's test skips when its
-  # secret is missing, so this job covers whichever keys are configured.
+  # Fireworks, DeepInfra, xAI, GitHub Copilot). Optional: each preset's test
+  # skips when its secret is missing, so this job covers whichever keys are
+  # configured. Copilot needs a token with a Copilot seat (a fine-grained
+  # token with "Copilot Requests"): this repository is user-owned, so the
+  # workflow's own token cannot be granted `copilot-requests`.
   openai-compat-presets:
     name: OpenAI Compatible (presets)
     if: |
@@ -425,6 +431,7 @@ jobs:
       - name: Run e2e tests
         run: cargo test --locked -p allama-openai-compat --test e2e_presets -- --ignored --nocapture
         env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           DEEPINFRA_API_KEY: ${{ secrets.DEEPINFRA_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
