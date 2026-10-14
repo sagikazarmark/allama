@@ -12,6 +12,7 @@ review the diff (`tests/vendor_shapes.rs`).
 | `gemini3_thought_signature.sse` | Recorded 2026-10-07, same endpoint, `gemini-3-flash-preview` | Parallel calls in separate chunks without `index`, the first with `extra_content.google.thought_signature`; `finish_reason: "stop"` |
 | `mistral_thinking.sse`, `mistral_thinking.json` | Hand-built from Mistral's documented Magistral shape | `content` as an array of `thinking` and `text` parts |
 | `openrouter_reasoning_details.sse`, `openrouter_reasoning_details.json` | Hand-built from OpenRouter's reasoning-tokens guide | `reasoning` with `reasoning_details` (text with a signature, and encrypted reasoning) |
+| `copilot_reasoning_opaque.sse`, `copilot_reasoning_opaque.json` | Hand-built from the fields GitHub Copilot's editor clients read and replay (VS Code's `copilotChatEndpoint.ts` and `stream.ts`, Zed's `copilot_chat.rs`); not recorded | `reasoning_text` deltas, a whole `reasoning_opaque` signature after them, and a new one before a tool call |
 | `reasoning_after_text.sse` | Hand-built | Reasoning that resumes after text |
 | `openrouter_usage_cost.json` | Hand-built from OpenRouter's usage accounting | Vendor usage counters (`cost`), `native_finish_reason`, `logprobs` |
 | `tool_call_without_id.json` | Hand-built | A unary tool call without an `id`, and one with an empty `id` |

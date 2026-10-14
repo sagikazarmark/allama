@@ -151,7 +151,7 @@ applications pick providers by model address.
 
 | The endpoint… | Start from | You write |
 | --- | --- | --- |
-| is already a preset (Groq, Together, Fireworks, DeepInfra, OpenRouter, DeepSeek, xAI, Mistral, Ollama, vLLM, Azure, Cloudflare) | `allama_openai_compat::providers::<Preset>` | Nothing. Adjust with `<Preset>::builder(..)`. |
+| is already a preset (Groq, Together, Fireworks, DeepInfra, OpenRouter, DeepSeek, xAI, Mistral, Ollama, vLLM, Azure, Cloudflare, GitHub Copilot) | `allama_openai_compat::providers::<Preset>` | Nothing. Adjust with `<Preset>::builder(..)`. |
 | speaks OpenAI Chat Completions, with its own URL, auth, and a few accepted or rejected fields | `allama_openai_compat::Provider` with a `CompatQuirks` dialect | A `CompatQuirks` value and a builder call, in your application or a small crate. |
 | speaks the OpenAI Responses API | `allama_openai_compat::ResponsesProvider` with `ResponsesQuirks` (and `ResponsesModelRules` for per-model facts) | The same: a dialect and a builder call. |
 | speaks Chat Completions but has request fields of its own | `allama_openai_compat::Provider`, or a thin crate that wraps it | Vendor fields in `allama_openai_compat::ChatRequestOptions::extra` (fields the adapter owns are refused), and your capability answers through the builder (`chat_capability`) or a resolver (`with_chat_capabilities`). A wrapper crate with an options type of its own maps it onto `ChatRequestOptions` on the request it forwards. The Chat Completions wire types are internal; the `WireOptions` hooks `allama-openai` builds on are `#[doc(hidden)]` and not a stable API. |

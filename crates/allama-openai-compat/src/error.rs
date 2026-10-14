@@ -91,6 +91,10 @@ const EXTRA_PARAMS: &[&str] = &["logprobs", "top_logprobs"];
 ///   `param` `messages[N]`, and "Content blocks are expected to be either
 ///   …". The refusal has no subject: `N` counts the wire messages, which
 ///   start with the system prompts, not the caller's.
+/// - GitHub Copilot's `invalid_reasoning_effort` (no `param`): a level the
+///   model does not offer ("reasoning_effort \"none\" is not supported by
+///   model …"), or any effort for a model without one ("… does not support
+///   reasoning effort"), which refuses the parameter itself.
 /// - OpenAI Chat Completions' refusal of function tools with a reasoning
 ///   effort on a model that takes them together only on the Responses API
 ///   (`gpt-6-astra`): `code: null`, `param` `reasoning_effort`, and
@@ -125,6 +129,17 @@ fn upstream_refusal(error: &ApiError, status: Option<u16>) -> Option<(Option<Sub
             return Some((
                 None,
                 "the model does not support a content part that was sent".to_owned(),
+            ));
+        }
+        Some("invalid_reasoning_effort") => {
+            let what = if error.message.contains("does not support reasoning effort") {
+                ""
+            } else {
+                "this value of "
+            };
+            return Some((
+                field(RequestField::Reasoning),
+                format!("the model does not support {what}`reasoning_effort`"),
             ));
         }
         None if refuses_tools_with_reasoning(error) => {
@@ -210,7 +225,14 @@ fn codeless_refusal(error: &ApiError) -> Option<&'static str> {
 ///   for with `501` and "This server does not support embeddings. Start it
 ///   with `--embeddings`"; Ollama passes it through for a chat-only model.
 ///   Without this, the `501` would be a generic provider error.
+/// - GitHub Copilot answers `unsupported_api_for_model` for a model it
+///   serves only on another of its APIs ("model \"gpt-5.6-luna\" is not
+///   accessible via the /chat/completions endpoint"): the model exists, but
+///   not on this endpoint.
 fn unsupported_operation(error: &ApiError, status: Option<u16>) -> Option<&'static str> {
+    if error.code.as_deref() == Some("unsupported_api_for_model") {
+        return Some("the model is not served on this API");
+    }
     (status == Some(501)
         && error
             .message
@@ -348,7 +370,9 @@ fn classify(error: &ApiError, status: Option<u16>, quota_codes: &[Cow<'static, s
         "image_content_policy_violation",
     ]) {
         Error::content_filtered(message)
-    } else if is(&["model_not_found"]) {
+    // GitHub Copilot answers `model_not_supported` (400, `param: model`) for
+    // a model the token's plan does not serve (seen live, 2026-10-14).
+    } else if is(&["model_not_found", "model_not_supported"]) {
         Error::model_not_found(message)
     } else if is(&[
         "invalid_api_key",
@@ -672,6 +696,20 @@ mod tests {
             ),
             Error::ModelNotFound { .. }
         ));
+        // GitHub Copilot, for a model the token's plan does not serve: the
+        // code, type, param and status of a live reply (2026-10-14); the
+        // message is a stand-in.
+        let unserved = http(
+            400,
+            json!({"error": {"message": "The requested model is not supported.",
+                             "code": "model_not_supported", "param": "model",
+                             "type": "invalid_request_error"}}),
+        );
+        assert!(
+            matches!(unserved, Error::ModelNotFound { .. }),
+            "{unserved:?}"
+        );
+        assert_eq!(unserved.status(), Some(400));
         let rate = http(
             429,
             json!({"error": {"message": "slow down", "code": "rate_limit_exceeded"}}),
@@ -880,6 +918,54 @@ mod tests {
         assert_eq!(
             ollama.unsupported_stage(),
             Some(allama::UnsupportedStage::Provider)
+        );
+    }
+
+    /// GitHub Copilot's refusals, as recorded by Pydantic AI
+    /// (`tests/models/cassettes/test_github_copilot/`, 2026-09-07): a
+    /// reasoning effort the model does not offer, an effort for a model
+    /// without one, and a model served only on the Responses API. Copilot
+    /// sends them as `text/plain`, with no `param` or `type`.
+    #[test]
+    fn github_copilot_refusals_are_unsupported() {
+        use allama::UnsupportedStage::Provider;
+
+        let level = map_http_error(
+            400,
+            &Headers::new(),
+            r#"{"error":{"message":"reasoning_effort \"none\" is not supported by model claude-sonnet-5; supported values: [low medium high xhigh max]","code":"invalid_reasoning_effort"}}"#,
+        );
+        assert!(matches!(level, Error::Unsupported { .. }), "{level:?}");
+        assert_eq!(level.unsupported_stage(), Some(Provider));
+        assert_eq!(level.unsupported_field(), Some(RequestField::Reasoning));
+        assert_eq!(
+            level.message(),
+            "HTTP 400: the model does not support this value of `reasoning_effort`"
+        );
+
+        let none = map_http_error(
+            400,
+            &Headers::new(),
+            r#"{"error":{"message":"reasoning_effort \"medium\" was provided, but model claude-haiku-4.5 does not support reasoning effort","code":"invalid_reasoning_effort"}}"#,
+        );
+        assert_eq!(none.unsupported_field(), Some(RequestField::Reasoning));
+        assert_eq!(
+            none.message(),
+            "HTTP 400: the model does not support `reasoning_effort`"
+        );
+
+        let api = map_http_error(
+            400,
+            &Headers::new(),
+            r#"{"error":{"message":"model \"gpt-5.6-luna\" is not accessible via the /chat/completions endpoint","code":"unsupported_api_for_model"}}"#,
+        );
+        assert!(matches!(api, Error::Unsupported { .. }), "{api:?}");
+        assert_eq!(api.unsupported_stage(), Some(Provider));
+        assert_eq!(api.unsupported_subject(), None);
+        assert!(
+            api.upstream_message()
+                .is_some_and(|m| m.contains("/chat/completions")),
+            "{api:?}"
         );
     }
 

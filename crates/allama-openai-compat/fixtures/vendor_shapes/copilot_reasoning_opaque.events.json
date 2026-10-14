@@ -1,0 +1,123 @@
+[
+  {
+    "event": "response_start",
+    "id": "msg_vrtx_01",
+    "model": "claude-sonnet-4.5"
+  },
+  {
+    "event": "response_metadata",
+    "provider": "vendor"
+  },
+  {
+    "block_type": "reasoning",
+    "event": "block_start",
+    "index": 0
+  },
+  {
+    "event": "block_provider_data",
+    "index": 0,
+    "provider_data": {
+      "openai-compat:vendor": {
+        "reasoning_field": "reasoning_text"
+      }
+    }
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": "The user wants"
+  },
+  {
+    "event": "reasoning_delta",
+    "index": 0,
+    "text": " the weather in Paris."
+  },
+  {
+    "event": "block_provider_data",
+    "index": 0,
+    "provider_data": {
+      "openai-compat:vendor": {
+        "reasoning_opaque": "c2lnLTE="
+      }
+    }
+  },
+  {
+    "event": "block_stop",
+    "index": 0
+  },
+  {
+    "block_type": "text",
+    "event": "block_start",
+    "index": 1
+  },
+  {
+    "event": "text_delta",
+    "index": 1,
+    "text": "Let me check."
+  },
+  {
+    "event": "block_stop",
+    "index": 1
+  },
+  {
+    "block_type": "reasoning",
+    "event": "block_start",
+    "index": 2
+  },
+  {
+    "event": "block_provider_data",
+    "index": 2,
+    "provider_data": {
+      "openai-compat:vendor": {
+        "reasoning_field": "reasoning_text"
+      }
+    }
+  },
+  {
+    "event": "block_provider_data",
+    "index": 2,
+    "provider_data": {
+      "openai-compat:vendor": {
+        "reasoning_opaque": "c2lnLTI="
+      }
+    }
+  },
+  {
+    "event": "block_stop",
+    "index": 2
+  },
+  {
+    "block_type": "tool_call",
+    "event": "block_start",
+    "id": "toolu_01",
+    "index": 3,
+    "name": "get_weather"
+  },
+  {
+    "arguments": "{\"city\":\"Paris\"}",
+    "event": "tool_call_delta",
+    "index": 3
+  },
+  {
+    "event": "block_stop",
+    "index": 3
+  },
+  {
+    "event": "response_metadata",
+    "finish_reason": "tool_calls",
+    "finish_reason_raw": "tool_calls"
+  },
+  {
+    "event": "response_metadata",
+    "usage": {
+      "cache_read_input_tokens": 0,
+      "input_tokens": 120,
+      "output_tokens": 40,
+      "reasoning_tokens": 12,
+      "total_tokens": 160
+    }
+  },
+  {
+    "event": "response_stop"
+  }
+]

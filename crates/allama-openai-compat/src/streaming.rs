@@ -26,9 +26,9 @@ use crate::error::classify_api_error;
 use crate::quirks::CompatQuirks;
 use crate::wire::{
     ANNOTATIONS_KEY, ApiError, ChatCompletionChunk, ContentPiece, REASONING_DETAILS_KEY,
-    REASONING_FIELD_KEY, ResponseContext, USAGE_KEY, content_pieces, custom_call_content,
-    from_api_usage, keep_extra_field, made_up_call_id, parse_finish_reason, promote_stop,
-    tool_call_extra, usage_extra,
+    REASONING_FIELD_KEY, REASONING_OPAQUE_KEY, ResponseContext, USAGE_KEY, content_pieces,
+    custom_call_content, from_api_usage, keep_extra_field, made_up_call_id, parse_finish_reason,
+    promote_stop, tool_call_extra, usage_extra,
 };
 
 /// Incremental decoder state for one Chat Completions stream.
@@ -75,6 +75,9 @@ struct OpenReasoning {
     index: usize,
     /// OpenRouter `reasoning_details` fragments, merged by their `index`.
     details: Vec<Value>,
+    /// GitHub Copilot's `reasoning_opaque` signature: each one arrives
+    /// whole, and the last wins.
+    signature: Option<String>,
 }
 
 #[derive(Default)]
@@ -191,20 +194,33 @@ impl SseState {
                     extra.insert(key, value);
                 }
             }
-            let reasoning = match (&delta.reasoning_content, &delta.reasoning) {
-                (Some(text), _) if !text.is_empty() => Some((text.clone(), "reasoning_content")),
-                (_, Some(text)) if !text.is_empty() => Some((text.clone(), "reasoning")),
+            let reasoning = match (
+                &delta.reasoning_content,
+                &delta.reasoning,
+                &delta.reasoning_text,
+            ) {
+                (Some(text), _, _) if !text.is_empty() => Some((text.clone(), "reasoning_content")),
+                (_, Some(text), _) if !text.is_empty() => Some((text.clone(), "reasoning")),
+                (_, _, Some(text)) if !text.is_empty() => Some((text.clone(), "reasoning_text")),
                 _ => None,
             };
             let details = delta.reasoning_details.take().filter(|d| !d.is_empty());
-            if reasoning.is_some() || details.is_some() {
+            let signature = delta.reasoning_opaque.take().filter(|s| !s.is_empty());
+            if reasoning.is_some() || details.is_some() || signature.is_some() {
                 let field = match (&reasoning, &details) {
                     (Some((_, field)), _) => field,
-                    _ => REASONING_DETAILS_KEY,
+                    (None, Some(_)) => REASONING_DETAILS_KEY,
+                    // A signature alone, after the reasoning it signs was
+                    // closed (Copilot sends one before each tool call):
+                    // a block of its own, with no text.
+                    (None, None) => "reasoning_text",
                 };
                 let index = self.open_reasoning(field, &mut events);
                 if let Some(details) = details {
                     self.merge_details(details);
+                }
+                if let (Some(signature), Some(open)) = (signature, &mut self.reasoning) {
+                    open.signature = Some(signature);
                 }
                 if let Some((text, _)) = reasoning {
                     events.push(Ok(StreamEvent::reasoning_delta(index, text)));
@@ -580,6 +596,7 @@ impl SseState {
         self.reasoning = Some(OpenReasoning {
             index,
             details: Vec::new(),
+            signature: None,
         });
         events.push(Ok(StreamEvent::block_start(
             index,
@@ -641,15 +658,16 @@ impl SseState {
         let Some(open) = self.reasoning.take() else {
             return;
         };
+        let namespace = self.context.namespace.as_ref();
+        let mut data = ProviderData::new();
         if !open.details.is_empty() {
-            events.push(Ok(StreamEvent::block_provider_data(
-                open.index,
-                ProviderData::new().with_raw(
-                    self.context.namespace.as_ref(),
-                    REASONING_DETAILS_KEY,
-                    Value::Array(open.details),
-                ),
-            )));
+            data.insert_raw(namespace, REASONING_DETAILS_KEY, Value::Array(open.details));
+        }
+        if let Some(signature) = open.signature {
+            data.insert_raw(namespace, REASONING_OPAQUE_KEY, signature.into());
+        }
+        if !data.is_empty() {
+            events.push(Ok(StreamEvent::block_provider_data(open.index, data)));
         }
         events.push(Ok(StreamEvent::block_stop(open.index)));
     }

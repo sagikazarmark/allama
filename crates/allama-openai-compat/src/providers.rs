@@ -20,6 +20,7 @@
 //! | [`DeepInfra`] | `https://api.deepinfra.com/v1/openai` | `DEEPINFRA_API_KEY` |
 //! | [`DeepSeek`] | `https://api.deepseek.com` | `DEEPSEEK_API_KEY` |
 //! | [`Fireworks`] | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` |
+//! | [`GitHubCopilot`] | `https://api.githubcopilot.com` (`GITHUB_COPILOT_BASE_URL`) | `COPILOT_GITHUB_TOKEN` |
 //! | [`Groq`] | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
 //! | [`Mistral`] | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
 //! | [`Ollama`] | `http://localhost:11434/v1` (`OLLAMA_HOST`) | none |
@@ -809,6 +810,196 @@ impl Vllm {
     }
 }
 
+/// GitHub Copilot's Chat Completions endpoint, billed to the Copilot
+/// subscription of the token's owner.
+///
+/// This is not a published GitHub API: it is the endpoint Copilot's own
+/// clients call, and GitHub may change it without notice. GitHub's
+/// supported route for other applications is the Copilot SDK, which uses
+/// the same tokens.
+///
+/// # Tokens
+///
+/// The token is sent as a bearer token, as it is; there is no token
+/// exchange. GitHub's Copilot SDK documents these
+/// (<https://docs.github.com/en/copilot/how-tos/copilot-sdk/auth/authenticate>):
+///
+/// - an OAuth user token (`gho_`, such as `gh auth token` prints) or a
+///   GitHub App user token (`ghu_`);
+/// - a fine-grained personal access token (`github_pat_`) with the
+///   account permission "Copilot Requests";
+/// - in GitHub Actions, the workflow's `GITHUB_TOKEN` with the
+///   `copilot-requests: write` permission, in an organization-owned
+///   repository whose organization bills Copilot to itself.
+///
+/// Classic personal access tokens (`ghp_`) are refused.
+///
+/// # Hosts
+///
+/// Copilot Business and Enterprise plans may be served from their own
+/// host (`https://api.business.githubcopilot.com`,
+/// `https://api.enterprise.githubcopilot.com`): address it with
+/// [`builder_with_base_url`](Self::builder_with_base_url), or
+/// `GITHUB_COPILOT_BASE_URL` for [`from_env`][Self::from_env].
+///
+/// # Integration id
+///
+/// Every request carries `Copilot-Integration-Id`
+/// ([`INTEGRATION_ID`](Self::INTEGRATION_ID), the Copilot CLI's, which the
+/// Copilot SDK uses). Send another with
+/// [`ProviderBuilder::header`], which replaces it:
+///
+/// ```
+/// use allama_openai_compat::providers::GitHubCopilot;
+///
+/// let builder = GitHubCopilot::builder("gho_token")?.header("copilot-integration-id", "my-app");
+/// # let _ = builder;
+/// # Ok::<(), allama::Error>(())
+/// ```
+///
+/// # Models
+///
+/// Which model ids a token can use depends on its plan (`GET /models`
+/// lists them). Ids are sent as written, dots included
+/// (`claude-sonnet-4.5`). The host serves some models only on its
+/// Responses or Messages API, which this preset does not speak; the
+/// endpoint refuses those here (`unsupported_api_for_model`).
+///
+/// The output cap is sent as `max_completion_tokens`: the endpoint refuses
+/// `max_tokens`.
+///
+/// The reasoning effort is sent as `reasoning_effort`, and which levels a
+/// model takes is the model's to decide (ADR 0015): the endpoint refuses a
+/// level the model does not offer (Claude ids have no `none`) and an effort
+/// for a model without one (`claude-haiku-4.5`), which is
+/// [`Error::Unsupported`] with the reasoning as its subject. Claude ids
+/// reason adaptively, so the effort is a ceiling: an easy request gets no
+/// reasoning at any effort. Reasoning text arrives in `reasoning_text`
+/// with a `reasoning_opaque` signature, and both go back in later turns
+/// ([`ReasoningReplayField::ReasoningText`]).
+///
+/// The endpoint serves no embeddings.
+///
+#[cfg_attr(not(feature = "reqwest"), doc = "[Self::from_env]: crate#transport")]
+#[derive(Debug, Clone, Copy)]
+pub struct GitHubCopilot;
+
+impl GitHubCopilot {
+    /// The [`provider_name`](allama::ProviderIdentity::provider_name) this
+    /// preset reports.
+    pub const PROVIDER_NAME: &'static str = "github-copilot";
+
+    /// The default credential scope of this preset's providers, its
+    /// provider name: per-request credentials addressed to it
+    /// (`allama_http::HttpRequestOptions::credential`) are theirs. Change
+    /// it with [`ProviderBuilder::credential_scope`].
+    pub const DEFAULT_CREDENTIAL_SCOPE: &'static str = "github-copilot";
+
+    /// The provider-data namespace of the state this preset mints. Request
+    /// options use the shared [`NAMESPACE`](crate::NAMESPACE).
+    pub const NAMESPACE: &'static str = "openai-compat:github-copilot";
+
+    /// The base URL of [`builder`](Self::builder).
+    pub const BASE_URL: &'static str = "https://api.githubcopilot.com";
+
+    /// The `Copilot-Integration-Id` every request carries: the Copilot
+    /// CLI's, which the Copilot SDK uses.
+    pub const INTEGRATION_ID: &'static str = "copilot-developer-cli";
+
+    /// A provider for `https://api.githubcopilot.com`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the token is empty.
+    #[allow(clippy::new_ret_no_self)]
+    #[cfg(feature = "reqwest")]
+    pub fn new(token: &str) -> Result<Provider> {
+        Self::builder(token)?.build()
+    }
+
+    /// A pre-configured builder for `https://api.githubcopilot.com`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the token is empty.
+    pub fn builder(token: &str) -> Result<ProviderBuilder> {
+        Self::builder_with_base_url(Self::BASE_URL, token)
+    }
+
+    /// A provider for another Copilot host. See
+    /// [`builder_with_base_url`](Self::builder_with_base_url).
+    ///
+    /// # Errors
+    ///
+    /// See [`builder_with_base_url`](Self::builder_with_base_url).
+    #[cfg(feature = "reqwest")]
+    pub fn new_with_base_url(base_url: &str, token: &str) -> Result<Provider> {
+        Self::builder_with_base_url(base_url, token)?.build()
+    }
+
+    /// A pre-configured builder for another Copilot host, such as
+    /// `https://api.enterprise.githubcopilot.com`. Requests go to
+    /// `{base_url}/chat/completions`.
+    ///
+    /// # Errors
+    ///
+    /// An authored [`Error::Configuration`] when the token is empty, or the
+    /// base URL is not an absolute `http(s)` URL without a query
+    /// ([`allama_http::config::base_url`]).
+    pub fn builder_with_base_url(base_url: &str, token: &str) -> Result<ProviderBuilder> {
+        let base_url = allama_http::config::base_url("base_url", base_url)?;
+        Ok(
+            hosted(&base_url, token, Self::PROVIDER_NAME, Self::quirks())?
+                .header("copilot-integration-id", Self::INTEGRATION_ID),
+        )
+    }
+
+    /// The dialect this preset configures, under
+    /// [`NAMESPACE`](Self::NAMESPACE): reasoning goes back as
+    /// `reasoning_text` with its `reasoning_opaque` signature. The endpoint
+    /// routes to several vendors' models, so a strict schema is rewritten
+    /// for OpenAI's rules but not [verified](CompatQuirks::dialect_verified).
+    #[must_use]
+    pub fn quirks() -> CompatQuirks {
+        let mut q = CompatQuirks::new(Self::NAMESPACE);
+        // `max_tokens` is a bare `400 Bad Request` (no JSON, nothing names
+        // the field), and `max_completion_tokens` is accepted (recorded by
+        // Pydantic AI, `test_github_copilot_rejects_max_tokens`).
+        q.max_tokens_field = MaxTokensField::MaxCompletionTokens;
+        // Copilot's editor clients send both back on the assistant message
+        // (VS Code's `copilotChatEndpoint.ts`, Zed's `copilot_chat`).
+        // Copilot also takes a turn without them (Pydantic AI, probed live
+        // 2026-09-07), so dropping reasoning without a signature costs
+        // nothing.
+        q.reasoning_replay = ReasoningReplayField::ReasoningText;
+        q
+    }
+
+    /// Create a provider from `COPILOT_GITHUB_TOKEN` (the variable the
+    /// Copilot SDK reads first) and optional `GITHUB_COPILOT_BASE_URL`
+    /// (default `https://api.githubcopilot.com`).
+    ///
+    /// `GITHUB_TOKEN` and `GH_TOKEN` are not read: they usually hold a
+    /// token for GitHub's REST API, which is not a Copilot token.
+    ///
+    /// # Errors
+    ///
+    /// An authored [`Error::Configuration`] naming the variable when
+    /// `COPILOT_GITHUB_TOKEN` is not set or holds a value no HTTP header can
+    /// carry, or `GITHUB_COPILOT_BASE_URL` is not a valid base URL.
+    #[cfg(feature = "reqwest")]
+    pub fn from_env() -> Result<Provider> {
+        let token = env_secret("COPILOT_GITHUB_TOKEN")?;
+        match optional_env_var("GITHUB_COPILOT_BASE_URL") {
+            Some(url) => Self::new_with_base_url(
+                &allama_http::config::base_url("GITHUB_COPILOT_BASE_URL", &url)?,
+                &token,
+            ),
+            None => Self::new(&token),
+        }
+    }
+}
+
 /// Azure OpenAI through its OpenAI-compatible v1 API.
 ///
 /// Address a resource by name ([`builder`](Self::builder), for
@@ -1430,6 +1621,85 @@ mod tests {
             rules.chat_capability("gemma4:cloud", ChatCapability::StructuredOutput),
             Unsupported
         );
+    }
+
+    /// GitHub Copilot: the token as a bearer token, the integration id on
+    /// every request (replaceable), another host by base URL, and no rules
+    /// per model id (ADR 0015).
+    #[tokio::test]
+    async fn github_copilot_sends_token_and_integration_id() {
+        use allama::{ChatRequest, ProviderIdentity};
+        use allama_http::{ReplayResponse, ReplayTransport};
+
+        let reply = || {
+            ReplayResponse::json(
+                200,
+                r#"{"id":"c1","model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}]}"#,
+            )
+        };
+        let transport = ReplayTransport::new([reply()]);
+        let copilot = GitHubCopilot::builder(" gho_token ")
+            .unwrap()
+            .http_transport(transport.clone())
+            .build()
+            .unwrap();
+        copilot
+            .chat(
+                &ChatRequest::new("claude-sonnet-4.5")
+                    .user("Hi")
+                    .max_output_tokens(100)
+                    .reasoning(
+                        allama::ReasoningConfig::new().effort(allama::ReasoningEffort::Medium),
+                    ),
+            )
+            .await
+            .unwrap();
+        let sent = &transport.requests()[0];
+        assert_eq!(sent.url, "https://api.githubcopilot.com/chat/completions");
+        assert_eq!(sent.headers.get("authorization"), Some("Bearer gho_token"));
+        assert_eq!(
+            sent.headers.get("copilot-integration-id"),
+            Some("copilot-developer-cli")
+        );
+        let body: serde_json::Value = serde_json::from_slice(sent.body.as_ref().unwrap()).unwrap();
+        assert_eq!(body["model"], "claude-sonnet-4.5");
+        assert_eq!(body["max_completion_tokens"], 100);
+        assert_eq!(body["reasoning_effort"], "medium", "{body}");
+        assert!(body.get("max_tokens").is_none(), "{body}");
+        assert_eq!(copilot.provider_name(), "github-copilot");
+        assert_eq!(copilot.quirks().namespace, GitHubCopilot::NAMESPACE);
+        assert_eq!(
+            copilot.quirks().reasoning_replay,
+            ReasoningReplayField::ReasoningText
+        );
+        assert_eq!(
+            copilot.model_rules("claude-haiku-4.5"),
+            ChatModelRules::new()
+        );
+
+        let transport = ReplayTransport::new([reply()]);
+        let enterprise = GitHubCopilot::builder_with_base_url(
+            "https://api.enterprise.githubcopilot.com/",
+            "gho_token",
+        )
+        .unwrap()
+        .header("Copilot-Integration-Id", "my-app")
+        .http_transport(transport.clone())
+        .build()
+        .unwrap();
+        enterprise
+            .chat(&ChatRequest::new("gpt-5.4").user("Hi"))
+            .await
+            .unwrap();
+        let sent = &transport.requests()[0];
+        assert_eq!(
+            sent.url,
+            "https://api.enterprise.githubcopilot.com/chat/completions"
+        );
+        assert_eq!(sent.headers.get("copilot-integration-id"), Some("my-app"));
+
+        assert!(GitHubCopilot::builder(" ").is_err());
+        assert!(GitHubCopilot::builder_with_base_url("api.githubcopilot.com", "t").is_err());
     }
 
     /// Ollama's `TestHost` and `TestConnectableHost` tables

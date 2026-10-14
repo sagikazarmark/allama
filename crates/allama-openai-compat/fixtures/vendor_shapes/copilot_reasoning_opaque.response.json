@@ -1,0 +1,46 @@
+{
+  "content": [
+    {
+      "provider_data": {
+        "openai-compat:vendor": {
+          "reasoning_field": "reasoning_text",
+          "reasoning_opaque": "c2lnLTE="
+        }
+      },
+      "text": "The user wants the weather in Paris.",
+      "type": "reasoning"
+    },
+    {
+      "text": "Let me check.",
+      "type": "text"
+    },
+    {
+      "provider_data": {
+        "openai-compat:vendor": {
+          "reasoning_field": "reasoning_text",
+          "reasoning_opaque": "c2lnLTI="
+        }
+      },
+      "text": "",
+      "type": "reasoning"
+    },
+    {
+      "arguments": "{\"city\":\"Paris\"}",
+      "id": "toolu_01",
+      "name": "get_weather",
+      "type": "tool_call"
+    }
+  ],
+  "finish_reason": "tool_calls",
+  "finish_reason_raw": "tool_calls",
+  "id": "msg_vrtx_01",
+  "model": "claude-sonnet-4.5",
+  "provider": "vendor",
+  "usage": {
+    "cache_read_input_tokens": 0,
+    "input_tokens": 120,
+    "output_tokens": 40,
+    "reasoning_tokens": 12,
+    "total_tokens": 160
+  }
+}
