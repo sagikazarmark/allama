@@ -389,7 +389,9 @@ jobs:
         env:
           OPENAI_COMPAT_BASE_URL: https://api.openai.com/v1
           OPENAI_COMPAT_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_COMPAT_MODEL: gpt-4.1-nano
+          # gpt-4.1-nano shuts down on 2026-10-23; OpenAI names this its
+          # replacement.
+          OPENAI_COMPAT_MODEL: gpt-5.6-luna
           OPENAI_COMPAT_EMBEDDING_MODEL: text-embedding-3-small
 
   # The hosted presets (Groq, OpenRouter, DeepSeek, Mistral, Together,
