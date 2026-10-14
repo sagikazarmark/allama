@@ -98,6 +98,7 @@
 //! | `openai-chat` | `allama_openai::Provider` (Chat Completions) | | | `openai` |
 //! | `openai-responses` | `allama_openai::ResponsesProvider`, as `openai` | | | `openai` |
 //! | `azure-responses` | `allama_openai_compat::ResponsesProvider` (`Azure::responses_from_env`) | | | `openai-compat` |
+//! | `github-copilot` | `allama_openai_compat` preset (`GitHubCopilot`, Chat Completions) | | | `openai-compat` |
 //! | `azure`, `deepinfra`, `deepseek`, `fireworks`, `groq`, `mistral`, `together`, `vllm`, `xai` | `allama_openai_compat` preset | same preset | | `openai-compat` |
 //! | `cloudflare`, `ollama`, `openrouter` | `allama_openai_compat` preset | same preset | `allama_systemone` preset | `openai-compat`, `systemone` |
 //! | `digitalocean`, `litellm`, `typesafe` | | | `allama_systemone` preset | `systemone` |
@@ -113,7 +114,8 @@
 //! key. `openai-responses` is `openai` under the name Pydantic AI also
 //! accepts, so its model strings resolve unchanged. The keys named after an
 //! API (`openai-chat`, `openai-responses`, `azure-responses`) offer chat
-//! only.
+//! only. `github-copilot`, Pydantic AI's name too, is chat only: Copilot
+//! serves no embeddings.
 //!
 //! A built-in key reaches the same adapter and endpoint in every 0.x
 //! release. `gemini` is Gemini's `generateContent` API, which Google now

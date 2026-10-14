@@ -141,6 +141,7 @@ an allowlist of addresses you configured, and never pass their string to
 | `openai-chat` | Chat Completions | no | no | `openai` |
 | `openai-responses` | Responses API, as `openai` | no | no | `openai` |
 | `azure-responses` | Azure OpenAI Responses API | no | no | `openai-compat` |
+| `github-copilot` | GitHub Copilot, Chat Completions | no | no | `openai-compat` |
 | `azure`, `cloudflare`, `deepinfra`, `deepseek`, `fireworks`, `groq`, `mistral`, `together`, `vllm`, `xai` | `allama-openai-compat` presets | yes | no | `openai-compat` |
 | `ollama`, `openrouter` | `allama-openai-compat` presets | yes | `allama-systemone` presets | `openai-compat`, `systemone` |
 | `digitalocean`, `litellm`, `typesafe` | no | no | `allama-systemone` presets | `systemone` |
