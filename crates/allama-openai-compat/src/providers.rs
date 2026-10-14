@@ -195,6 +195,29 @@ fn is_ollama_cloud(base_url: &str) -> bool {
     host == "ollama.com" || host.ends_with(".ollama.com")
 }
 
+/// Whether a checked base URL ([`allama_http::config::base_url`]) is
+/// `https://`, or `http://` on a loopback host (`localhost`, `127.0.0.0/8`,
+/// `::1`).
+fn is_https_or_loopback(base_url: &str) -> bool {
+    let Some((scheme, rest)) = base_url.split_once("://") else {
+        return false;
+    };
+    if scheme.eq_ignore_ascii_case("https") {
+        return true;
+    }
+    let authority = rest.split('/').next().unwrap_or_default();
+    // User info (`user:password@`) is not the host.
+    let host_port = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let host = split_host_port(host_port).map_or(host_port, |(host, _)| host);
+    let host = host.trim_matches(['[', ']']);
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
 /// Go's `net.SplitHostPort`: `host:port` or `[host]:port`, where an
 /// unbracketed host has no colon.
 fn split_host_port(value: &str) -> Option<(&str, &str)> {
@@ -941,13 +964,24 @@ impl GitHubCopilot {
     /// `https://api.enterprise.githubcopilot.com`. Requests go to
     /// `{base_url}/chat/completions`.
     ///
+    /// Plain `http://` is refused except on loopback (a local proxy): the
+    /// token is a GitHub credential, and every Copilot host serves HTTPS.
+    ///
     /// # Errors
     ///
     /// An authored [`Error::Configuration`] when the token is empty, or the
     /// base URL is not an absolute `http(s)` URL without a query
-    /// ([`allama_http::config::base_url`]).
+    /// ([`allama_http::config::base_url`]), or is `http://` on a host other
+    /// than loopback.
     pub fn builder_with_base_url(base_url: &str, token: &str) -> Result<ProviderBuilder> {
         let base_url = allama_http::config::base_url("base_url", base_url)?;
+        if !is_https_or_loopback(&base_url) {
+            return Err(Error::configuration(
+                "`base_url` must use `https://` (plain `http://` only on loopback): \
+                 the GitHub Copilot token is a GitHub credential",
+            )
+            .authored());
+        }
         Ok(
             hosted(&base_url, token, Self::PROVIDER_NAME, Self::quirks())?
                 .header("copilot-integration-id", Self::INTEGRATION_ID),
@@ -986,7 +1020,8 @@ impl GitHubCopilot {
     ///
     /// An authored [`Error::Configuration`] naming the variable when
     /// `COPILOT_GITHUB_TOKEN` is not set or holds a value no HTTP header can
-    /// carry, or `GITHUB_COPILOT_BASE_URL` is not a valid base URL.
+    /// carry, or `GITHUB_COPILOT_BASE_URL` is not a valid base URL or is
+    /// plain `http://` off loopback.
     #[cfg(feature = "reqwest")]
     pub fn from_env() -> Result<Provider> {
         let token = env_secret("COPILOT_GITHUB_TOKEN")?;
@@ -1700,6 +1735,34 @@ mod tests {
 
         assert!(GitHubCopilot::builder(" ").is_err());
         assert!(GitHubCopilot::builder_with_base_url("api.githubcopilot.com", "t").is_err());
+
+        // The token is a GitHub credential: never in the clear off loopback.
+        for base_url in [
+            "http://api.githubcopilot.com",
+            "http://10.0.0.5:8080",
+            "http://localhost.evil.example",
+            "http://localhost@evil.example",
+            "http://127.0.0.1.evil.example",
+        ] {
+            let err = GitHubCopilot::builder_with_base_url(base_url, "t").unwrap_err();
+            assert!(
+                matches!(err, Error::Configuration { .. }),
+                "{base_url}: {err:?}"
+            );
+        }
+        for base_url in [
+            "http://localhost:8080",
+            "HTTP://LOCALHOST",
+            "http://127.0.0.1:4141/copilot",
+            "http://[::1]:4141",
+            "http://user:pw@127.0.0.1",
+            "https://copilot-proxy.internal",
+        ] {
+            assert!(
+                GitHubCopilot::builder_with_base_url(base_url, "t").is_ok(),
+                "{base_url}"
+            );
+        }
     }
 
     /// Ollama's `TestHost` and `TestConnectableHost` tables
