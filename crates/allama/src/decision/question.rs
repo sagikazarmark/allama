@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Every question is answered against the whole input; answers are not
 /// passed to later questions. Build one with [`Question::yes_no`],
-/// [`Question::choice`], or [`Question::score`]:
+/// [`Question::choice`], [`Question::score`], or [`Question::locate`]:
 ///
 /// ```
 /// use allama::decision::Question;
@@ -32,6 +32,8 @@ pub enum Question {
     Choice(ChoiceQuestion),
     /// Rate on an ordered scale of levels.
     Score(ScoreQuestion),
+    /// Find one target in the request's images (ADR 0018).
+    Locate(LocateQuestion),
 }
 
 impl Question {
@@ -54,6 +56,14 @@ impl Question {
         ScoreQuestion::new(instructions)
     }
 
+    /// A question that finds one target in the request's images, such as
+    /// "the coffee mug in the photo", and answers with its bounding box.
+    /// The request needs at least one image.
+    #[must_use]
+    pub fn locate(instructions: impl Into<String>) -> LocateQuestion {
+        LocateQuestion::new(instructions)
+    }
+
     /// The kind of question.
     #[must_use]
     pub fn kind(&self) -> QuestionKind {
@@ -61,6 +71,7 @@ impl Question {
             Self::YesNo(_) => QuestionKind::YesNo,
             Self::Choice(_) => QuestionKind::Choice,
             Self::Score(_) => QuestionKind::Score,
+            Self::Locate(_) => QuestionKind::Locate,
         }
     }
 
@@ -71,6 +82,7 @@ impl Question {
             Self::YesNo(q) => &q.instructions,
             Self::Choice(q) => &q.instructions,
             Self::Score(q) => &q.instructions,
+            Self::Locate(q) => &q.instructions,
         }
     }
 }
@@ -93,6 +105,12 @@ impl From<ScoreQuestion> for Question {
     }
 }
 
+impl From<LocateQuestion> for Question {
+    fn from(question: LocateQuestion) -> Self {
+        Self::Locate(question)
+    }
+}
+
 /// The kind of a [`Question`] or [`Answer`](super::Answer).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -104,11 +122,13 @@ pub enum QuestionKind {
     Choice,
     /// A rating question.
     Score,
+    /// A question that finds one target in the images.
+    Locate,
 }
 
 impl QuestionKind {
     /// Every kind, in declaration order.
-    pub const ALL: &[Self] = &[Self::YesNo, Self::Choice, Self::Score];
+    pub const ALL: &[Self] = &[Self::YesNo, Self::Choice, Self::Score, Self::Locate];
 
     /// The kind's name, as used in diagnostics.
     #[must_use]
@@ -117,6 +137,7 @@ impl QuestionKind {
             Self::YesNo => "yes/no",
             Self::Choice => "choice",
             Self::Score => "score",
+            Self::Locate => "locate",
         }
     }
 }
@@ -328,6 +349,41 @@ impl ScoreLevel {
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
+    }
+}
+
+/// Asks where one target is in the request's images; answered with its
+/// bounding box (ADR 0018).
+///
+/// The instructions name the target, and the image to search when the
+/// request has several: "the coffee mug in the photo". A target that is not
+/// there still gets a box, so ask a yes/no question alongside when it may
+/// be absent.
+///
+/// ```
+/// use allama::decision::Question;
+/// use allama::{DecisionRequest, Image};
+///
+/// let request = DecisionRequest::new("jev-preview", "A kitchen counter.")
+///     .image(Image::base64("image/jpeg", "/9j/4AAQ..."))
+///     .question("visible", Question::yes_no("Is there a coffee mug in the image?"))
+///     .question("mug", Question::locate("the coffee mug"));
+/// # let _ = request;
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LocateQuestion {
+    /// What to find, and in which image.
+    pub instructions: String,
+}
+
+impl LocateQuestion {
+    /// A question finding what `instructions` describe.
+    #[must_use]
+    pub fn new(instructions: impl Into<String>) -> Self {
+        Self {
+            instructions: instructions.into(),
+        }
     }
 }
 

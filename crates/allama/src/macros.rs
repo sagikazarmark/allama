@@ -176,7 +176,7 @@ mod tests {
         );
         names_agree(
             DecisionCapability::VARIANTS,
-            &["yes_no", "choice", "score", "image_input"],
+            &["yes_no", "choice", "score", "locate", "image_input"],
         );
         names_agree(
             CapabilitySupport::VARIANTS,
