@@ -33,8 +33,16 @@ pub struct DecisionRequestOptions {
     /// only: another endpoint is not sent it, with a warning.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keep_alive: Option<KeepAlive>,
+    /// Raise TypeSafe's context limits for this request, from 64k tokens
+    /// per request and 32k per question to 262k for both. TypeSafe calls it
+    /// a preview: such requests are slower and less accurate, so set it only
+    /// on the requests that need it. TypeSafe only: another endpoint is not
+    /// sent it, with a warning.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub long_context: bool,
     /// Endpoint-specific body fields, merged into the request. A field the
-    /// adapter owns (`model`, `state`, `questions`, `keep_alive`, `images`;
+    /// adapter owns (`model`, `state`, `questions`, `keep_alive`, `images`,
+    /// `assets`;
     /// images are [`DecisionRequest::images`](allama::DecisionRequest::images))
     /// is refused with [`Error::InvalidRequest`](allama::Error::InvalidRequest).
     /// In the JSON form it is the nested `extra` object.
@@ -61,6 +69,13 @@ impl DecisionRequestOptions {
     #[must_use]
     pub fn keep_alive(mut self, keep_alive: impl Into<KeepAlive>) -> Self {
         self.keep_alive = Some(keep_alive.into());
+        self
+    }
+
+    /// Raise TypeSafe's context limits (see [`long_context`](Self::long_context)).
+    #[must_use]
+    pub fn long_context(mut self, enabled: bool) -> Self {
+        self.long_context = enabled;
         self
     }
 

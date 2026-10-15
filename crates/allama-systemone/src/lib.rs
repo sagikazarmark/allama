@@ -33,7 +33,9 @@
 //! # Mapping
 //!
 //! - Yes/no questions are System One `noul` questions; their probability is
-//!   the `noul` field.
+//!   the `noul` field. Locate questions are `box` questions, whose edges
+//!   become the [`LocateAnswer`](allama::decision::LocateAnswer); TypeSafe
+//!   serves them on Jev 1.14 (`jev-preview`), behind its images header.
 //! - Option descriptions become `criteria`; a score level becomes the
 //!   string `label: description` (or its label alone), the convention of the
 //!   protocol's own examples.
@@ -42,10 +44,13 @@
 //! - Each provider's `confidence` statistic is kept in provider data as
 //!   [`Confidence`]: TypeSafe and Ollama compute it differently.
 //! - [`DecisionRequest::images`](allama::DecisionRequest::images) go to the
-//!   endpoints that take them, inline only: Ollama as bare base64, and
-//!   Cloudflare as `{"content_type", "base64"}`. TypeSafe's protocol has no
-//!   images, so its endpoints refuse them before sending.
-//! - Ollama's `keep_alive` is a [`DecisionRequestOptions`] field.
+//!   endpoints that take them, inline only: Ollama as bare base64,
+//!   Cloudflare as `{"content_type", "base64"}`, and TypeSafe as `assets`
+//!   the state refers to, behind its opt-in header (see
+//!   [`TypeSafe`](providers::TypeSafe)). The gateways forward TypeSafe's
+//!   protocol without images, so they refuse them before sending.
+//! - Ollama's `keep_alive` and TypeSafe's `long_context` are
+//!   [`DecisionRequestOptions`] fields.
 //! - Cloudflare's own differences (a URL per model, a model selector, its
 //!   envelopes) are the [`Cloudflare`](providers::Cloudflare) preset's.
 //!
@@ -105,6 +110,14 @@ pub const NAMESPACE: &str = "systemone";
 /// The default [`provider_name`](allama::ProviderIdentity::provider_name) of
 /// [`Provider`]. Presets in [`providers`] report their own.
 pub const PROVIDER_NAME: &str = "systemone";
+
+/// The header TypeSafe requires on a request with images
+/// (its "danger zone" opt-in).
+const TYPESAFE_IMAGES_HEADER: &str = "typesafe-danger-zone-images";
+
+/// The header that raises TypeSafe's context limits
+/// ([`DecisionRequestOptions::long_context`]).
+const TYPESAFE_LONG_CONTEXT_HEADER: &str = "typesafe-danger-zone-long-context";
 
 /// The default credential scope of [`Provider`]: its default provider name.
 /// A provider with another [`provider_name`](ProviderBuilder::provider_name),
@@ -196,10 +209,11 @@ impl Provider {
     /// options, the body, and the HTTP request with the caller's transport
     /// options applied.
     ///
-    /// `keep_alive` is Ollama's: another endpoint is not sent it, and since
-    /// it is a hint, it is dropped with a warning. Images go to the
-    /// endpoints that take them (Ollama, Cloudflare), each in its own form;
-    /// they change the answer, so another endpoint refuses them.
+    /// `keep_alive` is Ollama's and `long_context` TypeSafe's: another
+    /// endpoint is not sent them, and since they are hints, they are dropped
+    /// with a warning. Images go to the endpoints that take them (TypeSafe,
+    /// Ollama, Cloudflare), each in its own form; they change the answer, so
+    /// another endpoint refuses them.
     fn encode(
         &self,
         prepared: &mut allama::adapter::decision::Prepared<'_>,
@@ -233,17 +247,37 @@ impl Provider {
                 "`keep_alive` is an Ollama option this endpoint does not take; it was not sent",
             )?;
         }
+        if dialect != wire::Dialect::TypeSafe && std::mem::take(&mut options.long_context) {
+            d.hint(
+                Subject::Other {
+                    name: "`long_context`".into(),
+                },
+                "`long_context` is a TypeSafe option this endpoint does not take; it was not sent",
+            )?;
+        }
         let body = serde_json::to_string(&wire::encode(request, &options, dialect, d)?)?;
         let config = &self.inner.transport;
         let url = match dialect {
             wire::Dialect::WorkersAi => format!("{}/{}", config.url(), model_path(&request.model)?),
-            wire::Dialect::SystemOne | wire::Dialect::Ollama => config.url(),
+            wire::Dialect::SystemOne | wire::Dialect::TypeSafe | wire::Dialect::Ollama => {
+                config.url()
+            }
         };
         let mut http = HttpRequest::post(url, body)
             .header("content-type", "application/json")
             .timeout(config.timeout);
         if let Some((name, value)) = &config.auth {
             http = http.header(name, value);
+        }
+        // TypeSafe serves images and long context only to requests that
+        // opt in: images are opted into by sending them.
+        if dialect == wire::Dialect::TypeSafe {
+            if !request.images.is_empty() {
+                http = http.header(TYPESAFE_IMAGES_HEADER, "true");
+            }
+            if options.long_context {
+                http = http.header(TYPESAFE_LONG_CONTEXT_HEADER, "true");
+            }
         }
         let http = http
             .with_headers(&config.headers)
@@ -317,7 +351,7 @@ impl DecisionProvider for Provider {
             // The Cloudflare API wraps the model's output.
             wire::Dialect::WorkersAi => serde_json::from_slice::<wire::CloudflareEnvelope>(&bytes)
                 .and_then(|envelope| serde_json::from_str(envelope.result.get())),
-            wire::Dialect::SystemOne | wire::Dialect::Ollama => {
+            wire::Dialect::SystemOne | wire::Dialect::TypeSafe | wire::Dialect::Ollama => {
                 serde_json::from_slice::<wire::WireResponse>(&bytes)
             }
         };
