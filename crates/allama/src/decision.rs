@@ -4,7 +4,9 @@
 //! probabilities instead of generating text: the probability that the answer
 //! is yes ([`Question::yes_no`]), a pick among options
 //! ([`Question::choice`]), or a rating on an ordered scale of levels
-//! ([`Question::score`]). Providers implement [`DecisionProvider`].
+//! ([`Question::score`]). Models that read images may also find a target in
+//! them ([`Question::locate`]), answered with its bounding box rather than a
+//! probability (ADR 0018). Providers implement [`DecisionProvider`].
 //!
 //! The portable model is what the decision protocols share. Provider
 //! statistics such as a "confidence" summary are computed differently by
@@ -83,13 +85,14 @@ pub use provider::{
     DecisionCapability, DecisionProvider, DecisionProviderExt, DynDecisionProvider,
 };
 pub use question::{
-    ChoiceOption, ChoiceQuestion, Question, QuestionKind, ScoreLevel, ScoreQuestion, YesNoQuestion,
+    ChoiceOption, ChoiceQuestion, LocateQuestion, Question, QuestionKind, ScoreLevel,
+    ScoreQuestion, YesNoQuestion,
 };
 #[doc(no_inline)]
 pub use request::{DecisionLimits, DecisionRequest};
 #[doc(no_inline)]
 pub use response::DecisionResponse;
-pub use response::{Answer, ChoiceAnswer, ScoreAnswer, YesNoAnswer};
+pub use response::{Answer, ChoiceAnswer, LocateAnswer, ScoreAnswer, YesNoAnswer};
 #[doc(hidden)]
 pub use typed::__private;
 pub use typed::{

@@ -13,7 +13,8 @@
 //! ```
 //!
 //! A screenshot (PNG, JPEG or WebP) needs a model that reads images, such
-//! as Clef; TypeSafe refuses it before sending.
+//! as Clef or Jev; TypeSafe takes PNG and JPEG only, and refuses WebP before
+//! sending.
 
 use std::process::ExitCode;
 

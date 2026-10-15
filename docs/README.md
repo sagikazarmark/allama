@@ -59,4 +59,5 @@ Runnable examples are in [`crates/allama/examples`](../crates/allama/examples)
 | [0015](decisions/0015-provider-level-capabilities.md) | Capabilities belong to the provider; model knowledge is an opt-in catalog |
 | [0016](decisions/0016-model-addresses-and-the-builtin-registry.md) | Model addresses have a fixed grammar; the built-in registry is closed |
 | [0017](decisions/0017-conformance-contract-lifecycle.md) | Conformance contracts are added in minor releases, and required only when adapters pass them |
+| [0018](decisions/0018-locate-questions.md) | Locate questions answer with one bounding box, in fractions of the image |
 

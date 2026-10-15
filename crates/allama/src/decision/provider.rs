@@ -20,6 +20,8 @@ pub enum DecisionCapability {
     Choice,
     /// Score questions.
     Score,
+    /// Locate questions (ADR 0018).
+    Locate,
     /// Images read together with the input
     /// ([`DecisionRequest::images`](crate::DecisionRequest::images)).
     ImageInput,
@@ -29,12 +31,19 @@ enum_names!(DecisionCapability, "decision capability", {
     YesNo => "yes_no",
     Choice => "choice",
     Score => "score",
+    Locate => "locate",
     ImageInput => "image_input",
 });
 
 impl DecisionCapability {
     /// Every capability, in declaration order.
-    pub const ALL: &[Self] = &[Self::YesNo, Self::Choice, Self::Score, Self::ImageInput];
+    pub const ALL: &[Self] = &[
+        Self::YesNo,
+        Self::Choice,
+        Self::Score,
+        Self::Locate,
+        Self::ImageInput,
+    ];
 }
 
 impl From<QuestionKind> for DecisionCapability {
@@ -43,6 +52,7 @@ impl From<QuestionKind> for DecisionCapability {
             QuestionKind::YesNo => Self::YesNo,
             QuestionKind::Choice => Self::Choice,
             QuestionKind::Score => Self::Score,
+            QuestionKind::Locate => Self::Locate,
         }
     }
 }

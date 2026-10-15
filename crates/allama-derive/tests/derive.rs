@@ -1,6 +1,6 @@
 use allama::decision::{
-    Answer, Choice, ChoiceAnswer, ChoiceSet, Decision, DecisionField, Question, QuestionKind,
-    Scale, Score, ScoreAnswer, YesNoAnswer,
+    Answer, Choice, ChoiceAnswer, ChoiceSet, Decision, DecisionField, LocateAnswer, Question,
+    QuestionKind, Scale, Score, ScoreAnswer, YesNoAnswer,
 };
 use allama::{DecisionLimits, DecisionResponse};
 use serde_json::json;
@@ -446,6 +446,43 @@ fn doc_comments_fall_back() {
             ("refund", "Is a refund requested?"),
             ("urgency", "How urgent is it?"),
         ]
+    );
+}
+
+/// A locate field asks a locate question and decodes the box.
+#[test]
+fn locate_fields() {
+    #[derive(Debug, Decision)]
+    struct Kitchen {
+        /// Is there a coffee mug in the photo?
+        visible: YesNoAnswer,
+        /// the coffee mug in the photo
+        mug: LocateAnswer,
+    }
+
+    assert_eq!(LocateAnswer::KIND, QuestionKind::Locate);
+    let questions = Kitchen::questions();
+    assert_eq!(
+        serde_json::to_value(&questions[1].1).unwrap(),
+        json!({"type": "locate", "instructions": "the coffee mug in the photo"})
+    );
+    let mug = LocateAnswer::new(0.44, 0.25, 0.84, 0.82);
+    let kitchen = Kitchen::from_response(&DecisionResponse::new([
+        ("visible", YesNoAnswer::new(0.9).into()),
+        ("mug", mug.into()),
+    ]))
+    .unwrap();
+    assert!(kitchen.visible.is_yes());
+    assert_eq!(kitchen.mug, mug);
+    let err = Kitchen::from_response(&DecisionResponse::new([
+        ("visible", YesNoAnswer::new(0.9).into()),
+        ("mug", YesNoAnswer::new(0.9).into()),
+    ]))
+    .unwrap_err();
+    assert!(
+        err.message()
+            .contains("expected a locate answer, found a yes/no answer"),
+        "{err}"
     );
 }
 

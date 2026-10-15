@@ -147,12 +147,19 @@ impl DecisionResponse {
         self.answer(name)?.as_score()
     }
 
+    /// The answer to the locate question named `name`.
+    #[must_use]
+    pub fn locate(&self, name: &str) -> Option<&LocateAnswer> {
+        self.answer(name)?.as_locate()
+    }
+
     /// Check that this response answers `request`.
     ///
     /// Every question must be answered exactly once by an answer of its
     /// kind, and nothing else may be answered. A choice must be one of the
     /// question's options and carry exactly one probability per option; a
-    /// score must carry one probability per level and lie on the scale.
+    /// score must carry one probability per level and lie on the scale; a
+    /// located box must lie in the image with its edges in order.
     /// Probabilities must lie in `[0, 1]`. They are not required to sum to
     /// exactly 1: providers round them. A choice is not required to be the
     /// most likely option either, since providers report both.
@@ -246,6 +253,9 @@ impl DecisionResponse {
                         ));
                     }
                 }
+                (Question::Locate(_), Answer::Locate(answer)) => {
+                    check_box(name, answer)?;
+                }
                 _ => unreachable!("kinds were compared above"),
             }
         }
@@ -269,6 +279,8 @@ pub enum Answer {
     Choice(ChoiceAnswer),
     /// Answer to a score question.
     Score(ScoreAnswer),
+    /// Answer to a locate question.
+    Locate(LocateAnswer),
 }
 
 impl Answer {
@@ -279,6 +291,7 @@ impl Answer {
             Self::YesNo(_) => QuestionKind::YesNo,
             Self::Choice(_) => QuestionKind::Choice,
             Self::Score(_) => QuestionKind::Score,
+            Self::Locate(_) => QuestionKind::Locate,
         }
     }
 
@@ -308,6 +321,15 @@ impl Answer {
             _ => None,
         }
     }
+
+    /// The locate answer, if this is one.
+    #[must_use]
+    pub fn as_locate(&self) -> Option<&LocateAnswer> {
+        match self {
+            Self::Locate(answer) => Some(answer),
+            _ => None,
+        }
+    }
 }
 
 impl From<YesNoAnswer> for Answer {
@@ -325,6 +347,12 @@ impl From<ChoiceAnswer> for Answer {
 impl From<ScoreAnswer> for Answer {
     fn from(answer: ScoreAnswer) -> Self {
         Self::Score(answer)
+    }
+}
+
+impl From<LocateAnswer> for Answer {
+    fn from(answer: LocateAnswer) -> Self {
+        Self::Locate(answer)
     }
 }
 
@@ -502,6 +530,82 @@ impl ScoreAnswer {
     }
 }
 
+/// Where the target of a locate question is: the bounding box around it
+/// (ADR 0018).
+///
+/// Each edge is a fraction of the image's size, measured from its top-left
+/// corner: `left` and `right` of its width, `top` and `bottom` of its
+/// height, with `0 ≤ left ≤ right ≤ 1` and `0 ≤ top ≤ bottom ≤ 1`. Multiply
+/// by the image's size in pixels to draw or crop the box.
+///
+/// It carries no probability: a provider's confidence statistic, when it
+/// reports one, is provider data. A target that is not in the image still
+/// gets a box.
+///
+/// This is also the typed answer of a locate field in a
+/// [`Decision`](super::Decision).
+///
+/// ```
+/// use allama::decision::LocateAnswer;
+///
+/// let mug = LocateAnswer::new(0.44, 0.25, 0.84, 0.82);
+/// assert_eq!(mug.to_pixels(1000, 600), (440, 150, 840, 492));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LocateAnswer {
+    /// The left edge, as a fraction of the image's width.
+    pub left: f64,
+    /// The top edge, as a fraction of the image's height.
+    pub top: f64,
+    /// The right edge, as a fraction of the image's width.
+    pub right: f64,
+    /// The bottom edge, as a fraction of the image's height.
+    pub bottom: f64,
+}
+
+impl LocateAnswer {
+    /// A box with these edges, as fractions of the image's size.
+    #[must_use]
+    pub fn new(left: f64, top: f64, right: f64, bottom: f64) -> Self {
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    /// The box's width, as a fraction of the image's width.
+    #[must_use]
+    pub fn width(&self) -> f64 {
+        self.right - self.left
+    }
+
+    /// The box's height, as a fraction of the image's height.
+    #[must_use]
+    pub fn height(&self) -> f64 {
+        self.bottom - self.top
+    }
+
+    /// The box in pixels of an image `width` by `height`, as
+    /// `(left, top, right, bottom)`, each edge rounded to the nearest pixel
+    /// and kept within the image.
+    #[must_use]
+    pub fn to_pixels(&self, width: u32, height: u32) -> (u32, u32, u32, u32) {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let scale = |edge: f64, size: u32| -> u32 {
+            (edge.clamp(0.0, 1.0) * f64::from(size)).round() as u32
+        };
+        (
+            scale(self.left, width),
+            scale(self.top, height),
+            scale(self.right, width),
+            scale(self.bottom, height),
+        )
+    }
+}
+
 /// Rounding slack accepted on probabilities and scores.
 const TOLERANCE: f64 = 1e-6;
 
@@ -530,6 +634,34 @@ fn check_probability(name: &str, probability: f64) -> Result<()> {
             format!("reports probability {probability} outside 0..=1"),
         ))
     }
+}
+
+/// A located box lies in the image, its edges in order.
+fn check_box(name: &str, answer: &LocateAnswer) -> Result<()> {
+    let LocateAnswer {
+        left,
+        top,
+        right,
+        bottom,
+    } = *answer;
+    let in_image = |edge: f64| edge.is_finite() && (-TOLERANCE..=1.0 + TOLERANCE).contains(&edge);
+    if ![left, top, right, bottom].into_iter().all(in_image) {
+        return Err(unexpected(
+            name,
+            format!(
+                "reports a box (left {left}, top {top}, right {right}, bottom {bottom}) outside 0..=1"
+            ),
+        ));
+    }
+    if left > right + TOLERANCE || top > bottom + TOLERANCE {
+        return Err(unexpected(
+            name,
+            format!(
+                "reports a box whose edges are out of order (left {left}, top {top}, right {right}, bottom {bottom})"
+            ),
+        ));
+    }
+    Ok(())
 }
 
 fn unexpected(name: &str, problem: impl std::fmt::Display) -> Error {
@@ -701,5 +833,63 @@ mod tests {
         let text = serde_json::to_string(&response()).unwrap();
         let back: DecisionResponse = serde_json::from_str(&text).unwrap();
         assert_eq!(back, response());
+    }
+
+    fn locate_request() -> DecisionRequest {
+        DecisionRequest::new("m", "a kitchen")
+            .image(crate::Image::base64("image/png", "aGk="))
+            .question("mug", Question::locate("the coffee mug"))
+    }
+
+    #[test]
+    fn located_boxes_lie_in_the_image_in_order() {
+        let check = |answer: LocateAnswer| {
+            DecisionResponse::new([("mug", answer.into())]).validate(&locate_request())
+        };
+        check(LocateAnswer::new(0.44, 0.25, 0.84, 0.82)).unwrap();
+        // The whole image, and a box of no area.
+        check(LocateAnswer::new(0.0, 0.0, 1.0, 1.0)).unwrap();
+        check(LocateAnswer::new(0.5, 0.5, 0.5, 0.5)).unwrap();
+        for (answer, problem) in [
+            (LocateAnswer::new(-0.1, 0.25, 0.84, 0.82), "outside 0..=1"),
+            (LocateAnswer::new(0.44, 0.25, 1.2, 0.82), "outside 0..=1"),
+            (
+                LocateAnswer::new(0.44, f64::NAN, 0.84, 0.82),
+                "outside 0..=1",
+            ),
+            (LocateAnswer::new(0.84, 0.25, 0.44, 0.82), "out of order"),
+            (LocateAnswer::new(0.44, 0.82, 0.84, 0.25), "out of order"),
+        ] {
+            let err = check(answer).unwrap_err();
+            assert!(err.message().contains(problem), "{answer:?}: {err}");
+        }
+        let err = DecisionResponse::new([("mug", YesNoAnswer::new(0.5).into())])
+            .validate(&locate_request())
+            .unwrap_err();
+        assert!(
+            err.message()
+                .contains("is a locate question, answered as yes/no"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn locate_answers_read_in_pixels() {
+        let response =
+            DecisionResponse::new([("mug", LocateAnswer::new(0.25, 0.1, 0.75, 0.6).into())]);
+        let mug = response.locate("mug").unwrap();
+        assert!((mug.width() - 0.5).abs() < 1e-9);
+        assert!((mug.height() - 0.5).abs() < 1e-9);
+        assert_eq!(mug.to_pixels(640, 480), (160, 48, 480, 288));
+        // Out-of-range edges are kept within the image.
+        assert_eq!(
+            LocateAnswer::new(-0.1, 0.0, 1.1, 1.0).to_pixels(100, 50),
+            (0, 0, 100, 50)
+        );
+        assert!(response.yes_no("mug").is_none());
+        assert_eq!(
+            serde_json::to_value(&response).unwrap()["answers"]["mug"],
+            json!({"type": "locate", "left": 0.25, "top": 0.1, "right": 0.75, "bottom": 0.6})
+        );
     }
 }

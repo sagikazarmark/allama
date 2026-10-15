@@ -9,6 +9,12 @@ Copied verbatim from the official API documentation (2026-10-02):
 - `typesafe/department.json`, `frustration.json`, `is_urgent.json`: the
   per-answer-type example responses of <https://docs.typesafe.ai/api>.
 
+Copied verbatim from the official API documentation (2026-10-15):
+
+- `typesafe/box.json`: the example response of
+  <https://docs.typesafe.ai/primitives/box>, a Box (locate) answer from
+  `jev-1.14.0`.
+
 Recorded from the live API (2026-10-02):
 
 - `typesafe/recorded_triage.json`: `jev-latest` (served as `jev-1.13.0`)

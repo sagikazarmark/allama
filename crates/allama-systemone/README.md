@@ -36,7 +36,7 @@ extensions of its own, images among them.
   the version.
 - **Hosted, with TypeSafe**: set `TYPESAFE_API_KEY` to a key from
   TypeSafe, then use the `TypeSafe` preset with `jev-latest`
-  (`typesafe:jev-latest`).
+  (`typesafe:jev-latest`), or `jev-preview` for the newest release.
 - **Hosted, with Cloudflare**: set `CLOUDFLARE_ACCOUNT_ID` and
   `CLOUDFLARE_API_TOKEN` (a token with Workers AI access), then use the
   `Cloudflare` preset with `@cf/cloudflare/clef`
@@ -46,7 +46,7 @@ extensions of its own, images among them.
 ```bash
 # TypeSafe when TYPESAFE_API_KEY is set, Cloudflare when CLOUDFLARE_API_TOKEN is, else Ollama.
 cargo run -p allama-examples --example provider_decision
-# With a screenshot, for a model that reads images (Clef).
+# With a screenshot, for a model that reads images (Clef, Jev).
 cargo run -p allama-examples --example provider_decision -- "Checkout fails." error.png
 ```
 
@@ -117,13 +117,46 @@ async fn main() -> anyhow::Result<()> {
 | `Question::yes_no` (+ `yes`/`no` descriptions) | `noul` (+ `criteria: {"true", "false"}`) |
 | `Question::choice` options | `choice` with `criteria: {key: description \| null}` |
 | `Question::score` levels | `score` with `criteria: ["label: description" \| "label", ...]` |
+| `Question::locate` | `box` (TypeSafe, Jev 1.14) |
 | `YesNoAnswer::probability` | `noul` |
 | `ChoiceAnswer::chosen` | `choice` |
 | `ScoreAnswer::probabilities` | `probabilities: {"0": .., "1": ..}` (the `legend` echo is dropped) |
+| `LocateAnswer` edges | `box: {"left", "top", "right", "bottom"}` |
 | provider data `Confidence` | `confidence` (formulas differ between TypeSafe and Ollama) |
 | `DecisionResponse::id`; provider data `Gateway` | OpenRouter's `id`; its `provider` and `usage.cost` |
-| `DecisionRequest::images` (inline data) | `images`: bare base64 on Ollama, `{"content_type", "base64"}` on Cloudflare; refused before sending on TypeSafe and the gateways, and as a URL or provider file everywhere |
+| `DecisionRequest::images` (inline data) | `images`: bare base64 on Ollama, `{"content_type", "base64"}` on Cloudflare; `assets` the state refers to on TypeSafe (see below); refused before sending on the gateways, and as a URL or provider file everywhere |
 | `DecisionRequestOptions::keep_alive` | Ollama's `keep_alive` (the Ollama preset only: elsewhere it is dropped with a warning) |
+| `DecisionRequestOptions::long_context` | the `TypeSafe-Danger-Zone-Long-Context: true` header (the TypeSafe preset only: elsewhere it is dropped with a warning) |
+
+### TypeSafe images
+
+TypeSafe serves images as a preview ("danger zone") that each request opts
+into with the `TypeSafe-Danger-Zone-Images: true` header; the preset sends
+it with every request that has images, and only then. Both Jev 1.13
+(`jev-latest`) and Jev 1.14 (`jev-preview`) read them.
+
+TypeSafe takes each image once, in the body's `assets`, under a reference
+string, and shows the model the image wherever the reference occurs. The
+preset names them `[image-0]`, `[image-1]` and so on (salted, as
+`[image-0-1]`, when the request's own text already holds one), and appends
+the references to the state in its own shape, so the paths questions
+refer to stay valid:
+
+| Input | State sent |
+| --- | --- |
+| text | the text, a blank line, then one reference per line |
+| JSON array | the array, with the references as further elements |
+| JSON object | the object, with an `images` array of the references (an object that has its own `images` field is refused) |
+
+A locate question (`Question::locate`) is TypeSafe's Box question, which
+Jev 1.14 (`jev-preview`) answers with one bounding box; Jev 1.13
+(`jev-latest` for now) refuses it with HTTP 400 ("Invalid request."), an
+`Error::InvalidRequest`. Like any other request with an image, it is sent
+behind the images header. Its confidence is provider data (`Confidence`).
+
+TypeSafe reads PNG and JPEG only; other media types are refused before
+sending. Its other limits (16 MiB per file, 256 to 1568 pixels a side) are
+checked by TypeSafe, which answers `400` or `413`.
 
 ### Cloudflare (Clef)
 
