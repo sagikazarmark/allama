@@ -16,7 +16,7 @@ Use it when you want to:
 - normalize streaming, tool calls, usage, and errors across providers
 - move conversations between providers without leaking opaque state
 - produce embedding vectors from multiple providers with a single trait
-- ask decision models typed questions (yes/no, choice, score) and read
+- ask decision models typed questions (yes/no, choice, score, locate) and read
   probabilities, untyped or through `#[derive(Decision)]`
 - ask extraction models for typed fields (text spans, numbers, dates,
   durations, lists, estimates, forecasts) and read values with null
@@ -118,7 +118,7 @@ which mock to pick and when scripted errors surface.
 | --- | --- |
 | Requests | `ChatRequest`, `Message`, `ContentPart` (`Text`, `Image`, `File`), `MediaSource` (`Url`, `Base64`, `ProviderFile`), `SystemPrompt`, `ToolDefinition`, `ToolChoice`, `ResponseFormat`, `ReasoningConfig`, `PromptCache` |
 | Responses | `ChatResponse`, `ContentBlock` (`Text`, `Image`, `ToolCall`, `Reasoning`, `Refusal`, `ProviderToolCall`, `ProviderToolResult`, `Other`), `FinishReason`, `Usage`, `Warning` |
-| Decisions | `DecisionRequest`, `DecisionResponse`, `DecisionLimits`; in `decision`: `DecisionInput`, `Question` (`yes_no`, `choice`, `score`), `Answer`; typed: `Decision`, `ChoiceSet`, `Scale`, `Choice`, `Score`, `DecisionProviderExt::decide_as` |
+| Decisions | `DecisionRequest`, `DecisionResponse`, `DecisionLimits`; in `decision`: `DecisionInput`, `Question` (`yes_no`, `choice`, `score`, `locate`), `Answer`; typed: `Decision`, `ChoiceSet`, `Scale`, `Choice`, `Score`, `LocateAnswer`, `DecisionProviderExt::decide_as` |
 | Extraction (unstable) | `ExtractionRequest`, `ExtractionResponse`, `ExtractionLimits`; in `extraction`: `Field` (`text`, `number`, `date`, `time`, `datetime`, `duration`, `list`, `estimate`, `forecast`), `Answer`, `TextSpan`, `PredictionInterval`, `Date`, `Time`, `DateTime` |
 | Streaming | `StreamEvent`, `ChatStreamExt::{next_event, collect_response, with_collector}`, `CollectedEvent`; in `chat::stream`: `StreamCollector`, `StreamTranscript`, `until_committed` |
 | Provider escape hatches | `ProviderOptions` / `RequestOptions` (typed or JSON request options), `ProviderData` (namespaced provider state on blocks, messages, responses) |

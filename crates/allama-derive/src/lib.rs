@@ -91,7 +91,7 @@ pub fn derive_scale(input: TokenStream) -> TokenStream {
 ///   (default `::allama`).
 ///
 /// Field types must implement `DecisionField`: `YesNoAnswer`, `Choice<T>`,
-/// `Score<T>`, or an enum deriving `ChoiceSet`.
+/// `Score<T>`, `LocateAnswer`, or an enum deriving `ChoiceSet`.
 #[proc_macro_derive(Decision, attributes(decision))]
 pub fn derive_decision(input: TokenStream) -> TokenStream {
     expand(input, decision::expand)

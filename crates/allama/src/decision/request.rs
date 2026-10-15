@@ -127,6 +127,7 @@ impl DecisionRequest {
     ///   scope;
     /// - a choice has fewer than two options or a score fewer than two
     ///   levels;
+    /// - a locate question is asked of a request without images;
     /// - the request exceeds `limits`, its images included.
     pub fn validate(&self, limits: &DecisionLimits) -> Result<()> {
         if self.model.trim().is_empty() {
@@ -194,6 +195,13 @@ impl DecisionRequest {
                     check_max(score.levels.len(), limits.max_score_levels, || {
                         format!("levels in question {name:?}")
                     })?;
+                }
+                Question::Locate(_) => {
+                    if self.images.is_empty() {
+                        return Err(fail(
+                            "a locate question needs an image in the request".into(),
+                        ));
+                    }
                 }
             }
         }
@@ -543,6 +551,22 @@ mod tests {
         assert_eq!(
             serde_json::to_value(request()).unwrap()["input"],
             json!("ticket")
+        );
+    }
+    #[test]
+    fn a_locate_question_needs_an_image() {
+        let request = DecisionRequest::new("m", "a kitchen")
+            .question("mug", Question::locate("the coffee mug"));
+        let err = request.validate(&DecisionLimits::new()).unwrap_err();
+        assert!(matches!(err, Error::InvalidRequest { .. }), "{err:?}");
+        assert!(err.message().contains("needs an image"), "{err}");
+        request
+            .image(Image::base64("image/png", "aGk="))
+            .validate(&DecisionLimits::new())
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(Question::from(Question::locate("the mug"))).unwrap(),
+            json!({"type": "locate", "instructions": "the mug"})
         );
     }
 }

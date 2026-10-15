@@ -1,7 +1,7 @@
 {
   "chat_capabilities": ["tool_calls", "streaming", "forced_tool_choice"],
   "embedding_capabilities": ["batch_input", "output_dimensions", "image_input", "composite_input", "input_type"],
-  "decision_capabilities": ["yes_no", "choice", "score", "image_input"],
+  "decision_capabilities": ["yes_no", "choice", "score", "locate", "image_input"],
   "capability_support": ["supported", "unsupported", "unknown"],
   "errors": [
     {"type": "rejected", "data": {"message": "tenant budget exhausted", "context": {"provider_code": "tenant_budget_exhausted", "message_origin": "authored"}}},

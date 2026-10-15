@@ -6,7 +6,8 @@ use std::marker::PhantomData;
 
 use super::response::most_likely_level;
 use super::{
-    Answer, DecisionInput, DecisionRequest, DecisionResponse, Question, QuestionKind, YesNoAnswer,
+    Answer, DecisionInput, DecisionRequest, DecisionResponse, LocateAnswer, Question, QuestionKind,
+    YesNoAnswer,
 };
 use crate::{Error, Result};
 
@@ -56,8 +57,8 @@ use crate::{Error, Result};
 /// ```
 ///
 /// Field types implement [`DecisionField`]: [`YesNoAnswer`], [`Choice<T>`],
-/// [`Score<T>`], or an enum deriving [`ChoiceSet`] (which keeps only the
-/// chosen option).
+/// [`Score<T>`], [`LocateAnswer`] (whose request needs an image), or an enum
+/// deriving [`ChoiceSet`] (which keeps only the chosen option).
 ///
 /// # Attributes
 ///
@@ -125,7 +126,7 @@ pub struct Decided<T> {
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be a decision question",
     label = "not a decision field",
-    note = "use `YesNoAnswer`, `Choice<T>`, `Score<T>`, or an enum deriving `ChoiceSet`"
+    note = "use `YesNoAnswer`, `Choice<T>`, `Score<T>`, `LocateAnswer`, or an enum deriving `ChoiceSet`"
 )]
 pub trait DecisionField: Sized {
     /// The kind of question this field asks.
@@ -196,6 +197,21 @@ impl DecisionField for YesNoAnswer {
     fn from_answer(answer: &Answer) -> std::result::Result<Self, AnswerMismatch> {
         match answer {
             Answer::YesNo(answer) => Ok(*answer),
+            other => Err(AnswerMismatch::kind(Self::KIND, other)),
+        }
+    }
+}
+
+impl DecisionField for LocateAnswer {
+    const KIND: QuestionKind = QuestionKind::Locate;
+
+    fn question(instructions: impl Into<String>) -> Question {
+        Question::locate(instructions).into()
+    }
+
+    fn from_answer(answer: &Answer) -> std::result::Result<Self, AnswerMismatch> {
+        match answer {
+            Answer::Locate(answer) => Ok(*answer),
             other => Err(AnswerMismatch::kind(Self::KIND, other)),
         }
     }

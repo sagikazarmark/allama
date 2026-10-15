@@ -417,8 +417,12 @@ What a decision model reads before answering: text, or a JSON object or array wh
 _Avoid_: State
 
 **Question**:
-A named request for one answer about the decision input: a yes/no question, a choice among options, or a score on an ordered scale of levels. Questions are answered independently; answers are not passed to later questions.
+A named request for one answer about the decision input: a yes/no question, a choice among options, a score on an ordered scale of levels, or a locate question. Questions are answered independently; answers are not passed to later questions.
 _Avoid_: Primitive, field (an extraction model's request for a value)
+
+**Locate question**:
+A question that finds one target in the request's images and answers with its bounding box (`Question::locate`, `LocateAnswer`): the box's left, top, right and bottom edges as fractions of the image's width and height, measured from its top-left corner. It is localization (one box for one target), not detection (any number of boxes). The answer carries no probability and has no "not found" form, so a yes/no question in the same request tells whether the target is there. A locate question needs an image in the request. TypeSafe calls it a Box question. See ADR 0019.
+_Avoid_: Box question (TypeSafe's wire name), detection
 
 **Option**:
 One candidate answer of a choice question: a key the model can pick, with an optional description. The model reads both, so a key is prompt text.
