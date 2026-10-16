@@ -73,7 +73,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up devenv
-        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        uses: sagikazarmark/setup-devenv@c36f9e57ca50ee1a6dad1a05a1a684e321f8096a # v0.3.0
         with:
           # Leaves out the services the shell runs locally.
           profile: ci
@@ -122,7 +122,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up devenv
-        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        uses: sagikazarmark/setup-devenv@c36f9e57ca50ee1a6dad1a05a1a684e321f8096a # v0.3.0
         with:
           # Leaves out the services the shell runs locally.
           profile: ci
@@ -180,7 +180,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up devenv
-        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        uses: sagikazarmark/setup-devenv@c36f9e57ca50ee1a6dad1a05a1a684e321f8096a # v0.3.0
         with:
           # Leaves out the services the shell runs locally.
           profile: ci
