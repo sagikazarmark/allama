@@ -73,13 +73,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up devenv
-        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        uses: sagikazarmark/setup-devenv@c36f9e57ca50ee1a6dad1a05a1a684e321f8096a # v0.3.0
         with:
           # Leaves out the services the shell runs locally.
           profile: ci
 
       - name: Set up Rust cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
           cmd-format: devenv shell -- {0}
@@ -122,13 +122,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up devenv
-        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        uses: sagikazarmark/setup-devenv@c36f9e57ca50ee1a6dad1a05a1a684e321f8096a # v0.3.0
         with:
           # Leaves out the services the shell runs locally.
           profile: ci
 
       - name: Set up Rust cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
           cmd-format: devenv shell -- {0}
@@ -180,13 +180,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up devenv
-        uses: sagikazarmark/setup-devenv@90406f4a932213700a1ecf235ea13ba70fe9ac5d # v0.2.1
+        uses: sagikazarmark/setup-devenv@c36f9e57ca50ee1a6dad1a05a1a684e321f8096a # v0.3.0
         with:
           # Leaves out the services the shell runs locally.
           profile: ci
 
       - name: Set up Rust cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
           cmd-format: devenv shell -- {0}
