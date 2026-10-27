@@ -230,6 +230,7 @@ version = "0.2.0"
 dependencies = [
  "allama",
  "allama-anthropic",
+ "allama-cloudflare",
  "allama-conformance",
  "allama-gemini",
  "allama-openai",

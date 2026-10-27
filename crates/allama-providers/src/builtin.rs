@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::registry::Operation::{self, Chat, Decision, Embedding};
+use crate::registry::Operation::{self, Chat, Decision, Embedding, Extraction};
 use crate::{AdapterSettings, Registry};
 
 /// Every built-in provider, whether or not its feature is on. A key may
@@ -61,6 +61,12 @@ const BUILTINS: &[Builtin] = &[
     Builtin::compat("vllm"),
     Builtin::compat("xai"),
     Builtin::systemone("cloudflare"),
+    Builtin::new(
+        "cloudflare",
+        &[Extraction],
+        "cloudflare",
+        cfg!(feature = "cloudflare"),
+    ),
     Builtin::systemone("digitalocean"),
     Builtin::systemone("litellm"),
     Builtin::systemone("ollama"),
@@ -193,6 +199,17 @@ pub(crate) fn register(registry: &mut Registry) {
                 scoped(from_env, allama_systemone::Provider::with_credential_scope),
             );
         }
+    }
+
+    #[cfg(feature = "cloudflare")]
+    {
+        registry.register_extraction_with(
+            "cloudflare",
+            scoped(
+                allama_cloudflare::Provider::from_env,
+                allama_cloudflare::Provider::with_credential_scope,
+            ),
+        );
     }
 
     let _ = registry;
@@ -423,6 +440,29 @@ mod tests {
         let (provider, model) = crate::decision::from_model("ollama:nimble").unwrap();
         assert_eq!(provider.provider_name(), "ollama");
         assert_eq!(model, "nimble");
+    }
+
+    /// The `cloudflare` key offers extraction beside its other operations;
+    /// the lookup needs the account's variables, like the others.
+    #[cfg(feature = "cloudflare")]
+    #[test]
+    fn cloudflare_offers_extraction() {
+        let err = crate::extraction::from_provider("anthropic").unwrap_err();
+        assert!(
+            err.message()
+                .starts_with("provider `anthropic` does not offer extractions (it offers chat); "),
+            "{}",
+            err.message()
+        );
+        assert!(err.message().contains("cloudflare"), "{}", err.message());
+        // A lookup fails on the environment, not on the key.
+        let err = crate::extraction::from_model("cloudflare:@cf/cloudflare/clairic")
+            .err()
+            .filter(|err| err.message().contains("CLOUDFLARE_"));
+        assert!(
+            err.is_some() || std::env::var("CLOUDFLARE_API_TOKEN").is_ok(),
+            "the lookup should reach the provider's own constructor"
+        );
     }
 
     #[cfg(feature = "systemone")]

@@ -90,7 +90,7 @@ footprint:
 musl:
     #!/usr/bin/env bash
     set -euo pipefail
-    features=anthropic,gemini,openai,openai-compat,systemone,rustls-ring
+    features=anthropic,cloudflare,gemini,openai,openai-compat,systemone,rustls-ring
     target=x86_64-unknown-linux-musl
     if cargo tree -p allama-providers --no-default-features --features "$features" --target "$target" -e normal,build --locked | grep -E "aws-lc-sys|cmake"; then
       echo "the ring TLS build still needs aws-lc-sys or cmake"
