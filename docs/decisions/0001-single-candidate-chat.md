@@ -1,6 +1,7 @@
 # ADR 0001: Chat is single-candidate; other operations are sibling traits
 
-- Status: accepted
+- Status: accepted; amended by ADR 0018, which lets a sibling trait ship
+  on one provider while marked unstable
 
 ## Context
 
