@@ -63,7 +63,7 @@ features:
 # Check each feature of the HTTP, provider and conformance crates.
 [env("RUSTFLAGS", "--deny warnings")]
 provider-features:
-    cargo hack check -p allama-http -p allama-anthropic -p allama-gemini -p allama-openai -p allama-openai-compat -p allama-systemone -p allama-providers -p allama-conformance --each-feature --all-targets --locked
+    cargo hack check -p allama-http -p allama-anthropic -p allama-cloudflare -p allama-gemini -p allama-openai -p allama-openai-compat -p allama-systemone -p allama-providers -p allama-conformance --each-feature --all-targets --locked
 
 # With default features off, a provider crate must not depend on reqwest, and
 # must work over an injected transport (the tests use ReplayTransport; the
@@ -72,7 +72,7 @@ provider-features:
 footprint:
     #!/usr/bin/env bash
     set -euo pipefail
-    for crate in allama-anthropic allama-gemini allama-openai allama-openai-compat allama-systemone; do
+    for crate in allama-anthropic allama-cloudflare allama-gemini allama-openai allama-openai-compat allama-systemone; do
       echo "==> $crate"
       if cargo tree -p "$crate" --no-default-features -e normal --locked | grep reqwest; then
         echo "$crate depends on reqwest with default features off"
