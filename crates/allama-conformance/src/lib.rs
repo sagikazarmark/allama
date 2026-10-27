@@ -160,11 +160,13 @@
 //! - the capability answers
 //!   ([`chat_capability`](allama::ChatProvider::chat_capability),
 //!   [`embedding_capability`](allama::EmbeddingProvider::embedding_capability),
-//!   [`decision_capability`](allama::DecisionProvider::decision_capability)),
-//!   which drive validation and extraction's `Auto` mode;
+//!   [`decision_capability`](allama::DecisionProvider::decision_capability),
+//!   [`extraction_capability`](allama::ExtractionProvider::extraction_capability)),
+//!   which drive validation and chat extraction's `Auto` mode;
 //! - the limits
 //!   ([`embedding_limits`](allama::EmbeddingProvider::embedding_limits),
-//!   [`decision_limits`](allama::DecisionProvider::decision_limits));
+//!   [`decision_limits`](allama::DecisionProvider::decision_limits),
+//!   [`extraction_limits`](allama::ExtractionProvider::extraction_limits));
 //! - request validation
 //!   ([`validate_chat_request`](allama::ChatProvider::validate_chat_request),
 //!   [`validate_chat_stream_request`](allama::ChatProvider::validate_chat_stream_request),
@@ -248,8 +250,9 @@
 //!   test reaches the server over `allama-http`'s `reqwest` transport, so a
 //!   crate whose own `reqwest` feature is off in the test build adds
 //!   `allama-http` with that feature as a dev-dependency.
-//! - `extract` (default): the extraction scenarios in [`e2e`] (requires
-//!   `allama/chat-extract`).
+//! - `chat-extract` (default): the chat extraction scenarios in [`e2e`]
+//!   (requires `allama/chat-extract`); `extract` is its former name, kept
+//!   as an alias.
 //!
 //! The contracts that wait ([`assert_retry_respects_hint`]) need a Tokio
 //! runtime with timers, such as `#[tokio::test]`.
