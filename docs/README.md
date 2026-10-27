@@ -9,7 +9,7 @@ and in the crate READMEs; the domain glossary is
 | --- | --- | --- |
 | Guides | [`guides/`](guides) | Current. How-to material for library users and provider authors. |
 | Decisions (ADRs) | [`decisions/`](decisions) | Current unless marked superseded. Each records one design choice and why. |
-| Model catalog evidence | [`catalog/`](catalog) | Current. Model-specific claims the adapters do not apply (ADR 0020), with their evidence. |
+| Model catalog evidence | [`catalog/`](catalog) | Current. Model-specific claims the adapters do not apply (ADR 0015), with their evidence. |
 
 ## Guides
 
