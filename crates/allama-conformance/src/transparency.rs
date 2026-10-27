@@ -11,8 +11,10 @@ use allama::{
     ChatStream, ChatValidation, DecisionCapability, DecisionLimits, DecisionProvider,
     DecisionRequest, DecisionResponse, DecisionValidation, EmbeddingCapability, EmbeddingLimits,
     EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, EmbeddingValidation, Error,
-    ProviderIdentity, ProviderIdentityExt, Result, Subject, Validation, ValidationCoverage,
-    Warning, WarningKind, decision::Question, expose,
+    ExtractionCapability, ExtractionLimits, ExtractionProvider, ExtractionRequest,
+    ExtractionResponse, ExtractionValidation, ProviderIdentity, ProviderIdentityExt, Result,
+    Subject, Validation, ValidationCoverage, Warning, WarningKind, decision::Question, expose,
+    extraction::Field,
 };
 
 use data_path::Scenario;
@@ -115,6 +117,28 @@ pub async fn assert_decision_wrapper<W: DecisionProvider>(
     data_path::report(std::any::type_name::<W>(), &problems);
 }
 
+/// [`assert_chat_wrapper`] for an extraction wrapper: identity, capability
+/// answers, limits and validation
+/// ([`assert_transparent_extraction_wrapper`]), and the data path
+/// ([`assert_transparent_extraction_data_path`]).
+///
+/// [`assert_wrapper`] does not run it: `ExtractionProvider` is unstable
+/// (ADR 0018), so a wrapper that forwards it calls this one beside
+/// `assert_wrapper`.
+///
+/// # Panics
+///
+/// As [`assert_chat_wrapper`].
+pub async fn assert_extraction_wrapper<W: ExtractionProvider>(
+    wrap: impl FnOnce(TransparencyProbe) -> W,
+) {
+    let wrapper = wrap(TransparencyProbe::new());
+    check_identity(&wrapper);
+    check_extraction(&wrapper, &unmapped);
+    let problems = data_path::extraction_problems(&wrapper).await;
+    data_path::report(std::any::type_name::<W>(), &problems);
+}
+
 /// Assert that a chat wrapper passes the provider's data through
 /// unchanged.
 ///
@@ -208,6 +232,23 @@ pub async fn assert_transparent_decision_data_path<W: DecisionProvider>(
 ) {
     let wrapper = wrap(TransparencyProbe::new());
     let problems = data_path::decision_problems(&wrapper).await;
+    data_path::report(std::any::type_name::<W>(), &problems);
+}
+
+/// [`assert_transparent_decision_data_path`] for an extraction wrapper.
+///
+/// [`assert_extraction_wrapper`] runs this part with the rest of the
+/// contract, and is the check to call. On its own, this function may
+/// change or go in any minor release (ADR 0017, ADR 0018).
+///
+/// # Panics
+///
+/// As [`assert_transparent_chat_data_path`].
+pub async fn assert_transparent_extraction_data_path<W: ExtractionProvider>(
+    wrap: impl FnOnce(TransparencyProbe) -> W,
+) {
+    let wrapper = wrap(TransparencyProbe::new());
+    let problems = data_path::extraction_problems(&wrapper).await;
     data_path::report(std::any::type_name::<W>(), &problems);
 }
 
@@ -317,6 +358,24 @@ pub fn assert_transparent_decision_wrapper<W: DecisionProvider>(
     let wrapper = wrap(TransparencyProbe::new());
     check_identity(&wrapper);
     check_decision(&wrapper, &unmapped);
+}
+
+/// [`assert_transparent_decision_wrapper`] for an extraction wrapper.
+///
+/// [`assert_extraction_wrapper`] runs this part with the rest of the
+/// contract, and is the check to call. On its own, this function may
+/// change or go in any minor release (ADR 0017, ADR 0018).
+///
+/// # Panics
+///
+/// Panics, naming the method, when the wrapper answers differently from the
+/// probe.
+pub fn assert_transparent_extraction_wrapper<W: ExtractionProvider>(
+    wrap: impl FnOnce(TransparencyProbe) -> W,
+) {
+    let wrapper = wrap(TransparencyProbe::new());
+    check_identity(&wrapper);
+    check_extraction(&wrapper, &unmapped);
 }
 
 /// Assert that a wrapper forwards the [`ProviderIdentity`] surface:
@@ -569,6 +628,34 @@ impl DecisionProvider for TransparencyProbe {
     }
 }
 
+impl ExtractionProvider for TransparencyProbe {
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        data_path::extract_values(Scenario::of_extraction(request), request)
+    }
+
+    fn extraction_capability(
+        &self,
+        model: &str,
+        capability: ExtractionCapability,
+    ) -> CapabilitySupport {
+        Self::support(model, index_of(ExtractionCapability::ALL, capability))
+    }
+
+    fn extraction_limits(&self, model: &str) -> ExtractionLimits {
+        ExtractionLimits::new()
+            .max_fields(model.len() + 3)
+            .max_images(model.len() + 1)
+            .max_forecast_horizon(model.len() + 7)
+    }
+
+    fn validate_extraction_request(
+        &self,
+        request: &ExtractionRequest,
+    ) -> Result<ExtractionValidation> {
+        Self::validate(&request.model, "validate_extraction_request")
+    }
+}
+
 fn check_identity<W: ProviderIdentity + ?Sized>(wrapper: &W) {
     let wrapper_name = std::any::type_name::<W>();
     assert_eq!(
@@ -735,6 +822,38 @@ fn check_decision_validation<W: DecisionProvider + ?Sized>(wrapper: &W, map: Mod
     }
 }
 
+fn check_extraction<W: ExtractionProvider + ?Sized>(wrapper: &W, map: ModelMap<'_>) {
+    let wrapper_name = std::any::type_name::<W>();
+    for model in checked_models() {
+        let mapped = map(model);
+        for &capability in ExtractionCapability::ALL {
+            assert_same(
+                wrapper_name,
+                "extraction_capability",
+                (model, capability),
+                wrapper.extraction_capability(model, capability),
+                TransparencyProbe.extraction_capability(&mapped, capability),
+            );
+        }
+        assert_same(
+            wrapper_name,
+            "extraction_limits",
+            model,
+            wrapper.extraction_limits(model),
+            TransparencyProbe.extraction_limits(&mapped),
+        );
+    }
+    for model in checked_models() {
+        check_validation(
+            wrapper_name,
+            "validate_extraction_request",
+            model,
+            wrapper.validate_extraction_request(&extraction_request(model)),
+            TransparencyProbe::validate(&map(model), "validate_extraction_request"),
+        );
+    }
+}
+
 fn assert_same<A: Debug, T: Debug + PartialEq>(
     wrapper_name: &str,
     method: &str,
@@ -789,6 +908,35 @@ fn decision_request(model: &str) -> DecisionRequest {
         _ => Question::yes_no("probe?").into(),
     };
     DecisionRequest::new(model, "probe").question("q", question)
+}
+
+/// A request with a field of a kind the probe does not answer
+/// `Unsupported` for `model`, so a wrapper that checks requests itself
+/// (with `allama::adapter::extraction::prepare`) forwards it.
+fn extraction_request(model: &str) -> ExtractionRequest {
+    let kind = allama::extraction::FieldKind::ALL
+        .iter()
+        .copied()
+        .find(|&kind| {
+            TransparencyProbe.extraction_capability(model, kind.into())
+                != CapabilitySupport::Unsupported
+        });
+    let field: Field = match kind {
+        Some(allama::extraction::FieldKind::Number) => Field::number().into(),
+        Some(allama::extraction::FieldKind::Date) => Field::date().into(),
+        Some(allama::extraction::FieldKind::Time) => Field::time().into(),
+        Some(allama::extraction::FieldKind::DateTime) => Field::datetime().into(),
+        Some(allama::extraction::FieldKind::Duration) => {
+            Field::duration(allama::extraction::DurationUnit::Days).into()
+        }
+        Some(allama::extraction::FieldKind::List) => {
+            Field::list(allama::extraction::ListItemKind::Text).into()
+        }
+        Some(allama::extraction::FieldKind::Estimate) => Field::estimate(0.0, 1.0).into(),
+        Some(allama::extraction::FieldKind::Forecast) => Field::forecast(0.0, 1.0).into(),
+        _ => Field::text().into(),
+    };
+    ExtractionRequest::new(model, "probe").field("f", field)
 }
 
 fn index_of<T: PartialEq>(all: &[T], item: T) -> usize {

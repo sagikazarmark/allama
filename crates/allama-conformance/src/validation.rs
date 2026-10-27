@@ -13,18 +13,23 @@
 //! and [`embed`](EmbeddingProvider::embed), and
 //! [`assert_decision_validation_agrees`] and [`decision_drift_requests`]
 //! for [`validate_decision_request`](DecisionProvider::validate_decision_request)
-//! and [`decide`](DecisionProvider::decide).
+//! and [`decide`](DecisionProvider::decide), and
+//! [`assert_extraction_validation_agrees`] and [`extraction_drift_requests`]
+//! for [`validate_extraction_request`](ExtractionProvider::validate_extraction_request)
+//! and [`extract_values`](ExtractionProvider::extract_values).
 
 use std::future::Future;
 
 use allama::decision::Question;
+use allama::extraction::{DurationUnit, Field, ListItemKind};
 use allama::{
     Capability, CapabilitySupport, ChatCapability, ChatProvider, ChatRequest, ChatResponse,
     ChatValidation, DecisionCapability, DecisionProvider, DecisionRequest, DecisionResponse,
     DecisionValidation, EmbeddingCapability, EmbeddingInput, EmbeddingInputType, EmbeddingPart,
-    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, EmbeddingValidation, Image,
-    ImageDetail, ReasoningEffort, ResponseFormat, Result, ToolChoice, ToolDefinition,
-    UnsupportedPolicy, Validation, ValidationCoverage, Warning,
+    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, EmbeddingValidation,
+    ExtractionCapability, ExtractionProvider, ExtractionRequest, ExtractionResponse,
+    ExtractionValidation, Image, ImageDetail, ReasoningEffort, ResponseFormat, Result, ToolChoice,
+    ToolDefinition, UnsupportedPolicy, Validation, ValidationCoverage, Warning,
 };
 use serde_json::json;
 
@@ -391,6 +396,127 @@ pub fn decision_drift_requests(model: &str) -> Vec<DecisionRequest> {
     ]
 }
 
+/// Assert that
+/// [`validate_extraction_request`](ExtractionProvider::validate_extraction_request)
+/// agrees with [`extract_values`](ExtractionProvider::extract_values) for
+/// every request: [`assert_decision_validation_agrees`] for extraction
+/// models. The plain request the canned response is measured against asks
+/// one text field.
+///
+/// # Panics
+///
+/// On every disagreement, listed with the request.
+pub async fn assert_extraction_validation_agrees<P, F, Fut>(
+    provider: &P,
+    mut probe: F,
+    requests: &[ExtractionRequest],
+) where
+    P: ExtractionProvider,
+    F: FnMut(ExtractionRequest) -> Fut,
+    Fut: Future<Output = ProbeOutcome<ExtractionResponse>>,
+{
+    let mut problems = Vec::new();
+    for request in requests {
+        let plain = plain_extraction(request);
+        let base = Baseline::of(
+            provider.validate_extraction_request(&plain),
+            &probe(plain).await.result,
+            |response: &ExtractionResponse| &response.warnings,
+        );
+        let validation = provider.validate_extraction_request(request);
+        let outcome = probe(request.clone()).await;
+        let summary = summarize_extraction(request);
+        problems.extend(agree_on(
+            &summary,
+            &validation,
+            &outcome.result,
+            |response: &ExtractionResponse| &response.warnings,
+            outcome.sent_raw.is_empty(),
+            &base,
+        ));
+        if let Ok(validation) = &validation {
+            problems.extend(check_extraction_unknown(
+                provider, request, validation, &summary,
+            ));
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "extraction validation disagrees with the call:\n  {}",
+        problems.join("\n  ")
+    );
+}
+
+/// Extraction requests where validation and the call can drift apart, for
+/// `model`. Pass them to [`assert_extraction_validation_agrees`] with the
+/// requests specific to your adapter.
+///
+/// - one field of each kind, and every kind in one request;
+/// - a request without fields, and one with an empty input;
+/// - more fields and a longer forecast than most providers accept, which
+///   [`extraction_limits`](ExtractionProvider::extraction_limits) must
+///   refuse before sending;
+/// - a reference date;
+/// - images: one inline, one with a detail hint, one by URL, and more
+///   than most providers accept.
+#[must_use]
+pub fn extraction_drift_requests(model: &str) -> Vec<ExtractionRequest> {
+    let base = || {
+        ExtractionRequest::new(
+            model,
+            "Order A-88412 arrived Sept 28. I paid $649.00 plus $52.10 tax.",
+        )
+    };
+    let text = || Field::text().instructions("Order number");
+    let all = || {
+        base()
+            .field("order_id", text())
+            .field("total", Field::number().decimals(2).unit("USD"))
+            .field("delivered", Field::date())
+            .field("at", Field::time())
+            .field("when", Field::datetime())
+            .field("late_by", Field::duration(DurationUnit::Days).integer())
+            .field("items", Field::list(ListItemKind::Text))
+            .field(
+                "repair",
+                Field::estimate(10.0, 5000.0).log_scale().step(1.0),
+            )
+            .field("demand", Field::forecast(0.0, 1_000_000.0).horizon(3))
+    };
+    vec![
+        base().field("order_id", text()),
+        base().field("total", Field::number().decimals(2).unit("USD")),
+        base().field("delivered", Field::date()),
+        base().field("at", Field::time()),
+        base().field("when", Field::datetime()),
+        base().field("late_by", Field::duration(DurationUnit::Days).integer()),
+        base().field("items", Field::list(ListItemKind::Text)),
+        base().field(
+            "repair",
+            Field::estimate(10.0, 5000.0).log_scale().step(1.0),
+        ),
+        base().field("demand", Field::forecast(0.0, 1_000_000.0).horizon(3)),
+        all(),
+        base(),
+        ExtractionRequest::new(model, "").field("order_id", text()),
+        base().fields((0..256).map(|i| (format!("f{i}"), text()))),
+        base().field("demand", Field::forecast(0.0, 1.0).horizon(256)),
+        base()
+            .field("delivered", Field::date())
+            .reference_date("2026-10-09".parse().expect("a date")),
+        base().image(png()).field("order_id", text()),
+        base()
+            .image(png().with_detail(ImageDetail::High))
+            .field("order_id", text()),
+        base()
+            .image(Image::url("https://example.com/receipt.png"))
+            .field("order_id", text()),
+        (0..32)
+            .fold(base(), |request, _| request.image(png()))
+            .field("order_id", text()),
+    ]
+}
+
 /// A one-pixel PNG.
 fn png() -> Image {
     Image::base64(
@@ -418,6 +544,14 @@ fn plain_embedding(request: &EmbeddingRequest) -> EmbeddingRequest {
 fn plain_decision(request: &DecisionRequest) -> DecisionRequest {
     let mut plain = DecisionRequest::new(request.model.clone(), "Hi")
         .question("plain", Question::yes_no("Is this a greeting?"));
+    plain.options = request.options.clone();
+    plain
+}
+
+/// The plain extraction request of the same model.
+fn plain_extraction(request: &ExtractionRequest) -> ExtractionRequest {
+    let mut plain = ExtractionRequest::new(request.model.clone(), "Hi")
+        .field("plain", Field::text().instructions("The greeting"));
     plain.options = request.options.clone();
     plain
 }
@@ -687,6 +821,53 @@ fn check_decision_unknown<P: DecisionProvider>(
         ));
     }
     problems
+}
+
+/// [`check_unknown`] for an extraction validation.
+fn check_extraction_unknown<P: ExtractionProvider>(
+    provider: &P,
+    request: &ExtractionRequest,
+    validation: &ExtractionValidation,
+    summary: &str,
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (capability, subject) in validation.relied_on_unknown() {
+        let answer = provider.extraction_capability(&request.model, *capability);
+        if answer != CapabilitySupport::Unknown {
+            problems.push(format!(
+                "{summary}: relies on {capability:?} ({subject:?}) as unknown, but the provider \
+                 answers {answer:?}"
+            ));
+        }
+    }
+    let Ok(reference) = allama::adapter::extraction::prepare_dry_run(provider, request) else {
+        return problems;
+    };
+    let reference = reference.into_validation(ValidationCoverage::Capabilities);
+    let capabilities = |validation: &ExtractionValidation| -> Vec<ExtractionCapability> {
+        validation
+            .relied_on_unknown()
+            .iter()
+            .map(|(capability, _)| *capability)
+            .collect()
+    };
+    if capabilities(validation) != capabilities(&reference) {
+        problems.push(format!(
+            "{summary}: relies on {:?} as unknown, the preflight records {:?}",
+            validation.relied_on_unknown(),
+            reference.relied_on_unknown()
+        ));
+    }
+    problems
+}
+
+/// A short description of an extraction request for problem reports.
+fn summarize_extraction(request: &ExtractionRequest) -> String {
+    let mut value = serde_json::to_value(request).unwrap_or_default();
+    if let Some(object) = value.as_object_mut() {
+        object.remove("input");
+    }
+    format!("request {value}")
 }
 
 /// A short description of a decision request for problem reports.

@@ -14,11 +14,12 @@ use allama::wrappers::{
 };
 use allama::{
     ChatProvider, ChatRequest, DynChatProvider, DynDecisionProvider, DynEmbeddingProvider,
-    ProviderIdentityExt, UnsupportedPolicy,
+    DynExtractionProvider, ProviderIdentityExt, UnsupportedPolicy,
 };
 use allama_conformance::{
     TransparencyProbe, assert_chat_wrapper, assert_decision_wrapper, assert_embedding_wrapper,
-    assert_transparent_chat_data_path, assert_transparent_model_mapping, assert_wrapper,
+    assert_extraction_wrapper, assert_transparent_chat_data_path, assert_transparent_model_mapping,
+    assert_wrapper,
 };
 
 /// Retries without waiting: the data path's retryable errors come back on
@@ -41,6 +42,35 @@ async fn wrappers_are_transparent() {
     assert_wrapper(|probe| RecordingProvider::new(probe, |_| {})).await;
     assert_wrapper(|probe| ObserveProvider::new(probe).on_warning(|_, _| {})).await;
     assert_wrapper(|probe| UnsupportedPolicyProvider::new(probe, UnsupportedPolicy::Error)).await;
+}
+
+/// The built-in wrappers forward the unstable extraction operation too;
+/// `assert_wrapper` leaves it to this check (ADR 0018).
+#[tokio::test]
+async fn wrappers_forward_extraction_transparently() {
+    assert_extraction_wrapper(retrying).await;
+    assert_extraction_wrapper(|probe| TimeoutProvider::new(probe, TimeoutPolicy::new())).await;
+    assert_extraction_wrapper(TracingProvider::new).await;
+    assert_extraction_wrapper(|probe| RecordingProvider::new(probe, |_| {})).await;
+    assert_extraction_wrapper(|probe| ObserveProvider::new(probe).on_warning(|_, _| {})).await;
+    assert_extraction_wrapper(|probe| {
+        UnsupportedPolicyProvider::new(probe, UnsupportedPolicy::Error)
+    })
+    .await;
+    assert_extraction_wrapper(|probe| MapRequestProvider::new(probe, |_| {})).await;
+    assert_extraction_wrapper(|probe| MapModelProvider::new(probe, |model: &str| model.into()))
+        .await;
+    assert_extraction_wrapper(|probe| FallbackProvider::new(probe, probe)).await;
+    assert_extraction_wrapper(Box::new).await;
+    assert_extraction_wrapper(Arc::new).await;
+    assert_extraction_wrapper(DynExtractionProvider::new).await;
+    assert_extraction_wrapper(|probe| {
+        TracingProvider::new(FallbackProvider::new(
+            retrying(TimeoutProvider::new(probe, TimeoutPolicy::new())),
+            retrying(probe),
+        ))
+    })
+    .await;
 }
 
 /// The default retry policy wraps the probe transparently too: it gives up
