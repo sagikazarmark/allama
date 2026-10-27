@@ -42,6 +42,7 @@ use serde::{Deserialize, Serialize};
 /// | `{modality}_output_tokens` | output | Output tokens of one modality |
 /// | `cache_write_5m_input_tokens`, `cache_write_1h_input_tokens` | input | Cache writes by time to live (subsets of `cache_write_input_tokens`) |
 /// | `tool_use_input_tokens` | input | Input the provider added from provider-executed tools' results |
+/// | `schema_input_tokens` | input | Input an extraction model spent on the request's fields (their kinds, parameters and instructions), beside the text and images |
 ///
 /// A provider counter that is neither a breakdown nor a tool request stays
 /// in the response's provider data.

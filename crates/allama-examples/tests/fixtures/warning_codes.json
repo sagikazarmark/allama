@@ -13,6 +13,7 @@
   ],
   "allama-cloudflare": [
     "approximated.input_truncated",
+    "dropped.provider_name_options",
     "dropped.span"
   ],
   "allama-cloudflare-worker": [

@@ -437,8 +437,14 @@ pub(crate) fn decode(body: WireResponse, request: &ExtractionRequest) -> Result<
     let mut warnings = Vec::new();
     let mut answers = Vec::with_capacity(body.answers.len());
     for (name, raw) in body.answers {
+        // A name the request has no field for is the model's text: it goes
+        // in the upstream message, out of the redacted view.
         let Some(field) = request.find_field(&name) else {
-            return Err(unexpected(&name, "was not asked"));
+            return Err(Error::unexpected_response(
+                "extraction answers a field that was not asked",
+            )
+            .authored()
+            .with_upstream_message(format!("field {name:?}")));
         };
         let wire: WireAnswer = serde_json::from_str(raw.get()).map_err(|err| {
             unexpected(&name, "is malformed").with_upstream_message(err.to_string())
@@ -448,8 +454,9 @@ pub(crate) fn decode(body: WireResponse, request: &ExtractionRequest) -> Result<
         {
             return Err(unexpected(
                 &name,
-                format!("is a {} field, answered as {kind}", field.kind()),
-            ));
+                format!("is a {} field, answered as another kind", field.kind()),
+            )
+            .with_upstream_message(format!("kind {kind:?}")));
         }
         if let Some(value) = wire.confidence {
             confidence.insert(name.clone(), value);
@@ -621,8 +628,9 @@ fn decode_answer(
             {
                 return Err(unexpected(
                     name,
-                    format!("is asked in {}, answered in {unit}", duration.unit),
-                ));
+                    format!("is asked in {}, answered in another unit", duration.unit),
+                )
+                .with_upstream_message(format!("unit {unit:?}")));
             }
             let mut answer =
                 DurationAnswer::new(optional(name, &wire.value, Value::as_f64)?, duration.unit);
@@ -666,11 +674,14 @@ fn decode_answer(
                         ));
                     }
                 };
-                if let (ListItemKind::Text, Some(spans)) = (list.items, &wire.spans)
-                    && let (Some(span), Some(text)) = (spans.get(index), value.as_str())
-                    && let Some(span) = place(name, span, text, input, state_text, warnings)
-                {
-                    item = item.span(span);
+                if let Some(span) = wire.spans.as_ref().and_then(|spans| spans.get(index)) {
+                    let placed = match value.as_str().filter(|_| list.items == ListItemKind::Text) {
+                        Some(text) => place(name, span, text, input, state_text, warnings),
+                        None => place_unverified(name, span, input, state_text, warnings),
+                    };
+                    if let Some(span) = placed {
+                        item = item.span(span);
+                    }
                 }
                 items.push(item);
             }
@@ -795,13 +806,13 @@ fn optional<'v, T>(
     }
 }
 
-/// Where `value` sits in `input`, as a byte span, from the offsets the
-/// model reported: against the model's own copy of the input when it
-/// returned one (`state_text`), else against `input`; read as `char`
-/// offsets, as byte offsets, or as UTF-16 units, whichever makes the span
-/// equal the value; else the value's unique occurrence in `input`, or the
-/// one nearest the reported offset; else `None`, with a warning (ADR 0018,
-/// decision 7).
+/// Place the model's span for `value` into `input` (ADR 0018, decision 7).
+///
+/// The offsets are read against the model's copy of the input when it
+/// returned one (`state_text`), else against `input`; as `char` offsets,
+/// as byte offsets, or as UTF-16 units, whichever makes the span equal the
+/// value; else the value's unique occurrence in `input`, or the one nearest
+/// the reported offset; else `None`, with a warning.
 fn place(
     name: &str,
     span: &[usize],
@@ -810,15 +821,10 @@ fn place(
     state_text: Option<&str>,
     warnings: &mut Vec<Warning>,
 ) -> Option<TextSpan> {
-    let (start, end) = match span {
-        [start, end] if end >= start => (*start, *end),
-        _ => {
-            warnings.push(span_warning(name, "is not a pair of offsets"));
-            return None;
-        }
-    };
+    let (start, end) = offsets(name, span, warnings)?;
     // The text the offsets index: the model's copy when it differs.
     let indexed = state_text.filter(|text| *text != input).unwrap_or(input);
+    let indexed_is_input = std::ptr::eq(indexed, input);
     let candidates = [
         char_offsets_to_bytes(indexed, start, end),
         Some(TextSpan::new(start, end)),
@@ -829,7 +835,7 @@ fn place(
         .flatten()
         .find(|candidate| candidate.text(indexed) == Some(value));
     if let Some(span) = placed
-        && std::ptr::eq(indexed, input)
+        && indexed_is_input
     {
         return Some(span);
     }
@@ -837,7 +843,7 @@ fn place(
     // start (in `input`'s bytes when the offsets were its own, else scaled
     // from the model's copy).
     let reported = match placed {
-        Some(span) if !indexed.is_empty() => span.start * input.len() / indexed.len(),
+        Some(span) if !indexed.is_empty() => scale(span.start, input.len(), indexed.len()),
         _ => char_offsets_to_bytes(input, start, start).map_or(start, |span| span.start),
     };
     let mut best: Option<TextSpan> = None;
@@ -852,6 +858,51 @@ fn place(
         warnings.push(span_warning(name, "does not match the value in the input"));
     }
     best
+}
+
+/// Place the model's span for a value that has no text to verify against
+/// (a number or date list item). The offsets are read in the unit the
+/// model documents, `char`s, and kept when they land in `input` (ADR 0018,
+/// decision 7: a span on a char boundary, with no value to compare).
+/// Offsets into the model's own copy of the input cannot be carried over
+/// without a text to find, so they are dropped with a warning.
+fn place_unverified(
+    name: &str,
+    span: &[usize],
+    input: &str,
+    state_text: Option<&str>,
+    warnings: &mut Vec<Warning>,
+) -> Option<TextSpan> {
+    let (start, end) = offsets(name, span, warnings)?;
+    if state_text.is_some_and(|text| text != input) {
+        warnings.push(span_warning(
+            name,
+            "indexes the model's copy of the input, which differs from the request's",
+        ));
+        return None;
+    }
+    let placed = char_offsets_to_bytes(input, start, end);
+    if placed.is_none() {
+        warnings.push(span_warning(name, "is outside the input"));
+    }
+    placed
+}
+
+/// The `[start, end]` pair of a reported span, or `None` with a warning.
+fn offsets(name: &str, span: &[usize], warnings: &mut Vec<Warning>) -> Option<(usize, usize)> {
+    match span {
+        [start, end] if end >= start => Some((*start, *end)),
+        _ => {
+            warnings.push(span_warning(name, "is not a pair of offsets"));
+            None
+        }
+    }
+}
+
+/// `offset * to / from`, without overflowing on 32-bit targets (a Worker
+/// is `wasm32`).
+fn scale(offset: usize, to: usize, from: usize) -> usize {
+    usize::try_from(offset as u128 * to as u128 / from as u128).unwrap_or(usize::MAX)
 }
 
 fn span_warning(name: &str, problem: &str) -> Warning {
@@ -899,6 +950,9 @@ fn utf16_offsets_to_bytes(input: &str, start: usize, end: usize) -> Option<TextS
     Some(TextSpan::new(byte_at(start)?, byte_at(end)?))
 }
 
+/// An authored `UnexpectedResponse` about the request's field `name`:
+/// `problem` is this crate's text, and `name` the caller's (a response key
+/// is matched to a request field before it is named).
 fn unexpected(name: &str, problem: impl std::fmt::Display) -> Error {
     Error::unexpected_response(format!("extraction field {name:?} {problem}")).authored()
 }
@@ -936,9 +990,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use allama::UnsupportedPolicy;
     use allama::extraction::{DurationUnit, Field, ListItemKind};
-    use allama::{Image, ImageDetail};
+    use allama::{Image, ImageDetail, MessageOrigin, UnsupportedPolicy};
     use serde_json::json;
 
     use super::*;
@@ -1155,6 +1208,56 @@ mod tests {
         assert_eq!(decoded.statistics.extras["t"].len(), 2);
     }
 
+    /// A number or date item has no text to verify a span against: its
+    /// offsets are kept as `char`s into the input, and dropped when they
+    /// index the model's own copy of the input or fall outside it. A null
+    /// list is an empty one.
+    #[test]
+    fn number_and_date_items_keep_unverified_spans() {
+        let input = "Paid €52.10 on 2026-09-28 and €7 on Oct 1.";
+        let request = ExtractionRequest::new("m", input)
+            .field("amounts", Field::list(ListItemKind::Number))
+            .field("dates", Field::list(ListItemKind::Date))
+            .field("none", Field::list(ListItemKind::Text));
+        let euros = input.find("€52.10").unwrap();
+        let chars = |byte: usize| input[..byte].chars().count();
+        let body = |state_text: Option<&str>| -> WireResponse {
+            serde_json::from_value(json!({
+                "answers": {
+                    "amounts": {"type": "list", "value": [52.1, 7], "spans": [[chars(euros), chars(euros) + 6], [900, 901]]},
+                    "dates": {"type": "list", "value": ["2026-09-28", "2026-10-01"], "spans": [[15, 25], [36, 41]]},
+                    "none": {"type": "list", "value": null},
+                },
+                "state_text": state_text,
+            }))
+            .unwrap()
+        };
+        let decoded = decode(body(None), &request).unwrap();
+        let amounts = decoded.response.list("amounts").unwrap();
+        assert_eq!(amounts.items[0].span.unwrap().text(input), Some("€52.10"));
+        assert_eq!(amounts.items[1].span, None, "outside the input");
+        let dates = decoded.response.list("dates").unwrap();
+        assert_eq!(dates.items[0].span.unwrap().text(input), Some("2026-09-28"));
+        assert_eq!(dates.items[1].span.unwrap().text(input), Some("Oct 1"));
+        assert!(decoded.response.list("none").unwrap().items.is_empty());
+        let codes: Vec<_> = decoded
+            .response
+            .warnings
+            .iter()
+            .map(|w| w.code.as_deref())
+            .collect();
+        assert_eq!(codes, [Some("dropped.span")]);
+        // The model's own copy of the input: nothing to find the items by.
+        let decoded = decode(body(Some("paid 52.10 on 2026-09-28")), &request).unwrap();
+        let spans: Vec<_> = ["amounts", "dates"]
+            .into_iter()
+            .flat_map(|name| decoded.response.list(name).unwrap().items.iter())
+            .map(|item| item.span)
+            .collect();
+        assert_eq!(spans, [None; 4]);
+        assert_eq!(decoded.response.warnings.len(), 4);
+    }
+
     #[test]
     fn forecast_steps_shape_is_read_too() {
         let request =
@@ -1301,6 +1404,24 @@ mod tests {
         }
     }
 
+    /// A field added to the body must be reserved too, or `extra` could
+    /// send it twice (ADR 0006).
+    #[test]
+    fn every_body_field_is_reserved() {
+        let request = request()
+            .image(Image::bytes("image/png", b"\x89PNG"))
+            .reference_date("2026-10-09".parse().unwrap());
+        let options = ExtractionRequestOptions::new()
+            .null_threshold("order_id", 0.3)
+            .include_quantiles()
+            .return_state_text();
+        let body = encode(&request, &options, &mut degradations()).unwrap();
+        let body = serde_json::to_value(body).unwrap();
+        for key in body.as_object().unwrap().keys() {
+            assert!(RESERVED.contains(&key.as_str()), "`{key}` is not reserved");
+        }
+    }
+
     #[test]
     fn malformed_answers_are_named() {
         let request = ExtractionRequest::new("m", "x").field("n", Field::number());
@@ -1316,13 +1437,21 @@ mod tests {
         }))
         .unwrap();
         let err = decode(body, &request).unwrap_err();
-        assert!(err.message().contains("answered as text"), "{err}");
+        // The response's text is the upstream message, out of the authored
+        // one.
+        assert!(err.message().contains("answered as another kind"), "{err}");
+        assert!(!err.message().contains("text"), "{err}");
+        assert_eq!(err.message_origin(), MessageOrigin::Authored);
+        assert_eq!(err.upstream_message(), Some("kind \"text\""));
         let body: WireResponse = serde_json::from_value(json!({
             "answers": {"other": {"type": "number", "value": 1}}
         }))
         .unwrap();
         let err = decode(body, &request).unwrap_err();
         assert!(err.message().contains("was not asked"), "{err}");
+        assert!(!err.message().contains("other"), "{err}");
+        assert_eq!(err.message_origin(), MessageOrigin::Authored);
+        assert_eq!(err.upstream_message(), Some("field \"other\""));
     }
 
     #[test]

@@ -43,8 +43,10 @@
 //!   detail is a hint Workers AI has no setting for, warned about.
 //! - Text spans come back as the model's character offsets and are placed
 //!   as byte spans into the request's input, by offset conversion or by
-//!   finding the value; a span that cannot be placed is dropped with a
-//!   warning coded `dropped.span`.
+//!   finding the value; a number or date list item's span, with no text to
+//!   compare, is kept as character offsets when they land in the input; a
+//!   span that cannot be placed is dropped with a warning coded
+//!   `dropped.span`.
 //! - Estimates keep `value`, `median` and the `p10`–`p90` interval as an
 //!   80% [`PredictionInterval`](allama::extraction::PredictionInterval);
 //!   forecasts are read in either of Clairic's shapes (parallel arrays, or
@@ -68,9 +70,9 @@
 //! `[A-Za-z0-9_.-]` starting with a letter or `_`, `decimals` up to 6,
 //! images of 4 MiB each and 8 MiB together, inline only, each an
 //! [`Error::InvalidRequest`] (or `Unsupported` for a URL image) that names
-//! the field (ADR 0018, decision 10). Counts (the number of images, a
-//! forecast's horizon) are model data and not claimed as limits: the model
-//! refuses them with an `InvalidRequest` of its own (ADR 0015).
+//! the field (ADR 0018, decision 10). The counts the schema caps are the
+//! provider's [`ExtractionLimits`]: at most 4 images, and a forecast
+//! horizon of at most 64 ([`ProviderBuilder::limits`] replaces them).
 //!
 //! # Transport
 //!
@@ -94,8 +96,8 @@ use std::time::Duration;
 
 use allama::{
     CapabilitySupport, Error, ExtractionCapability, ExtractionLimits, ExtractionProvider,
-    ExtractionRequest, ExtractionResponse, ExtractionValidation, ProviderIdentity, Result,
-    ValidationCoverage,
+    ExtractionRequest, ExtractionResponse, ExtractionValidation, ProviderIdentity, Result, Subject,
+    ValidationCoverage, Warning, WarningKind,
 };
 use allama_http::config::redact_url;
 use allama_http::{
@@ -228,10 +230,27 @@ impl Provider {
         prepared: &mut allama::adapter::extraction::Prepared<'_>,
     ) -> Result<(HttpRequest, ExtractionRequestOptions)> {
         let (request, d) = prepared.parts_mut();
+        // Options under the provider name (`cloudflare`) are not read: a
+        // configuration file that keys them so would otherwise be ignored
+        // silently (ADR 0006).
+        if request.options.json(PROVIDER_NAME).is_some() {
+            d.warn(
+                Warning::new(
+                    WarningKind::Dropped,
+                    Subject::Option {
+                        namespace: PROVIDER_NAME.to_owned(),
+                    },
+                    format!(
+                        "this provider reads options under `{NAMESPACE}`, not under its name `{PROVIDER_NAME}`; they were dropped; pass them under `{NAMESPACE}`, or as `ExtractionRequestOptions`"
+                    ),
+                )
+                .with_code("dropped.provider_name_options"),
+            );
+        }
         let mut options: ExtractionRequestOptions = request.resolve_option()?;
         if !std::mem::take(&mut options.run_options).is_empty() {
             d.hint(
-                allama::Subject::Other {
+                Subject::Other {
                     name: "`run_options`".into(),
                 },
                 "`run_options` belong to a Worker's binding call; the REST API has no such argument, so they were not sent",
@@ -393,7 +412,7 @@ pub struct ProviderBuilder {
     credential_scope: Option<Cow<'static, str>>,
     headers: Vec<(String, String)>,
     capabilities: HashMap<ExtractionCapability, CapabilitySupport>,
-    limits: ExtractionLimits,
+    limits: Option<ExtractionLimits>,
     timeout: Option<Option<Duration>>,
     max_response_size: Option<usize>,
     http: Option<Arc<dyn HttpTransport>>,
@@ -476,10 +495,12 @@ impl ProviderBuilder {
         self
     }
 
-    /// Request limits enforced before sending (default: none).
+    /// Request limits enforced before sending, in place of the ones
+    /// Clairic's input schema fixes ([`builtin_extraction_limits`]: 4
+    /// images, a forecast horizon of 64).
     #[must_use]
     pub fn limits(mut self, limits: ExtractionLimits) -> Self {
-        self.limits = limits;
+        self.limits = Some(limits);
         self
     }
 
@@ -567,7 +588,7 @@ impl ProviderBuilder {
                         .unwrap_or(allama_http::DEFAULT_MAX_RESPONSE_SIZE),
                 },
                 capabilities: self.capabilities,
-                limits: self.limits,
+                limits: self.limits.unwrap_or_else(builtin_extraction_limits),
             }),
         })
     }
@@ -757,6 +778,18 @@ pub fn builtin_extraction_capability(capability: ExtractionCapability) -> Capabi
         ExtractionCapability::ImageInput => CapabilitySupport::Unknown,
         _ => CapabilitySupport::Supported,
     }
+}
+
+/// The limits Clairic's input schema fixes, whatever the model behind it:
+/// at most 4 images, and a forecast horizon of at most 64 (ADR 0015: the
+/// endpoint's, not a model's). The schema caps no field count.
+/// `allama-cloudflare-worker` claims the same.
+#[doc(hidden)]
+#[must_use]
+pub fn builtin_extraction_limits() -> ExtractionLimits {
+    ExtractionLimits::new()
+        .max_images(4)
+        .max_forecast_horizon(64)
 }
 
 /// A Workers AI model name as a URL path (`@cf/cloudflare/clairic`),

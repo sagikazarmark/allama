@@ -180,10 +180,13 @@ transports send and read alike and share the options type
 - `ExtractionRequest::images` go as `{"content_type", "base64"}`, inline
   only;
 - every field kind is `Supported`, `ExtractionCapability::ImageInput` is
-  `Unknown` (model data), and `extraction_limits` claims no limit, as over
-  REST (ADR 0015);
-- text spans are placed as byte spans into the request's input; one the
-  codec cannot place is dropped with a `dropped.span` warning;
+  `Unknown` (model data, ADR 0015), and `extraction_limits` claims what
+  Clairic's input schema fixes (4 images, a forecast horizon of 64), as
+  over REST;
+- text spans are placed as byte spans into the request's input (a number
+  or date list item's, with no text to compare, as character offsets that
+  land in it); one the codec cannot place is dropped with a `dropped.span`
+  warning;
 - the binding call's options (an AI Gateway) go in
   `ExtractionRequestOptions::run_options`.
 

@@ -137,10 +137,10 @@
 //! | `approximated.thought_signature` | `Approximated` | `allama-gemini` | a function call without a Gemini thought signature was sent with Google's documented placeholder |
 //! | `approximated.tool_result_order` | `Approximated` | `allama-gemini` | a tool result's media was sent after its text |
 //! | `dropped.chat_completions_options` | `Dropped` | `allama-openai`, `allama-openai-compat` | Chat Completions options given to a Responses endpoint were not sent |
-//! | `dropped.provider_name_options` | `Dropped` | `allama-gemini`, `allama-openai-compat`, `allama-cloudflare-worker`, `allama-systemone` | JSON options under the provider's name, which is not the options namespace it reads (`gemini`, not `google-ai`), were not read |
+//! | `dropped.provider_name_options` | `Dropped` | `allama-gemini`, `allama-openai-compat`, `allama-cloudflare`, `allama-cloudflare-worker`, `allama-systemone` | JSON options under the provider's name, which is not the options namespace it reads (`gemini`, not `google-ai`), were not read |
 //! | `unsupported.logprobs`, `unsupported.top_logprobs` | `Unsupported` | `allama-openai-compat` | the model does not take `logprobs` or `top_logprobs` with reasoning enabled, so they were not sent |
-//! | `approximated.input_truncated` | `Approximated` | `allama-cloudflare` | an extraction model reports that it truncated the input to fit its context |
-//! | `dropped.span` | `Dropped` | `allama-cloudflare` | the span an extraction model reported for a text answer could not be placed in the request's input, so the answer has none |
+//! | `approximated.input_truncated` | `Approximated` | `allama-cloudflare`, `allama-cloudflare-worker` | an extraction model reports that it truncated the input to fit its context |
+//! | `dropped.span` | `Dropped` | `allama-cloudflare`, `allama-cloudflare-worker` | the span an extraction model reported for a text answer could not be placed in the request's input, so the answer has none |
 //!
 //! The codes are pinned by golden tests: `allama`'s `warning_codes` test
 //! for the kind and field names and the derived codes, and a workspace

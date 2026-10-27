@@ -10,8 +10,8 @@
 
 use allama::adapter::extraction::Prepared;
 use allama::{
-    CapabilitySupport, ExtractionCapability, ExtractionProvider, ExtractionRequest,
-    ExtractionResponse, ExtractionValidation, Result, ValidationCoverage,
+    CapabilitySupport, ExtractionCapability, ExtractionLimits, ExtractionProvider,
+    ExtractionRequest, ExtractionResponse, ExtractionValidation, Result, ValidationCoverage,
 };
 use allama_cloudflare::ExtractionRequestOptions;
 use allama_cloudflare::binding as codec;
@@ -47,12 +47,17 @@ impl ExtractionProvider for Provider {
     ) -> CapabilitySupport {
         builtin_extraction_capability(capability)
     }
+
+    /// The limits Clairic's input schema fixes (4 images, a forecast
+    /// horizon of 64), as over REST.
+    fn extraction_limits(&self, _model: &str) -> ExtractionLimits {
+        codec::builtin_extraction_limits()
+    }
 }
 
 /// Model-independent extraction capability answers, as the HTTP provider
 /// (`allama_cloudflare::Provider`) gives them: every field kind, and
-/// `Unknown` for images, which are model data. Like it, the binding claims
-/// no limits (ADR 0015).
+/// `Unknown` for images, which are model data (ADR 0015).
 fn builtin_extraction_capability(capability: ExtractionCapability) -> CapabilitySupport {
     codec::builtin_extraction_capability(capability)
 }

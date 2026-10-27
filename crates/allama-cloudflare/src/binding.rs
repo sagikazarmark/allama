@@ -43,7 +43,7 @@ pub fn workers_ai_selector(model: &str) -> &str {
     wire::selector(model)
 }
 
-pub use crate::builtin_extraction_capability;
+pub use crate::{builtin_extraction_capability, builtin_extraction_limits};
 
 /// Decode a Workers AI extraction model's output, the JSON text of the
 /// object the binding returns, into the response to `request` from

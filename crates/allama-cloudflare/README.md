@@ -86,12 +86,13 @@ println!("tracking null? {}", response.text("tracking_number").unwrap().is_null(
 
 The provider answers `Supported` for every field kind and `Unknown` for
 `ImageInput` (whether a model reads images is model data, ADR 0015), and
-claims no limits. Clairic's input schema is checked before sending (field
+claims the limits Clairic's input schema fixes as `ExtractionLimits`: at
+most 4 images, a forecast horizon of at most 64 (`ProviderBuilder::limits`
+replaces them). The rest of the schema is checked before sending (field
 names of at most 64 of `[A-Za-z0-9_.-]` starting with a letter or `_`,
 `decimals` up to 6, images of 4 MiB each and 8 MiB together), an
-`Error::InvalidRequest` that names the field; counts the schema caps (4
-images, a horizon of 64) are the model's to refuse. Options and provider
-data use the namespace `cloudflare-workers-ai`, shared with
+`Error::InvalidRequest` that names the field. Options and provider data
+use the namespace `cloudflare-workers-ai`, shared with
 `allama-cloudflare-worker`.
 
 ## Testing

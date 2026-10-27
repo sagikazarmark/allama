@@ -1,7 +1,9 @@
 //! Replays recorded and documented Workers AI bodies through the provider.
 
 use allama::extraction::{Field, ListItemKind};
-use allama::{Error, ExtractionProvider, ExtractionRequest, Image, ProviderIdentityExt};
+use allama::{
+    Error, ExtractionProvider, ExtractionRequest, Image, ProviderIdentityExt, Subject, WarningKind,
+};
 use allama_cloudflare::{
     Confidence, Distributions, ExtractionRequestOptions, Guesses, Provider, RawResponse, RunDetails,
 };
@@ -202,6 +204,38 @@ async fn an_error_envelope_with_a_success_status_is_an_error() {
     assert_eq!(err.upstream_message(), Some("No route for that URI"));
 }
 
+/// JSON options under the provider's name are not the namespace this
+/// provider reads; a dry run says so (ADR 0006). `run_options` belong to
+/// the Worker binding and are dropped with a hint.
+#[test]
+fn options_the_provider_does_not_read_are_reported() {
+    let provider = provider(&ReplayTransport::new([]));
+    let request = invoice_request()
+        .with_options_json("cloudflare", serde_json::json!({"include_quantiles": true}))
+        .with_option(
+            ExtractionRequestOptions::new().run_option("gateway", serde_json::json!({"id": "g"})),
+        );
+    let validation = provider.validate_extraction_request(&request).unwrap();
+    let codes: Vec<_> = validation
+        .warnings()
+        .iter()
+        .map(|warning| (warning.kind, warning.code.as_deref()))
+        .collect();
+    assert_eq!(
+        codes,
+        [
+            (WarningKind::Dropped, Some("dropped.provider_name_options")),
+            (WarningKind::Unsupported, None),
+        ]
+    );
+    assert_eq!(
+        validation.warnings()[0].subject,
+        Subject::Option {
+            namespace: "cloudflare".to_owned()
+        }
+    );
+}
+
 #[tokio::test]
 async fn invalid_requests_fail_before_sending() {
     let transport = ReplayTransport::new([]);
@@ -222,6 +256,25 @@ async fn invalid_requests_fail_before_sending() {
     assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
     let err = provider
         .extract_values(&ExtractionRequest::new("../oops", "x").field("f", Field::text()))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::InvalidRequest { .. }), "{err:?}");
+    // The schema's counts are the provider's limits.
+    let limits = provider.extraction_limits("@cf/cloudflare/clairic");
+    assert_eq!(
+        (limits.max_images, limits.max_forecast_horizon),
+        (Some(4), Some(64))
+    );
+    let mut request = ExtractionRequest::new("@cf/cloudflare/clairic", "x")
+        .field("f", Field::forecast(0.0, 1.0).horizon(65));
+    let err = provider.extract_values(&request).await.unwrap_err();
+    assert!(matches!(err, Error::InvalidRequest { .. }), "{err:?}");
+    request.fields.clear();
+    for _ in 0..5 {
+        request = request.image(Image::bytes("image/png", b"\x89PNG"));
+    }
+    let err = provider
+        .extract_values(&request.field("f", Field::text()))
         .await
         .unwrap_err();
     assert!(matches!(err, Error::InvalidRequest { .. }), "{err:?}");
