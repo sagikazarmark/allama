@@ -78,11 +78,11 @@ pub const EMBEDDINGS: &[(&str, AttributeType)] = &[
 ];
 
 /// The table an allama span is checked against, by its `tracing` span name.
-/// Decision spans have no table of their own; a decision is an inference
-/// call, so they use the inference table.
+/// Decision and extraction spans have no table of their own; both are
+/// inference calls, so they use the inference table.
 pub fn table_for(span_name: &str) -> &'static [(&'static str, AttributeType)] {
     match span_name {
-        "chat" | "decision" => INFERENCE,
+        "chat" | "decision" | "extraction" => INFERENCE,
         "embeddings" => EMBEDDINGS,
         other => panic!("no semantic conventions table for `{other}` spans"),
     }

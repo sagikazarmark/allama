@@ -6,17 +6,19 @@
 use std::collections::BTreeSet;
 
 use allama::decision::{Answer, Question, YesNoAnswer};
+use allama::extraction::{self, Field, NumberAnswer};
 use allama::mock::{
-    ChatResponseBuilder, MockDecisionProvider, MockEmbeddingProvider, MockProvider,
-    MockStreamingProvider,
+    ChatResponseBuilder, MockDecisionProvider, MockEmbeddingProvider, MockExtractionProvider,
+    MockProvider, MockStreamingProvider,
 };
 use allama::wrappers::{
     FallbackProvider, RetryPolicy, RetryingProvider, TracingContentConfig, TracingProvider,
 };
 use allama::{
     ChatProvider, ChatRequest, ChatResponse, ChatStreamExt, DecisionProvider, DecisionRequest,
-    DecisionResponse, EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, Error, FinishReason,
-    RequestField, ResponseFormat, Usage, Warning,
+    DecisionResponse, EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, Error,
+    ExtractionProvider, ExtractionRequest, ExtractionResponse, FinishReason, RequestField,
+    ResponseFormat, Usage, Warning,
 };
 use opentelemetry::Value;
 use opentelemetry::trace::{SpanKind, Status};
@@ -35,7 +37,7 @@ const LAYER_FIELDS: &[&str] = &[
 ];
 
 /// The `tracing` span names `TracingProvider` creates.
-const SPAN_NAMES: &[&str] = &["chat", "embeddings", "decision"];
+const SPAN_NAMES: &[&str] = &["chat", "embeddings", "decision", "extraction"];
 
 #[tokio::test]
 async fn emitted_names_are_semconv_span_attributes_or_allama() {
@@ -303,6 +305,19 @@ async fn exercise_every_operation() -> Exported {
         .usage(Usage::new().input_tokens(12).output_tokens(1))
         .warning(Warning::unsupported(RequestField::Seed, "demo")))]))
         .on_span(conversation);
+    let extraction = TracingProvider::new(MockExtractionProvider::new([Ok(
+        ExtractionResponse::new([(
+            "total",
+            extraction::Answer::from(NumberAnswer::new(Some(1080.0)).null_probability(0.01)),
+        )])
+        .model("x-1")
+        .id("resp-x")
+        .request_id("req-x")
+        .provider("mock")
+        .usage(Usage::new().input_tokens(20).output_tokens(0))
+        .warning(Warning::unsupported(RequestField::Seed, "demo")),
+    )]))
+    .on_span(conversation);
 
     let request = ChatRequest::new("m")
         .system("Be brief.")
@@ -339,6 +354,12 @@ async fn exercise_every_operation() -> Exported {
             .decide(
                 &DecisionRequest::new("d", "Win a cruise!")
                     .question("spam", Question::yes_no("Is this spam?")),
+            )
+            .await
+            .unwrap();
+        extraction
+            .extract_values(
+                &ExtractionRequest::new("x", "Total due: $1,080").field("total", Field::number()),
             )
             .await
             .unwrap();

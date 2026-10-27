@@ -5,6 +5,7 @@ use std::panic::AssertUnwindSafe;
 use std::time::Duration;
 
 use allama::decision::Question;
+use allama::extraction::Field;
 use allama::mock::{
     ChatResponseBuilder, FunctionProvider, MockDecisionProvider, MockEmbeddingProvider,
     MockProvider, MockResponse, MockStreamEvent, MockStreamingProvider,
@@ -13,6 +14,7 @@ use allama::wrappers::{RetryingProvider, TracingProvider};
 use allama::{
     CapabilitySupport, ChatProvider, ChatStreamExt, DecisionCapability, DecisionProvider,
     DecisionRequest, DecisionResponse, EmbeddingProvider, EmbeddingRequest, Error,
+    ExtractionCapability, ExtractionProvider, ExtractionRequest, ExtractionResponse,
     ProviderIdentity, StreamEvent,
 };
 use futures_util::{FutureExt, StreamExt};
@@ -65,8 +67,9 @@ async fn a_stream_dropped_before_its_first_token_under_the_recommended_stack_is_
     );
 }
 
-/// A unary call dropped before it completed, chat, embedding and decision
-/// alike; the embedding call is dropped while its retry backs off.
+/// A unary call dropped before it completed, chat, embedding, decision and
+/// extraction alike; the embedding call is dropped while its retry backs
+/// off.
 #[tokio::test]
 async fn a_unary_call_dropped_before_it_completed_is_cancelled() {
     let chat = TracingProvider::new(MockProvider::new([MockResponse::delayed(
@@ -79,6 +82,7 @@ async fn a_unary_call_dropped_before_it_completed_is_cancelled() {
         allama::wrappers::RetryPolicy::default(),
     ));
     let decision = TracingProvider::new(StalledDecider);
+    let extraction = TracingProvider::new(StalledDecider);
     let ((), exported) = export(async {
         assert!(chat.chat(&request()).now_or_never().is_none());
         assert!(
@@ -93,6 +97,12 @@ async fn a_unary_call_dropped_before_it_completed_is_cancelled() {
                 .now_or_never()
                 .is_none()
         );
+        assert!(
+            extraction
+                .extract_values(&ExtractionRequest::new("x", "text").field("f", Field::text()))
+                .now_or_never()
+                .is_none()
+        );
     })
     .await;
     let chat = exported.span("chat");
@@ -102,6 +112,7 @@ async fn a_unary_call_dropped_before_it_completed_is_cancelled() {
     assert_cancelled(embeddings);
     assert_eq!(embeddings.value("allama.attempts"), &Value::I64(1));
     assert_cancelled(exported.span("decision"));
+    assert_cancelled(exported.span("extraction"));
 }
 
 /// A future that is never polled issues no call, so it creates no span.
@@ -201,7 +212,7 @@ fn decision_request() -> DecisionRequest {
     DecisionRequest::new("d", "text").question("q", Question::yes_no("Is it?"))
 }
 
-/// A decision provider that never answers.
+/// A decision and extraction provider that never answers.
 struct StalledDecider;
 
 impl ProviderIdentity for StalledDecider {
@@ -223,6 +234,23 @@ impl DecisionProvider for StalledDecider {
         &self,
         _model: &str,
         _capability: DecisionCapability,
+    ) -> CapabilitySupport {
+        CapabilitySupport::Unknown
+    }
+}
+
+impl ExtractionProvider for StalledDecider {
+    async fn extract_values(
+        &self,
+        _request: &ExtractionRequest,
+    ) -> allama::Result<ExtractionResponse> {
+        std::future::pending().await
+    }
+
+    fn extraction_capability(
+        &self,
+        _model: &str,
+        _capability: ExtractionCapability,
     ) -> CapabilitySupport {
         CapabilitySupport::Unknown
     }
