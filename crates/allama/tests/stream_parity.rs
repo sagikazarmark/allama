@@ -1,9 +1,9 @@
 //! A streamed response collects to what the unary call returns, including
 //! when a tool call's arguments are not valid JSON.
 
-#![cfg(all(feature = "mock", feature = "extract"))]
+#![cfg(all(feature = "mock", feature = "chat-extract"))]
 
-use allama::extract::{ExtractError, ExtractExt, ExtractionMode};
+use allama::chat::extract::{ChatExtractError, ChatExtractExt, ChatExtractionMode};
 use allama::mock::{ChatResponseBuilder, MockProvider, MockStreamingProvider};
 use allama::prelude::*;
 use allama::schemars::{self, JsonSchema};
@@ -59,7 +59,7 @@ async fn malformed_tool_arguments_collect_like_unary() {
 async fn truncation_is_reported_the_same_unary_and_streamed() {
     let request = ChatRequest::new("m")
         .user("Ada")
-        .with_option(ExtractionMode::ForcedTool);
+        .with_option(ChatExtractionMode::ForcedTool);
     let unary = MockProvider::with_response(truncated())
         .extract::<Person>(&request)
         .await
@@ -73,7 +73,7 @@ async fn truncation_is_reported_the_same_unary_and_streamed() {
         panic!("expected an extraction failure, got {streamed:?}");
     };
     assert!(
-        matches!(failure.error(), ExtractError::Truncated { .. }),
+        matches!(failure.error(), ChatExtractError::Truncated { .. }),
         "{streamed}"
     );
 }

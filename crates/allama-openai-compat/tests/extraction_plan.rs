@@ -96,7 +96,7 @@ fn plans_per_preset() {
 mod typical {
     use std::collections::HashMap;
 
-    use allama::extract::{ExtractionMode, Extractor};
+    use allama::chat::extract::{ChatExtractionMode, ChatExtractor};
     use allama::schemars::JsonSchema;
     use allama::{ChatProvider, ChatRequest, ValidationCoverage};
     use serde::Deserialize;
@@ -130,9 +130,9 @@ mod typical {
     /// fails before sending. Every plan is a dry run (`Encoding`).
     pub fn plans<P: ChatProvider + ?Sized>(provider: &P, model: &str) -> Vec<String> {
         let mut rows = Vec::new();
-        for mode in [ExtractionMode::Native, ExtractionMode::ForcedTool] {
+        for mode in [ChatExtractionMode::Native, ChatExtractionMode::ForcedTool] {
             let request = ChatRequest::new(model).user("x").with_option(mode);
-            let extractor = Extractor::new();
+            let extractor = ChatExtractor::new();
             for (name, plan) in [
                 ("Person", extractor.plan::<Person>(provider, &request)),
                 ("Order", extractor.plan::<Order>(provider, &request)),

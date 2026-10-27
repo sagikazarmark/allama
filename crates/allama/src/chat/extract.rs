@@ -9,7 +9,7 @@
 //! # #[cfg(feature = "mock")]
 //! # tokio::runtime::Builder::new_current_thread().build().unwrap().block_on(async {
 //! # let provider = allama::mock::MockProvider::with_text(r#"{"author": "Ada", "year": 1843}"#);
-//! use allama::extract::{ExtractError, ExtractExt};
+//! use allama::chat::extract::{ChatExtractError, ChatExtractExt};
 //! use allama::schemars::{self, JsonSchema};
 //! use allama::{ChatRequest, Error};
 //!
@@ -23,8 +23,8 @@
 //! match provider.extract::<Program>(&request).await {
 //!     Ok(extracted) => println!("{} ({})", extracted.value.author, extracted.value.year),
 //!     Err(Error::Extract { failure, .. }) => match failure.error() {
-//!         ExtractError::Refused { .. } => println!("the model declined"),
-//!         ExtractError::Truncated { .. } => println!("cut off: raise max_output_tokens or lower the reasoning effort"),
+//!         ChatExtractError::Refused { .. } => println!("the model declined"),
+//!         ChatExtractError::Truncated { .. } => println!("cut off: raise max_output_tokens or lower the reasoning effort"),
 //!         other => println!("unusable output: {other}"),
 //!     },
 //!     // A provider error (a rate limit, a timeout) is returned as itself.
@@ -34,16 +34,16 @@
 //! ```
 //!
 //! To extract from a chat that used tools, see
-//! [extracting from a conversation](Extractor#extracting-from-a-conversation):
-//! a request with tools fails with [`ExtractError::ToolConflict`].
+//! [extracting from a conversation](ChatExtractor#extracting-from-a-conversation):
+//! a request with tools fails with [`ChatExtractError::ToolConflict`].
 //!
 //! To test code that extracts, script the value the model returns with
 //! `MockResponse::structured` (feature `mock`): it answers in the form the
 //! extraction asks for, whichever mode it picks.
 //!
-//! The [`ExtractFailure`] also keeps the output that could not be used
-//! ([`response`](ExtractFailure::response)) and what every pass cost
-//! ([`metadata`](ExtractFailure::metadata)); see
+//! The [`ChatExtractFailure`] also keeps the output that could not be used
+//! ([`response`](ChatExtractFailure::response)) and what every pass cost
+//! ([`metadata`](ChatExtractFailure::metadata)); see
 //! [Bookkeeping](#bookkeeping).
 //!
 //! An extraction derives its passes from the [`ChatRequest`] it is given
@@ -51,13 +51,13 @@
 //! provider options) except the ones the selected mode replaces: the
 //! response format in `Native` mode, the tools and tool choice in
 //! `ForcedTool` mode. A request that carries tools of its own fails with
-//! [`ExtractError::ToolConflict`] in **every** mode, before anything is
+//! [`ChatExtractError::ToolConflict`] in **every** mode, before anything is
 //! sent: the model would be offered both your tools and the schema, and
 //! might call a tool instead of answering, so the same request must not
 //! work on one provider and fail on another. To extract from a
 //! conversation that used tools, start a fresh request from its messages
 //! or clear the tools on a copy; see
-//! [extracting from a conversation](Extractor#extracting-from-a-conversation).
+//! [extracting from a conversation](ChatExtractor#extracting-from-a-conversation).
 //!
 //! # Contents
 //!
@@ -78,17 +78,17 @@
 //! Extraction derives a provider request that constrains the output to the
 //! JSON Schema of `T`, sends it, and parses the result:
 //!
-//! - [`ExtractionMode::Native`] uses the provider's JSON Schema response
+//! - [`ChatExtractionMode::Native`] uses the provider's JSON Schema response
 //!   format;
-//! - [`ExtractionMode::ForcedTool`] forces a call to a synthetic tool whose
+//! - [`ChatExtractionMode::ForcedTool`] forces a call to a synthetic tool whose
 //!   arguments follow the schema;
-//! - [`ExtractionMode::Auto`] (default) picks from the provider's capability
+//! - [`ChatExtractionMode::Auto`] (default) picks from the provider's capability
 //!   answers, a verified mode before a guessed one: `Native` when structured
 //!   output is `Supported`; else `ForcedTool` when tool calls and forced tool
 //!   choice are both `Supported`; else `Native` when structured output is
 //!   `Unknown`; else `ForcedTool` when neither tool answer is `Unsupported`.
 //!   When the answers rule out both, it fails with
-//!   [`ExtractError::Unsupported`]: set the mode, or settle the answers with
+//!   [`ChatExtractError::Unsupported`]: set the mode, or settle the answers with
 //!   a capability resolver
 //!   ([`CapabilityOverrideProvider`](crate::wrappers::CapabilityOverrideProvider),
 //!   or the adapter's own `with_chat_capabilities`).
@@ -103,16 +103,16 @@
 //! [stage](Error::unsupported_stage) is
 //! [`BeforeSending`](crate::UnsupportedStage::BeforeSending), such as Anthropic's
 //! `output_config.format` refusing a map), the extraction retries the pass
-//! in `ForcedTool` mode. On [`ExtractExt::extract_stream`] the refusal may
+//! in `ForcedTool` mode. On [`ChatExtractExt::extract_stream`] the refusal may
 //! come from the `chat_stream` call or as the stream's first item, before
 //! any event; both switch modes. To see that item, `extract_stream` reads
 //! the first item before returning whenever `Auto` picked `Native`; the
 //! returned stream still yields it.
 //!
 //! The switch is recorded, not hidden:
-//! [`ExtractionMetadata::mode`] reports `ForcedTool` and
-//! [`ExtractionMetadata::auto_fallback`] holds the refusal. It adds no
-//! [degradation](ExtractionMetadata::degradations): the forced-tool pass
+//! [`ChatExtractionMetadata::mode`] reports `ForcedTool` and
+//! [`ChatExtractionMetadata::auto_fallback`] holds the refusal. It adds no
+//! [degradation](ChatExtractionMetadata::degradations): the forced-tool pass
 //! reports its own. When the forced-tool attempt fails too before sending
 //! (it is refused, or the request carries its own tools), the native
 //! refusal is the primary cause: the error is an [`Error::Unsupported`]
@@ -122,7 +122,7 @@
 //! refused (...), and forced-tool mode was refused too (...)"). A provider
 //! error from the forced-tool call is returned as itself. Either way
 //! `auto_fallback` is set in the extraction record. An explicit
-//! [`ExtractionMode::Native`] never falls back.
+//! [`ChatExtractionMode::Native`] never falls back.
 //!
 //! **Object roots.** Some providers take only an object at the root of a
 //! response schema and of tool parameters (OpenAI, on Chat Completions and
@@ -133,33 +133,33 @@
 //! answers choice questions natively
 //! ([`DecisionProviderExt::decide_as`](crate::DecisionProviderExt::decide_as)).
 //!
-//! [`ExtractExt::extract`] is available on every provider and makes exactly
-//! one provider call. [`ExtractExt::extract_stream`] streams the same
+//! [`ChatExtractExt::extract`] is available on every provider and makes exactly
+//! one provider call. [`ChatExtractExt::extract_stream`] streams the same
 //! request and parses the value when the stream ends.
 //!
 //! # Recovery is opt-in
 //!
-//! An [`Extractor`] runs the same extraction with explicit recovery:
+//! An [`ChatExtractor`] runs the same extraction with explicit recovery:
 //!
-//! - [`Extractor::repair`]: local JSON repair (markdown fences, prose around
+//! - [`ChatExtractor::repair`]: local JSON repair (markdown fences, prose around
 //!   the value). No extra provider calls.
-//! - [`Extractor::retries`]: when the output cannot be parsed, send the
+//! - [`ChatExtractor::retries`]: when the output cannot be parsed, send the
 //!   failure back to the model and ask again. **Each retry is another
-//!   billed provider call**, reported in [`ExtractionMetadata::passes`].
+//!   billed provider call**, reported in [`ChatExtractionMetadata::passes`].
 //!
 //! Nothing retries or repairs unless configured to.
-//! [`Extractor::parse`] applies the same parsing and repair to a response
+//! [`ChatExtractor::parse`] applies the same parsing and repair to a response
 //! you already have, without calling a provider.
 //!
 //! # Bookkeeping
 //!
-//! Every extraction reports how it ran in an [`ExtractionMetadata`]: the
-//! mode, the number of provider calls ([`passes`](ExtractionMetadata::passes)),
-//! their token usage summed ([`usage`](ExtractionMetadata::usage)), and
+//! Every extraction reports how it ran in an [`ChatExtractionMetadata`]: the
+//! mode, the number of provider calls ([`passes`](ChatExtractionMetadata::passes)),
+//! their token usage summed ([`usage`](ChatExtractionMetadata::usage)), and
 //! how far the provider reported enforcing the schema
-//! ([`enforcement`](ExtractionMetadata::enforcement)). A successful
-//! extraction returns it in [`Extracted`]; a failed one returns
-//! [`Error::Extract`] with an [`ExtractFailure`] that carries the same record
+//! ([`enforcement`](ChatExtractionMetadata::enforcement)). A successful
+//! extraction returns it in [`ChatExtracted`]; a failed one returns
+//! [`Error::Extract`] with an [`ChatExtractFailure`] that carries the same record
 //! plus the last provider response, so the cost of failed passes and the
 //! output that could not be used stay inspectable.
 //!
@@ -167,7 +167,7 @@
 //! not an extraction failure: it is returned as itself, so retry and
 //! fallback policies still see `RateLimited` or `Timeout`. The record of the
 //! passes made before it travels in the error's context; read it with
-//! [`ExtractionMetadata::from_error`]. When a stream fails mid-way, the
+//! [`ChatExtractionMetadata::from_error`]. When a stream fails mid-way, the
 //! record also holds the usage and degradations the stream reported before
 //! failing; the stream is not counted as a pass, so `passes` can be `0`
 //! while `usage` is not.
@@ -177,28 +177,28 @@
 //! Before parsing, extraction checks how the response finished, and never
 //! retries these failures:
 //!
-//! - A refusal fails with [`ExtractError::Refused`]: the model wrote one
+//! - A refusal fails with [`ChatExtractError::Refused`]: the model wrote one
 //!   instead of the output, or the response finished with
 //!   [`FinishReason::Refusal`] or [`FinishReason::ContentFilter`]. Its
 //!   `text` is the model's refusal or the provider's explanation, when
 //!   there is one, and [`RefusalSource`] says which. Asking again would
 //!   pay for the same refusal.
 //! - Output cut off at the token limit ([`FinishReason::Length`]) fails
-//!   with [`ExtractError::Truncated`]: the same limit would cut it off
+//!   with [`ChatExtractError::Truncated`]: the same limit would cut it off
 //!   again. On a reasoning model the limit covers the reasoning too, and
 //!   the error says how much of it went to reasoning when the response
 //!   reported that; see [Reasoning models](#reasoning-models).
 //! - Output cut off by a full context window
 //!   ([`FinishReason::ContextWindow`]) fails with
-//!   [`ExtractError::Truncated`] too, with that finish reason: the input
+//!   [`ChatExtractError::Truncated`] too, with that finish reason: the input
 //!   left too little room, so shorten it (raising the output limit does not
 //!   help).
 //!
 //! Other abnormal finishes (an [`Other`](FinishReason::Other) reason, such
 //! as Gemini's `malformed_function_call`) are parsed as usual; when the
-//! output cannot be parsed, the [`ExtractError::Parse`] message names the
+//! output cannot be parsed, the [`ChatExtractError::Parse`] message names the
 //! finish reason. Empty or whitespace-only output in `Native` mode is
-//! [`ExtractError::MissingStructuredText`], not a parse failure.
+//! [`ChatExtractError::MissingStructuredText`], not a parse failure.
 //!
 //! # Reasoning models
 //!
@@ -207,7 +207,7 @@
 //! or the provider's default) covers the reasoning as well as the output,
 //! wherever the provider counts it so. A model that reasons at length can
 //! spend most or all of the limit before writing the value, and the
-//! extraction fails with [`ExtractError::Truncated`]. When the response
+//! extraction fails with [`ChatExtractError::Truncated`]. When the response
 //! reported its reasoning tokens, the error says so ("400 of 400 output
 //! tokens went to reasoning").
 //!
@@ -231,7 +231,7 @@
 //! `ForcedTool` mode are both strict. Adapters rewrite the schema into
 //! their grammar engine's dialect and report, as warnings on the field
 //! that carries it, what they could not keep. Extraction reads those
-//! warnings into [`ExtractionMetadata::enforcement`], a
+//! warnings into [`ChatExtractionMetadata::enforcement`], a
 //! [`SchemaEnforcement`]:
 //!
 //! - [`Exact`](SchemaEnforcement::Exact): constrained decoding ran over the
@@ -256,15 +256,15 @@
 //! `ForcedTool` mode ([`RequestField::Tools`]). A warning about the
 //! caller's own tools in `Native` mode leaves the enforcement alone. The
 //! counted warnings are in
-//! [`degradations`](ExtractionMetadata::degradations), reworded in terms of
+//! [`degradations`](ChatExtractionMetadata::degradations), reworded in terms of
 //! the caller's type: "the schema of `Order`" for the synthetic tool or
 //! the response schema, and `Order.attributes` for a JSON pointer such as
 //! `/properties/attributes` (the response keeps the adapter's own words).
 //!
 //! An enforcement below `Exact` is also a warning event (with the
 //! `warning-events` feature): an `Approximated` or `Unsupported` warning on
-//! the counted field, coded `extraction.<enforcement>.<Type>`
-//! (`extraction.not_enforced.Order`), so it is logged at `WARN` once per
+//! the counted field, coded `chat.extraction.<enforcement>.<Type>`
+//! (`chat.extraction.not_enforced.Order`), so it is logged at `WARN` once per
 //! provider, model and type, and at `DEBUG` after that.
 //!
 //! When strict mode cannot be honoured, the request's
@@ -289,7 +289,7 @@
 //! ```
 //! # #[cfg(feature = "mock")]
 //! # async fn example() -> allama::Result<()> {
-//! use allama::extract::{ExtractExt, ExtractionMode, SchemaEnforcement};
+//! use allama::chat::extract::{ChatExtractExt, ChatExtractionMode, SchemaEnforcement};
 //! use allama::mock::MockProvider;
 //! use allama::schemars::{self, JsonSchema};
 //! use allama::{ChatRequest, UnsupportedPolicy};
@@ -302,7 +302,7 @@
 //! let provider = MockProvider::with_text(r#"{"name": "Ada"}"#);
 //! let request = ChatRequest::new("m")
 //!     .user("Ada wrote the first program.")
-//!     .with_option(ExtractionMode::Native)
+//!     .with_option(ChatExtractionMode::Native)
 //!     .unsupported_policy(UnsupportedPolicy::Error); // constrained or fail
 //! let extracted = provider.extract::<Person>(&request).await?;
 //! assert_eq!(extracted.metadata.enforcement, SchemaEnforcement::Exact);
@@ -316,19 +316,19 @@
 //! some engines do not guarantee the capitalisation of string `enum` or
 //! `const` values (Anthropic, for one). The output is deserialized into `T`
 //! either way, so a value that does not match still fails with
-//! [`ExtractError::Parse`].
+//! [`ChatExtractError::Parse`].
 //!
 //! # Enforcement floor and plans
 //!
-//! [`Extractor::plan`] tells what an extraction would do before it sends
+//! [`ChatExtractor::plan`] tells what an extraction would do before it sends
 //! anything: the mode (after any automatic fallback), the enforcement its
 //! first pass would report, and how much of the call the provider's
-//! validation covered ([`ExtractionPlan`]). It runs the provider's
+//! validation covered ([`ChatExtractionPlan`]). It runs the provider's
 //! validation on a schema-only copy of the request.
 //!
-//! [`Extractor::min_enforcement`] sets a floor, off by default. With
+//! [`ChatExtractor::min_enforcement`] sets a floor, off by default. With
 //! [`ValidationCoverage::Encoding`] (every first-party adapter) a plan
-//! below it fails before sending with [`ExtractError::EnforcementBelow`];
+//! below it fails before sending with [`ChatExtractError::EnforcementBelow`];
 //! otherwise each pass is checked, and the failure carries the response
 //! and its usage, so it is a paid call.
 //! [`Approximate`](SchemaEnforcement::Approximate) is the practical
@@ -359,13 +359,13 @@
 //! `email`) or nests one at the wrong level yields a value that
 //! deserializes and is wrong: the `Option` or `#[serde(default)]` field it
 //! meant is empty. On every pass whose enforcement is not `Exact` (and in
-//! [`Extractor::parse`], which cannot know), extraction therefore walks the
+//! [`ChatExtractor::parse`], which cannot know), extraction therefore walks the
 //! output against the schema of `T` before deserializing, and rejects a
-//! key that no schema there declares, with an [`ExtractError::Parse`] that
+//! key that no schema there declares, with an [`ChatExtractError::Parse`] that
 //! names the key and its path (``unknown field `e_mail`, expected one of
 //! `email`, `phone` `` at `contact.e_mail`). The rejection is retryable:
-//! [`Extractor::retries`] sends it back to the model, and
-//! [`ExtractionMetadata::undeclared_key_rejections`] counts the passes it
+//! [`ChatExtractor::retries`] sends it back to the model, and
+//! [`ChatExtractionMetadata::undeclared_key_rejections`] counts the passes it
 //! cost. The raw output is kept.
 //!
 //! - **Stricter than JSON Schema and than other libraries.** An object
@@ -385,7 +385,7 @@
 //!   `untagged` enum.
 //! - **Aliases:** `#[serde(alias)]` names are not in the schema, so a key
 //!   written under an alias is rejected (and retried).
-//! - **Opt out** with [`Extractor::allow_undeclared_keys`].
+//! - **Opt out** with [`ChatExtractor::allow_undeclared_keys`].
 //!
 //! The check does not close the remaining gap: a schema sent without
 //! strict mode lets the model leave out `Option` and `#[serde(default)]`
@@ -408,7 +408,7 @@
 //! `#[serde(default)]` fields then get their default, while `Option<T>` and
 //! `serde_json::Value` keep their `null`. A `null` for a required property
 //! or a map entry is kept, so serde reports it ("invalid type: null").
-//! [`Extractor::parse`] normalizes too.
+//! [`ChatExtractor::parse`] normalizes too.
 //!
 //! # Validating values
 //!
@@ -417,7 +417,7 @@
 //! [table](self#enforcement-floor-and-plans)). To be sure of a rule,
 //! check it while deserializing: a newtype with `#[serde(try_from = ..)]`
 //! rejects a value that breaks it, and its error becomes the
-//! [`ExtractError::Parse`] message. With [`Extractor::retries`], that
+//! [`ChatExtractError::Parse`] message. With [`ChatExtractor::retries`], that
 //! message is the feedback the model gets, so say what is wrong in it.
 //! With `try_from`, schemars writes the schema of the type converted from
 //! (`u8` here), and a `range` attribute on the newtype's field is not
@@ -427,10 +427,10 @@
 //! ```
 //! # #[cfg(feature = "mock")]
 //! # tokio::runtime::Builder::new_current_thread().build().unwrap().block_on(async {
-//! use allama::extract::Extractor;
+//! use allama::chat::extract::ChatExtractor;
 //! use allama::mock::MockProvider;
 //! use allama::schemars::{self, JsonSchema};
-//! use allama::extract::ExtractionMode;
+//! use allama::chat::extract::ChatExtractionMode;
 //! use allama::ChatRequest;
 //!
 //! /// A rating from 1 to 5.
@@ -459,8 +459,8 @@
 //! let provider = MockProvider::build(|b| b.text(r#"{"rating": 7}"#).text(r#"{"rating": 4}"#));
 //! let request = ChatRequest::new("m")
 //!     .user("Rate this review: 'Great, but slow.'")
-//!     .with_option(ExtractionMode::Native);
-//! let extracted = Extractor::new()
+//!     .with_option(ChatExtractionMode::Native);
+//! let extracted = ChatExtractor::new()
 //!     .retries(1)
 //!     .extract::<_, Review>(&provider, &request)
 //!     .await?;
@@ -498,42 +498,42 @@ use crate::{UnsupportedPolicy, ValidationCoverage};
 
 mod enforcement;
 
-pub use enforcement::ExtractionPlan;
+pub use enforcement::ChatExtractionPlan;
 use enforcement::Target;
 
 const EXTRACTION_TOOL: &str = "submit_structured_output";
 
 /// Structured extraction for every chat provider.
-pub trait ExtractExt: ChatProvider {
+pub trait ChatExtractExt: ChatProvider {
     /// Extract a `T` from the response to `request`, in one provider call.
     ///
     /// The extraction mode is read from the request options (see
-    /// [`ExtractionMode`]) and removed from the derived request. For repair
-    /// or retries, use an [`Extractor`].
+    /// [`ChatExtractionMode`]) and removed from the derived request. For repair
+    /// or retries, use an [`ChatExtractor`].
     ///
     /// # Errors
     ///
     /// Returns provider errors as-is, with the extraction's record attached
-    /// ([`ExtractionMetadata::from_error`]), and extraction failures as
-    /// [`Error::Extract`], whose [`ExtractFailure`] carries the response
+    /// ([`ChatExtractionMetadata::from_error`]), and extraction failures as
+    /// [`Error::Extract`], whose [`ChatExtractFailure`] carries the response
     /// that could not be used.
     fn extract<'a, T>(
         &'a self,
         request: &'a ChatRequest,
-    ) -> impl Future<Output = Result<Extracted<T>>> + Send + 'a
+    ) -> impl Future<Output = Result<ChatExtracted<T>>> + Send + 'a
     where
         Self: Sync,
         T: JsonSchema + DeserializeOwned + Send + 'a,
     {
-        async move { Extractor::new().extract(self, request).await }
+        async move { ChatExtractor::new().extract(self, request).await }
     }
 
     /// Stream the extraction request for `request`.
     ///
     /// The returned stream yields the provider's events unchanged and keeps
     /// the raw structured output seen so far
-    /// ([`ExtractionStream::partial_output`]); call
-    /// [`ExtractionStream::finish`] after it ends to parse the value. Makes
+    /// ([`ChatExtractionStream::partial_output`]); call
+    /// [`ChatExtractionStream::finish`] after it ends to parse the value. Makes
     /// one provider call.
     ///
     /// # Errors
@@ -542,24 +542,24 @@ pub trait ExtractExt: ChatProvider {
     fn extract_stream<'a, T>(
         &'a self,
         request: &'a ChatRequest,
-    ) -> impl Future<Output = Result<ExtractionStream<Self::Stream, T>>> + Send + 'a
+    ) -> impl Future<Output = Result<ChatExtractionStream<Self::Stream, T>>> + Send + 'a
     where
         Self: Sync,
         T: JsonSchema + Send + 'a,
     {
-        async move { Extractor::new().extract_stream(self, request).await }
+        async move { ChatExtractor::new().extract_stream(self, request).await }
     }
 }
 
-impl<P: ChatProvider + ?Sized> ExtractExt for P {}
+impl<P: ChatProvider + ?Sized> ChatExtractExt for P {}
 
 /// How structured output is obtained.
 ///
-/// Attach it to a request with `request.with_option(ExtractionMode::Native)`.
+/// Attach it to a request with `request.with_option(ChatExtractionMode::Native)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
-pub enum ExtractionMode {
+pub enum ChatExtractionMode {
     /// Choose from the provider's reported capabilities (see the
     /// [module docs](self)).
     #[default]
@@ -570,42 +570,42 @@ pub enum ExtractionMode {
     ForcedTool,
 }
 
-enum_names!(ExtractionMode, "extraction mode", {
+enum_names!(ChatExtractionMode, "extraction mode", {
     Auto => "auto",
     Native => "native",
     ForcedTool => "forced_tool",
 });
 
-impl ProviderOptions for ExtractionMode {
-    const NAMESPACE: &'static str = "allama.extraction";
+impl ProviderOptions for ChatExtractionMode {
+    const NAMESPACE: &'static str = "allama.chat.extraction";
 }
 
 /// A typed extraction result.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct Extracted<T> {
+pub struct ChatExtracted<T> {
     /// The parsed value.
     pub value: T,
     /// The provider response it was parsed from (the last one, after
     /// retries).
     pub response: ChatResponse,
     /// How the extraction ran, including the usage of every pass.
-    pub metadata: ExtractionMetadata,
+    pub metadata: ChatExtractionMetadata,
 }
 
 /// How an extraction ran: its mode and the record of its passes.
 ///
-/// Reported on success ([`Extracted::metadata`]) and on failure
-/// ([`ExtractFailure::metadata`]).
+/// Reported on success ([`ChatExtracted::metadata`]) and on failure
+/// ([`ChatExtractFailure::metadata`]).
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
-pub struct ExtractionMetadata {
+pub struct ChatExtractionMetadata {
     /// The mode that was used.
-    pub mode: ExtractionMode,
+    pub mode: ChatExtractionMode,
     /// Number of provider calls made by the extraction (1 plus retries).
     ///
     /// `0` when it failed before calling the provider, and for
-    /// [`Extractor::parse`], which parses a response the caller already
+    /// [`ChatExtractor::parse`], which parses a response the caller already
     /// has. A call that failed with a provider error returned no response
     /// and is not counted (see [`from_error`](Self::from_error)), even a
     /// stream that failed mid-way, whose usage so far is still in
@@ -621,7 +621,7 @@ pub struct ExtractionMetadata {
     ///
     /// This reflects the adapter's own report, not a verified grammar
     /// guarantee. [`NotEnforced`](SchemaEnforcement::NotEnforced) when no
-    /// pass was made, including for [`Extractor::parse`], which cannot know
+    /// pass was made, including for [`ChatExtractor::parse`], which cannot know
     /// what the request asked for.
     #[serde(default)]
     pub enforcement: SchemaEnforcement,
@@ -640,15 +640,15 @@ pub struct ExtractionMetadata {
     /// reported usage.
     ///
     /// It also holds the usage a stream reported before it failed mid-way
-    /// ([`ExtractionStream::finish`]). That stream returned no response and
+    /// ([`ChatExtractionStream::finish`]). That stream returned no response and
     /// is not a pass, so the record of a failed stream can pair
     /// [`passes`](Self::passes) `0` with billed usage.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<Usage>,
-    /// The refusal that made an [`Auto`](ExtractionMode::Auto) extraction
+    /// The refusal that made an [`Auto`](ChatExtractionMode::Auto) extraction
     /// switch from native output to forced-tool mode, when it did (see the
     /// [module docs](self#automatic-fallback-to-forced-tool-mode)).
-    /// [`mode`](Self::mode) is then [`ForcedTool`](ExtractionMode::ForcedTool).
+    /// [`mode`](Self::mode) is then [`ForcedTool`](ChatExtractionMode::ForcedTool).
     ///
     /// The refused attempt sent nothing and is not counted in
     /// [`passes`](Self::passes).
@@ -662,11 +662,11 @@ pub struct ExtractionMetadata {
     pub undeclared_key_rejections: u32,
 }
 
-impl ExtractionMetadata {
+impl ChatExtractionMetadata {
     /// The record of an extraction in `mode` that has made no provider calls
     /// yet.
     #[must_use]
-    pub fn new(mode: ExtractionMode) -> Self {
+    pub fn new(mode: ChatExtractionMode) -> Self {
         Self {
             mode,
             passes: 0,
@@ -685,11 +685,11 @@ impl ExtractionMetadata {
     /// Extraction returns provider errors unchanged (so
     /// [`Error::is_retryable`], [`Error::retry_after`] and the variant stay
     /// what the provider reported) and attaches the record of the passes
-    /// made before the error to its context, under `allama.extraction` in
+    /// made before the error to its context, under `allama.chat.extraction` in
     /// [`ErrorContext::metadata`](crate::ErrorContext::metadata). It is
-    /// attached on every provider error from [`ExtractExt::extract`],
-    /// [`ExtractExt::extract_stream`], [`ExtractionStream::finish`] and the
-    /// [`Extractor`] methods, including one on the first call
+    /// attached on every provider error from [`ChatExtractExt::extract`],
+    /// [`ChatExtractExt::extract_stream`], [`ChatExtractionStream::finish`] and the
+    /// [`ChatExtractor`] methods, including one on the first call
     /// ([`passes`](Self::passes) `0`). For an error that ended a failover it
     /// is on that error's own context, not on the errors it
     /// [fell back from](Error::fallback_from).
@@ -697,12 +697,12 @@ impl ExtractionMetadata {
     /// `None` when the error carries no record: it did not come from an
     /// extraction, or its variant has no context ([`Error::Serialization`]).
     /// An [`Error::Extract`] carries its record in
-    /// [`ExtractFailure::metadata`] instead.
+    /// [`ChatExtractFailure::metadata`] instead.
     ///
     /// ```
     /// # #[cfg(feature = "mock")]
     /// # async fn example() {
-    /// use allama::extract::{ExtractionMetadata, ExtractionMode, Extractor};
+    /// use allama::chat::extract::{ChatExtractionMetadata, ChatExtractionMode, ChatExtractor};
     /// use allama::mock::{ChatResponseBuilder, MockProvider};
     /// use allama::schemars::{self, JsonSchema};
     /// use allama::{ChatRequest, Error};
@@ -718,14 +718,14 @@ impl ExtractionMetadata {
     /// });
     /// let request = ChatRequest::new("m")
     ///     .user("Ada wrote the first program.")
-    ///     .with_option(ExtractionMode::Native);
-    /// let error = Extractor::new()
+    ///     .with_option(ChatExtractionMode::Native);
+    /// let error = ChatExtractor::new()
     ///     .retries(1)
     ///     .extract::<_, Person>(&provider, &request)
     ///     .await
     ///     .unwrap_err();
     /// assert!(matches!(error, Error::RateLimited { .. })); // not reclassified
-    /// let metadata = ExtractionMetadata::from_error(&error).unwrap();
+    /// let metadata = ChatExtractionMetadata::from_error(&error).unwrap();
     /// assert_eq!(metadata.passes, 1);
     /// assert_eq!(metadata.usage.and_then(|u| u.input_tokens), Some(500));
     /// # }
@@ -751,15 +751,15 @@ impl ExtractionMetadata {
 
     /// The fallback to forced-tool mode that `error` calls for, when this
     /// extraction may still take it: the caller asked for
-    /// [`Auto`](ExtractionMode::Auto), it picked
-    /// [`Native`](ExtractionMode::Native), no pass was made yet, and the
+    /// [`Auto`](ChatExtractionMode::Auto), it picked
+    /// [`Native`](ChatExtractionMode::Native), no pass was made yet, and the
     /// response format was refused: by the adapter before sending, or, when
     /// `Native` was only a guess from an `Unknown` answer (`guessed`), by
     /// the provider itself. A provider's 4xx refusal produced nothing to
     /// bill, so the fallback still never pays twice for the output.
     fn auto_fallback_for(
         &self,
-        requested: ExtractionMode,
+        requested: ChatExtractionMode,
         guessed: bool,
         error: &Error,
     ) -> Option<AutoFallback> {
@@ -784,16 +784,16 @@ impl ExtractionMetadata {
 
     /// Whether a refusal of the native response format would still switch
     /// this extraction to forced-tool mode.
-    fn may_fall_back(&self, requested: ExtractionMode) -> bool {
-        requested == ExtractionMode::Auto
-            && self.mode == ExtractionMode::Native
+    fn may_fall_back(&self, requested: ChatExtractionMode) -> bool {
+        requested == ChatExtractionMode::Auto
+            && self.mode == ChatExtractionMode::Native
             && self.passes == 0
             && self.auto_fallback.is_none()
     }
 
     /// Switch to forced-tool mode after `fallback`.
     fn fall_back(&mut self, fallback: AutoFallback) {
-        self.mode = ExtractionMode::ForcedTool;
+        self.mode = ChatExtractionMode::ForcedTool;
         self.auto_fallback = Some(fallback);
     }
 
@@ -837,7 +837,7 @@ impl ExtractionMetadata {
 
 /// Shows the mode, passes and enforcement, and the other fields when they
 /// are set.
-impl fmt::Debug for ExtractionMetadata {
+impl fmt::Debug for ChatExtractionMetadata {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             mode,
@@ -849,7 +849,7 @@ impl fmt::Debug for ExtractionMetadata {
             auto_fallback,
             undeclared_key_rejections,
         } = self;
-        let mut debug = f.debug_struct("ExtractionMetadata");
+        let mut debug = f.debug_struct("ChatExtractionMetadata");
         debug
             .field("mode", mode)
             .field("passes", passes)
@@ -874,7 +874,7 @@ impl fmt::Debug for ExtractionMetadata {
 }
 
 /// How far the provider reported constraining an extraction's output to
-/// the schema of `T` ([`ExtractionMetadata::enforcement`]).
+/// the schema of `T` ([`ChatExtractionMetadata::enforcement`]).
 ///
 /// It is derived from the warnings the adapter reported on the field the
 /// extraction mode relies on; see the
@@ -908,7 +908,7 @@ impl SchemaEnforcement {
     /// `NotEnforced`, and `NotEnforced` only itself.
     ///
     /// ```
-    /// use allama::extract::SchemaEnforcement;
+    /// use allama::chat::extract::SchemaEnforcement;
     ///
     /// assert!(SchemaEnforcement::Exact.satisfies(SchemaEnforcement::Approximate));
     /// assert!(!SchemaEnforcement::NotEnforced.satisfies(SchemaEnforcement::Approximate));
@@ -940,8 +940,8 @@ impl SchemaEnforcement {
     }
 }
 
-/// Why an [`Auto`](ExtractionMode::Auto) extraction switched from native
-/// output to forced-tool mode ([`ExtractionMetadata::auto_fallback`]).
+/// Why an [`Auto`](ChatExtractionMode::Auto) extraction switched from native
+/// output to forced-tool mode ([`ChatExtractionMetadata::auto_fallback`]).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct AutoFallback {
@@ -991,7 +991,7 @@ impl AutoFallback {
 /// ```
 /// # #[cfg(feature = "mock")]
 /// # async fn example() {
-/// use allama::extract::{ExtractError, ExtractionMode, Extractor};
+/// use allama::chat::extract::{ChatExtractError, ChatExtractionMode, ChatExtractor};
 /// use allama::mock::{ChatResponseBuilder, MockProvider};
 /// use allama::schemars::{self, JsonSchema};
 /// use allama::{ChatRequest, Error};
@@ -1007,15 +1007,15 @@ impl AutoFallback {
 /// });
 /// let request = ChatRequest::new("m")
 ///     .user("Ada wrote the first program.")
-///     .with_option(ExtractionMode::Native);
-/// let Err(Error::Extract { failure, .. }) = Extractor::new()
+///     .with_option(ChatExtractionMode::Native);
+/// let Err(Error::Extract { failure, .. }) = ChatExtractor::new()
 ///     .retries(1)
 ///     .extract::<_, Person>(&provider, &request)
 ///     .await
 /// else {
 ///     panic!("expected an extraction failure");
 /// };
-/// assert!(matches!(failure.error(), ExtractError::Parse { .. }));
+/// assert!(matches!(failure.error(), ChatExtractError::Parse { .. }));
 /// assert_eq!(failure.response().and_then(|r| r.text()).as_deref(), Some("still not json"));
 /// assert_eq!(failure.metadata().passes, 2);
 /// assert_eq!(failure.metadata().usage.as_ref().and_then(|u| u.input_tokens), Some(24));
@@ -1024,20 +1024,20 @@ impl AutoFallback {
 ///
 /// [`Error`]'s serde form includes the response; its redacted logging view
 /// ([`Error::as_log`]) does not. Its `Debug` withholds the response, and the
-/// model's text in the error (see [`ExtractError`]).
+/// model's text in the error (see [`ChatExtractError`]).
 #[derive(Clone, Serialize, Deserialize)]
-pub struct ExtractFailure {
-    error: ExtractError,
+pub struct ChatExtractFailure {
+    error: ChatExtractError,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     response: Option<ChatResponse>,
-    metadata: ExtractionMetadata,
+    metadata: ChatExtractionMetadata,
 }
 
-impl ExtractFailure {
+impl ChatExtractFailure {
     /// A failure without a response (extraction stopped before or without
     /// one).
     #[must_use]
-    pub fn new(error: ExtractError, metadata: ExtractionMetadata) -> Self {
+    pub fn new(error: ChatExtractError, metadata: ChatExtractionMetadata) -> Self {
         Self {
             error,
             response: None,
@@ -1054,7 +1054,7 @@ impl ExtractFailure {
 
     /// Why extraction failed.
     #[must_use]
-    pub fn error(&self) -> &ExtractError {
+    pub fn error(&self) -> &ChatExtractError {
         &self.error
     }
 
@@ -1068,7 +1068,7 @@ impl ExtractFailure {
     /// How the extraction ran up to the failure: mode, provider calls made,
     /// and their summed usage.
     #[must_use]
-    pub fn metadata(&self) -> &ExtractionMetadata {
+    pub fn metadata(&self) -> &ChatExtractionMetadata {
         &self.metadata
     }
 
@@ -1079,15 +1079,15 @@ impl ExtractFailure {
     }
 }
 
-impl fmt::Display for ExtractFailure {
+impl fmt::Display for ChatExtractFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.error.fmt(f)
     }
 }
 
-impl fmt::Debug for ExtractFailure {
+impl fmt::Debug for ChatExtractFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut debug = f.debug_struct("ExtractFailure");
+        let mut debug = f.debug_struct("ChatExtractFailure");
         debug.field("error", &self.error);
         if self.response.is_some() {
             debug.field("response", &format_args!("<withheld>"));
@@ -1096,24 +1096,24 @@ impl fmt::Debug for ExtractFailure {
     }
 }
 
-impl std::error::Error for ExtractFailure {}
+impl std::error::Error for ChatExtractFailure {}
 
-impl From<ExtractFailure> for Error {
-    fn from(failure: ExtractFailure) -> Self {
+impl From<ChatExtractFailure> for Error {
+    fn from(failure: ChatExtractFailure) -> Self {
         Error::extract(failure)
     }
 }
 
 /// Runs extraction with explicit, opt-in recovery.
 ///
-/// The default extractor behaves exactly like [`ExtractExt::extract`]: one
+/// The default extractor behaves exactly like [`ChatExtractExt::extract`]: one
 /// provider call, strict parsing.
 ///
 /// ```
 /// # #[cfg(feature = "mock")]
 /// # async fn example() -> allama::Result<()> {
 /// use allama::ChatRequest;
-/// use allama::extract::Extractor;
+/// use allama::chat::extract::ChatExtractor;
 /// use allama::mock::MockProvider;
 /// use allama::schemars::{self, JsonSchema};
 ///
@@ -1125,8 +1125,8 @@ impl From<ExtractFailure> for Error {
 /// let provider = MockProvider::with_text("```json\n{\"name\": \"Ada\"}\n```");
 /// let request = ChatRequest::new("m")
 ///     .user("Ada wrote the first program.")
-///     .with_option(allama::extract::ExtractionMode::Native);
-/// let extracted = Extractor::new()
+///     .with_option(allama::chat::extract::ChatExtractionMode::Native);
+/// let extracted = ChatExtractor::new()
 ///     .repair(true) // strip the markdown fence locally
 ///     .retries(1) // ask once more if it still does not parse
 ///     .extract::<_, Person>(&provider, &request)
@@ -1146,7 +1146,7 @@ impl From<ExtractFailure> for Error {
 /// providers refuse a prefill with structured output.
 ///
 /// ```
-/// use allama::extract::ExtractionMode;
+/// use allama::chat::extract::ChatExtractionMode;
 /// use allama::{ChatRequest, ToolDefinition};
 ///
 /// let chat = ChatRequest::new("m")
@@ -1159,13 +1159,13 @@ impl From<ExtractFailure> for Error {
 /// let fresh = ChatRequest::new(&chat.model)
 ///     .extend_messages(chat.messages.clone())
 ///     .user("Extract the person from this conversation.")
-///     .with_option(ExtractionMode::ForcedTool);
+///     .with_option(ChatExtractionMode::ForcedTool);
 ///
 /// // Everything but the tools:
 /// let mut without_tools = chat
 ///     .clone()
 ///     .user("Extract the person from this conversation.")
-///     .with_option(ExtractionMode::ForcedTool);
+///     .with_option(ChatExtractionMode::ForcedTool);
 /// without_tools.tools.clear();
 /// without_tools.tool_choice = None;
 /// # assert!(fresh.tools.is_empty() && fresh.temperature.is_none());
@@ -1173,14 +1173,14 @@ impl From<ExtractFailure> for Error {
 /// # assert!(matches!(fresh.messages.last(), Some(allama::Message::User(_))));
 /// ```
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Extractor {
+pub struct ChatExtractor {
     repair: bool,
     retries: u32,
     allow_undeclared_keys: bool,
     min_enforcement: Option<SchemaEnforcement>,
 }
 
-impl Extractor {
+impl ChatExtractor {
     /// An extractor with no recovery.
     #[must_use]
     pub fn new() -> Self {
@@ -1189,10 +1189,10 @@ impl Extractor {
 
     /// Repair malformed output locally before giving up: strip markdown code
     /// fences and prose around the JSON value. Makes no provider calls;
-    /// [`ExtractionMetadata::repaired`] reports when it was needed.
+    /// [`ChatExtractionMetadata::repaired`] reports when it was needed.
     ///
     /// When the repaired value is valid JSON but does not fit `T`, the
-    /// [`ExtractError::Parse`] message (and the retry feedback) is its error,
+    /// [`ChatExtractError::Parse`] message (and the retry feedback) is its error,
     /// such as an unknown enum variant, not the error of the unrepaired
     /// text.
     #[must_use]
@@ -1208,15 +1208,15 @@ impl Extractor {
     /// The feedback names the failure: output that is not valid JSON ("it
     /// was not valid JSON: ...") is told apart from valid JSON that does not
     /// fit the schema ("it did not match the schema at `items[2].price`:
-    /// ..."). The path ([`ExtractError::Parse`]'s `path`) names the field
+    /// ..."). The path ([`ChatExtractError::Parse`]'s `path`) names the field
     /// to fix; it is found by deserializing again, only after a failure.
     ///
     /// Each retry is one more provider call, billed and with its own
-    /// latency; [`ExtractionMetadata`] counts the calls and sums their usage,
+    /// latency; [`ChatExtractionMetadata`] counts the calls and sums their usage,
     /// on success and on failure. Truncated output
-    /// ([`ExtractError::Truncated`]) is not retried: the same token limit
+    /// ([`ChatExtractError::Truncated`]) is not retried: the same token limit
     /// would cut it off again. Neither is a refusal
-    /// ([`ExtractError::Refused`]): asking again would pay for the same
+    /// ([`ChatExtractError::Refused`]): asking again would pay for the same
     /// refusal.
     ///
     /// A retry replays the failed reply. Each tool call in it is answered
@@ -1230,7 +1230,7 @@ impl Extractor {
     /// [`RetryingProvider`](crate::wrappers::RetryingProvider) for those. A
     /// provider error on a retry is returned as itself, not as an extraction
     /// failure, with the passes and usage so far attached: read them with
-    /// [`ExtractionMetadata::from_error`].
+    /// [`ChatExtractionMetadata::from_error`].
     #[must_use]
     pub fn retries(mut self, retries: u32) -> Self {
         self.retries = retries;
@@ -1244,7 +1244,7 @@ impl Extractor {
     /// ```
     /// # #[cfg(feature = "mock")]
     /// # async fn example() -> allama::Result<()> {
-    /// use allama::extract::{ExtractionMode, Extractor};
+    /// use allama::chat::extract::{ChatExtractionMode, ChatExtractor};
     /// use allama::mock::{ChatResponseBuilder, MockProvider};
     /// use allama::schemars::{self, JsonSchema};
     /// use allama::{ChatRequest, RequestField, Warning};
@@ -1267,8 +1267,8 @@ impl Extractor {
     ///         .warning(approximated)
     ///         .build(),
     /// );
-    /// let request = ChatRequest::new("m").user("Ada").with_option(ExtractionMode::Native);
-    /// let extracted = Extractor::new()
+    /// let request = ChatRequest::new("m").user("Ada").with_option(ChatExtractionMode::Native);
+    /// let extracted = ChatExtractor::new()
     ///     .allow_undeclared_keys(true)
     ///     .extract::<_, Person>(&provider, &request)
     ///     .await?;
@@ -1282,8 +1282,8 @@ impl Extractor {
     }
 
     /// Require at least `floor` schema enforcement
-    /// ([`ExtractionMetadata::enforcement`]), failing with
-    /// [`ExtractError::EnforcementBelow`] otherwise. Off by default.
+    /// ([`ChatExtractionMetadata::enforcement`]), failing with
+    /// [`ChatExtractError::EnforcementBelow`] otherwise. Off by default.
     ///
     /// When the provider's validation is a dry run of the call
     /// ([`ValidationCoverage::Encoding`], every first-party adapter), the
@@ -1312,10 +1312,14 @@ impl Extractor {
     ///
     /// # Errors
     ///
-    /// See [`ExtractExt::extract`]. After the last retry, the last
+    /// See [`ChatExtractExt::extract`]. After the last retry, the last
     /// extraction failure is returned, with the last response and the usage
     /// of every pass.
-    pub async fn extract<P, T>(&self, provider: &P, request: &ChatRequest) -> Result<Extracted<T>>
+    pub async fn extract<P, T>(
+        &self,
+        provider: &P,
+        request: &ChatRequest,
+    ) -> Result<ChatExtracted<T>>
     where
         P: ChatProvider + ?Sized,
         T: JsonSchema + DeserializeOwned + Send,
@@ -1324,7 +1328,7 @@ impl Extractor {
         let requested = requested_mode(request);
         self.check_floor_before_sending(provider, request, &target, false)?;
         let (mode, guessed) = select_mode(provider, request);
-        let mut metadata = ExtractionMetadata::new(mode);
+        let mut metadata = ChatExtractionMetadata::new(mode);
         let mut derived = target.derive(request, &metadata)?;
         let mut retries_left = self.retries;
         loop {
@@ -1357,7 +1361,7 @@ impl Extractor {
             match parsed {
                 Ok((value, repaired)) => {
                     metadata.repaired = repaired;
-                    return Ok(Extracted {
+                    return Ok(ChatExtracted {
                         value,
                         response,
                         metadata,
@@ -1371,7 +1375,7 @@ impl Extractor {
                         retries_left -= 1;
                         ask_again(&mut derived, response, mode, &rejection);
                     } else {
-                        return Err(ExtractFailure::new(rejection.error, metadata)
+                        return Err(ChatExtractFailure::new(rejection.error, metadata)
                             .with_response(response)
                             .into());
                     }
@@ -1386,26 +1390,26 @@ impl Extractor {
     /// Use it for responses obtained outside an extraction call: a batch
     /// result, a recorded response, or a request you built yourself with a
     /// [`ResponseFormat::JsonSchema`]. `mode` says where the output is: the
-    /// response text ([`Native`](ExtractionMode::Native)) or the arguments
+    /// response text ([`Native`](ChatExtractionMode::Native)) or the arguments
     /// of the single `submit_structured_output` tool call
-    /// ([`ForcedTool`](ExtractionMode::ForcedTool)).
-    /// [`Auto`](ExtractionMode::Auto) has nothing to choose from and fails
-    /// with [`ExtractError::Unsupported`].
+    /// ([`ForcedTool`](ChatExtractionMode::ForcedTool)).
+    /// [`Auto`](ChatExtractionMode::Auto) has nothing to choose from and fails
+    /// with [`ChatExtractError::Unsupported`].
     ///
     /// Strict `null`s are normalized against the schema of `T`, as in
     /// [`extract`](Self::extract); a parse failure keeps the text the model
     /// sent.
     ///
-    /// The response is returned in [`Extracted`] or in the failure. The
+    /// The response is returned in [`ChatExtracted`] or in the failure. The
     /// metadata reports no passes, no usage, and no degradations (they are
     /// on the response), and
-    /// [`enforcement`](ExtractionMetadata::enforcement) is
+    /// [`enforcement`](ChatExtractionMetadata::enforcement) is
     /// [`NotEnforced`](SchemaEnforcement::NotEnforced): whether the request
     /// asked for strict mode is unknown here.
     ///
     /// ```
     /// use allama::ChatResponse;
-    /// use allama::extract::{ExtractionMode, Extractor};
+    /// use allama::chat::extract::{ChatExtractionMode, ChatExtractor};
     /// use allama::schemars::{self, JsonSchema};
     ///
     /// #[derive(serde::Deserialize, JsonSchema)]
@@ -1416,9 +1420,9 @@ impl Extractor {
     /// let response = ChatResponse::new(vec![allama::ContentBlock::text(
     ///     "```json\n{\"name\": \"Ada\"}\n```",
     /// )]);
-    /// let extracted = Extractor::new()
+    /// let extracted = ChatExtractor::new()
     ///     .repair(true)
-    ///     .parse::<Person>(response, ExtractionMode::Native)?;
+    ///     .parse::<Person>(response, ChatExtractionMode::Native)?;
     /// assert_eq!(extracted.value.name, "Ada");
     /// assert!(extracted.metadata.repaired);
     /// # Ok::<(), allama::Error>(())
@@ -1430,13 +1434,13 @@ impl Extractor {
     pub fn parse<T: JsonSchema + DeserializeOwned>(
         &self,
         response: ChatResponse,
-        mode: ExtractionMode,
-    ) -> Result<Extracted<T>> {
+        mode: ChatExtractionMode,
+    ) -> Result<ChatExtracted<T>> {
         let provider = response.provider.as_deref().unwrap_or("unknown").to_owned();
-        let metadata = ExtractionMetadata::new(mode);
-        if mode == ExtractionMode::Auto {
-            return Err(ExtractFailure::new(
-                ExtractError::Unsupported { mode, provider },
+        let metadata = ChatExtractionMetadata::new(mode);
+        if mode == ChatExtractionMode::Auto {
+            return Err(ChatExtractFailure::new(
+                ChatExtractError::Unsupported { mode, provider },
                 metadata,
             )
             .with_response(response)
@@ -1454,12 +1458,12 @@ impl Extractor {
     ///
     /// # Errors
     ///
-    /// See [`ExtractExt::extract_stream`].
+    /// See [`ChatExtractExt::extract_stream`].
     pub async fn extract_stream<P, T>(
         &self,
         provider: &P,
         request: &ChatRequest,
-    ) -> Result<ExtractionStream<P::Stream, T>>
+    ) -> Result<ChatExtractionStream<P::Stream, T>>
     where
         P: ChatProvider + ?Sized,
         T: JsonSchema,
@@ -1468,7 +1472,7 @@ impl Extractor {
         let requested = requested_mode(request);
         self.check_floor_before_sending(provider, request, &target, true)?;
         let (mode, guessed) = select_mode(provider, request);
-        let mut metadata = ExtractionMetadata::new(mode);
+        let mut metadata = ChatExtractionMetadata::new(mode);
         loop {
             let derived = target.derive(request, &metadata)?;
             let mut stream = match provider.chat_stream(&derived).await {
@@ -1496,7 +1500,7 @@ impl Extractor {
                 }
                 first = Some(item);
             }
-            return Ok(ExtractionStream {
+            return Ok(ChatExtractionStream {
                 inner: stream,
                 first,
                 collector: StreamCollector::new(),
@@ -1515,10 +1519,10 @@ impl Extractor {
 
 /// A streamed extraction: the provider's events, then a parsed value.
 ///
-/// Created by [`ExtractExt::extract_stream`]. Read the stream to the end,
+/// Created by [`ChatExtractExt::extract_stream`]. Read the stream to the end,
 /// then call [`finish`](Self::finish). It ends after the provider's first
 /// error, as every [`ChatStream`](crate::ChatStream) does.
-pub struct ExtractionStream<S, T> {
+pub struct ChatExtractionStream<S, T> {
     inner: Pin<Box<S>>,
     /// The first item, when it was read before the stream was handed on
     /// (to check for a refusal); `Some(None)` when the stream had ended.
@@ -1526,21 +1530,21 @@ pub struct ExtractionStream<S, T> {
     collector: StreamCollector,
     partial: String,
     tool_index: Option<usize>,
-    mode: ExtractionMode,
+    mode: ChatExtractionMode,
     auto_fallback: Option<AutoFallback>,
     /// The schema of `T` and how messages name it.
     target: Target,
     /// Repair, undeclared keys and the floor.
-    extractor: Extractor,
+    extractor: ChatExtractor,
     done: bool,
     _value: PhantomData<fn() -> T>,
 }
 
-impl<S, T> ExtractionStream<S, T> {
+impl<S, T> ChatExtractionStream<S, T> {
     /// The mode the extraction uses: `ForcedTool` after an
     /// [automatic fallback](self#automatic-fallback-to-forced-tool-mode).
     #[must_use]
-    pub fn mode(&self) -> ExtractionMode {
+    pub fn mode(&self) -> ChatExtractionMode {
         self.mode
     }
 
@@ -1559,17 +1563,17 @@ impl<S, T> ExtractionStream<S, T> {
     /// # Errors
     ///
     /// Returns the stream's error when it failed or ended early, with the
-    /// extraction's record attached ([`ExtractionMetadata::from_error`]).
+    /// extraction's record attached ([`ChatExtractionMetadata::from_error`]).
     /// The failed stream is not counted as a pass, but the usage and the
-    /// [degradations](ExtractionMetadata::degradations) it reported before
+    /// [degradations](ChatExtractionMetadata::degradations) it reported before
     /// failing are in the record, so `passes` can be `0` while `usage`
     /// holds the tokens already billed. Returns [`Error::Extract`] (with the
     /// collected response) when the output cannot be used.
-    pub fn finish(self) -> Result<Extracted<T>>
+    pub fn finish(self) -> Result<ChatExtracted<T>>
     where
         T: DeserializeOwned,
     {
-        let mut metadata = ExtractionMetadata::new(self.mode);
+        let mut metadata = ChatExtractionMetadata::new(self.mode);
         metadata.auto_fallback = self.auto_fallback;
         // A stream that fails mid-way returns no response, but what it
         // reported before failing (usage, warnings) is still the caller's.
@@ -1596,7 +1600,7 @@ impl<S, T> ExtractionStream<S, T> {
 
     fn observe(&mut self, event: &StreamEvent) {
         match event {
-            StreamEvent::TextDelta { text, .. } if self.mode == ExtractionMode::Native => {
+            StreamEvent::TextDelta { text, .. } if self.mode == ChatExtractionMode::Native => {
                 self.partial.push_str(text);
             }
             StreamEvent::BlockStart {
@@ -1616,9 +1620,9 @@ impl<S, T> ExtractionStream<S, T> {
 }
 
 /// Counts and state, never content.
-impl<S, T> fmt::Debug for ExtractionStream<S, T> {
+impl<S, T> fmt::Debug for ChatExtractionStream<S, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ExtractionStream")
+        f.debug_struct("ChatExtractionStream")
             .field("mode", &self.mode)
             .field("collector", &self.collector)
             .field("partial_output_len", &self.partial.len())
@@ -1627,7 +1631,7 @@ impl<S, T> fmt::Debug for ExtractionStream<S, T> {
     }
 }
 
-impl<S, T> Stream for ExtractionStream<S, T>
+impl<S, T> Stream for ChatExtractionStream<S, T>
 where
     S: Stream<Item = Result<StreamEvent>>,
 {
@@ -1674,21 +1678,21 @@ where
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
-pub enum ExtractError {
+pub enum ChatExtractError {
     /// No mode could be selected: the provider's capability answers rule out
-    /// both native output and forced tool calls (or [`Extractor::parse`] was
-    /// given [`Auto`](ExtractionMode::Auto)).
+    /// both native output and forced tool calls (or [`ChatExtractor::parse`] was
+    /// given [`Auto`](ChatExtractionMode::Auto)).
     #[non_exhaustive]
     Unsupported {
         /// Requested mode.
-        mode: ExtractionMode,
+        mode: ChatExtractionMode,
         /// Provider name.
         provider: String,
     },
     /// The request carries tools of its own, which extraction refuses in
     /// every mode before sending. Clear `tools` and `tool_choice`, or start
     /// a fresh request from the messages; see
-    /// [extracting from a conversation](Extractor#extracting-from-a-conversation).
+    /// [extracting from a conversation](ChatExtractor#extracting-from-a-conversation).
     #[non_exhaustive]
     ToolConflict {
         /// Provider name.
@@ -1734,7 +1738,7 @@ pub enum ExtractError {
     #[non_exhaustive]
     Truncated {
         /// Mode used.
-        mode: ExtractionMode,
+        mode: ChatExtractionMode,
         /// Provider name.
         provider: String,
         /// What cut the output off: [`FinishReason::Length`] or
@@ -1757,11 +1761,11 @@ pub enum ExtractError {
     ///
     /// Checked before parsing and never retried: asking again would pay for
     /// the same refusal. The last response, with any partial output and the
-    /// provider's own decline data, is on the [`ExtractFailure`].
+    /// provider's own decline data, is on the [`ChatExtractFailure`].
     #[non_exhaustive]
     Refused {
         /// Mode used.
-        mode: ExtractionMode,
+        mode: ChatExtractionMode,
         /// Provider name.
         provider: String,
         /// The response's finish reason, when it reported one.
@@ -1775,11 +1779,11 @@ pub enum ExtractError {
         source: RefusalSource,
     },
     /// The schema enforcement is below the floor the extractor requires
-    /// ([`Extractor::min_enforcement`]).
+    /// ([`ChatExtractor::min_enforcement`]).
     ///
     /// Before sending when the provider's validation is a dry run of the
     /// call; after a pass otherwise, with its response on the
-    /// [`ExtractFailure`]. Never retried: asking again gets the same
+    /// [`ChatExtractFailure`]. Never retried: asking again gets the same
     /// enforcement.
     #[non_exhaustive]
     EnforcementBelow {
@@ -1797,7 +1801,7 @@ pub enum ExtractError {
     #[non_exhaustive]
     Parse {
         /// Mode used.
-        mode: ExtractionMode,
+        mode: ChatExtractionMode,
         /// Provider name.
         provider: String,
         /// Raw output: the text the model sent, before repair or `null`
@@ -1805,7 +1809,7 @@ pub enum ExtractError {
         raw: String,
         /// Parse error message.
         ///
-        /// With [`Extractor::repair`], this is the repaired value's error
+        /// With [`ChatExtractor::repair`], this is the repaired value's error
         /// when the repair found valid JSON (it reached `T`, so its error
         /// says what is wrong), and the raw output's error otherwise. When
         /// the response finished abnormally for a reason other than a
@@ -1826,7 +1830,7 @@ pub enum ExtractError {
     },
 }
 
-impl ExtractError {
+impl ChatExtractError {
     /// The raw output, for parse failures.
     #[must_use]
     pub fn raw_output(&self) -> Option<&str> {
@@ -1865,19 +1869,19 @@ impl ExtractError {
     }
 }
 
-impl fmt::Display for ExtractError {
+impl fmt::Display for ChatExtractError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Unsupported {
-                mode: ExtractionMode::Auto,
+                mode: ChatExtractionMode::Auto,
                 provider,
             } => write!(
                 f,
-                "{provider}: the provider reports that the model supports neither structured output nor forced tool calls, so extraction mode Auto has no mode to pick; set ExtractionMode explicitly, or override the capability answers with a capability resolver"
+                "{provider}: the provider reports that the model supports neither structured output nor forced tool calls, so extraction mode Auto has no mode to pick; set ChatExtractionMode explicitly, or override the capability answers with a capability resolver"
             ),
             Self::Unsupported { mode, provider } => write!(
                 f,
-                "{provider}: extraction mode {mode:?} is not supported; set ExtractionMode explicitly or override the capability answers with a capability resolver"
+                "{provider}: extraction mode {mode:?} is not supported; set ChatExtractionMode explicitly or override the capability answers with a capability resolver"
             ),
             Self::ToolConflict { provider } => write!(
                 f,
@@ -1962,7 +1966,7 @@ impl fmt::Display for ExtractError {
     }
 }
 
-impl fmt::Debug for ExtractError {
+impl fmt::Debug for ChatExtractError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Unsupported { mode, provider } => f
@@ -2058,9 +2062,9 @@ impl fmt::Debug for ExtractError {
     }
 }
 
-impl std::error::Error for ExtractError {}
+impl std::error::Error for ChatExtractError {}
 
-/// Where the text of an [`ExtractError::Refused`] came from.
+/// Where the text of an [`ChatExtractError::Refused`] came from.
 ///
 /// The enum is `#[non_exhaustive]`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -2089,14 +2093,14 @@ fn refused_without_text(provider: &str, finish_reason: Option<&FinishReason>) ->
 }
 
 /// The mode the caller asked for, before [`select_mode`] resolves `Auto`.
-fn requested_mode(request: &ChatRequest) -> ExtractionMode {
+fn requested_mode(request: &ChatRequest) -> ChatExtractionMode {
     request
-        .option::<ExtractionMode>()
+        .option::<ChatExtractionMode>()
         .copied()
         .unwrap_or_default()
 }
 
-/// Resolve [`Auto`](ExtractionMode::Auto) from the provider's answers, in
+/// Resolve [`Auto`](ChatExtractionMode::Auto) from the provider's answers, in
 /// this order:
 ///
 /// 1. `Native` when structured output is `Supported`;
@@ -2115,22 +2119,22 @@ fn requested_mode(request: &ChatRequest) -> ExtractionMode {
 fn select_mode<P: ChatProvider + ?Sized>(
     provider: &P,
     request: &ChatRequest,
-) -> (ExtractionMode, bool) {
+) -> (ChatExtractionMode, bool) {
     match requested_mode(request) {
-        ExtractionMode::Auto => {
+        ChatExtractionMode::Auto => {
             use CapabilitySupport::{Supported, Unknown, Unsupported};
             let answer = |c| provider.chat_capability(&request.model, c);
             let native = answer(ChatCapability::StructuredOutput);
             let tools = answer(ChatCapability::ToolCalls);
             let forced = answer(ChatCapability::ForcedToolChoice);
             match (native, tools, forced) {
-                (Supported, _, _) => (ExtractionMode::Native, false),
-                (_, Supported, Supported) => (ExtractionMode::ForcedTool, false),
-                (Unknown, _, _) => (ExtractionMode::Native, true),
+                (Supported, _, _) => (ChatExtractionMode::Native, false),
+                (_, Supported, Supported) => (ChatExtractionMode::ForcedTool, false),
+                (Unknown, _, _) => (ChatExtractionMode::Native, true),
                 (_, Supported | Unknown, Supported | Unknown) => {
-                    (ExtractionMode::ForcedTool, false)
+                    (ChatExtractionMode::ForcedTool, false)
                 }
-                (Unsupported, _, _) => (ExtractionMode::Auto, false),
+                (Unsupported, _, _) => (ChatExtractionMode::Auto, false),
             }
         }
         mode => (mode, false),
@@ -2139,24 +2143,24 @@ fn select_mode<P: ChatProvider + ?Sized>(
 
 fn derive_request(
     request: &ChatRequest,
-    mode: ExtractionMode,
+    mode: ChatExtractionMode,
     provider: &str,
     name: &str,
     schema: serde_json::Value,
-) -> std::result::Result<ChatRequest, ExtractError> {
-    if mode != ExtractionMode::Auto && !request.tools.is_empty() {
-        return Err(ExtractError::ToolConflict {
+) -> std::result::Result<ChatRequest, ChatExtractError> {
+    if mode != ChatExtractionMode::Auto && !request.tools.is_empty() {
+        return Err(ChatExtractError::ToolConflict {
             provider: provider.to_owned(),
         });
     }
     let mut derived = request.clone();
-    derived.options.remove::<ExtractionMode>();
-    derived.options.remove_json(ExtractionMode::NAMESPACE);
+    derived.options.remove::<ChatExtractionMode>();
+    derived.options.remove_json(ChatExtractionMode::NAMESPACE);
     match mode {
-        ExtractionMode::Native => {
+        ChatExtractionMode::Native => {
             derived.response_format = Some(ResponseFormat::json_schema(schema).name(name));
         }
-        ExtractionMode::ForcedTool => {
+        ChatExtractionMode::ForcedTool => {
             derived.tools = vec![
                 ToolDefinition::new(EXTRACTION_TOOL, schema)
                     .description("Submit extracted structured data")
@@ -2171,8 +2175,8 @@ fn derive_request(
             // Azure OpenAI) turn them off in the adapter, which knows the
             // dialect; core does not guess it from the model id.
         }
-        ExtractionMode::Auto => {
-            return Err(ExtractError::Unsupported {
+        ChatExtractionMode::Auto => {
+            return Err(ChatExtractError::Unsupported {
                 mode,
                 provider: provider.to_owned(),
             });
@@ -2183,11 +2187,11 @@ fn derive_request(
 
 /// The request field whose warnings count for `mode`'s enforcement: the
 /// one that carries the schema.
-fn counted_field(mode: ExtractionMode) -> Option<RequestField> {
+fn counted_field(mode: ChatExtractionMode) -> Option<RequestField> {
     match mode {
-        ExtractionMode::Native => Some(RequestField::ResponseFormat),
-        ExtractionMode::ForcedTool => Some(RequestField::Tools),
-        ExtractionMode::Auto => None,
+        ChatExtractionMode::Native => Some(RequestField::ResponseFormat),
+        ChatExtractionMode::ForcedTool => Some(RequestField::Tools),
+        ChatExtractionMode::Auto => None,
     }
 }
 
@@ -2200,11 +2204,11 @@ fn is_about(warning: &Warning, field: RequestField) -> bool {
 /// will not be retried.
 fn finish_extraction<T: DeserializeOwned>(
     response: ChatResponse,
-    mut metadata: ExtractionMetadata,
+    mut metadata: ChatExtractionMetadata,
     target: &Target,
     repair: bool,
     reject_undeclared: bool,
-) -> Result<Extracted<T>> {
+) -> Result<ChatExtracted<T>> {
     let parsed = parse_value::<T>(
         &response,
         metadata.mode,
@@ -2216,7 +2220,7 @@ fn finish_extraction<T: DeserializeOwned>(
     match parsed {
         Ok((value, repaired)) => {
             metadata.repaired = repaired;
-            Ok(Extracted {
+            Ok(ChatExtracted {
                 value,
                 response,
                 metadata,
@@ -2226,7 +2230,7 @@ fn finish_extraction<T: DeserializeOwned>(
             if rejection.undeclared {
                 metadata.undeclared_key_rejections += 1;
             }
-            Err(ExtractFailure::new(rejection.error, metadata)
+            Err(ChatExtractFailure::new(rejection.error, metadata)
                 .with_response(response)
                 .into())
         }
@@ -2236,7 +2240,7 @@ fn finish_extraction<T: DeserializeOwned>(
 /// Output that could not be used: why, and for a parse failure, whether
 /// the output was JSON at all, which the retry feedback tells apart.
 struct Rejection {
-    error: ExtractError,
+    error: ChatExtractError,
     /// The parse failed on JSON syntax (or early end of input), not on the
     /// shape of `T`.
     invalid_json: bool,
@@ -2244,8 +2248,8 @@ struct Rejection {
     undeclared: bool,
 }
 
-impl From<ExtractError> for Rejection {
-    fn from(error: ExtractError) -> Self {
+impl From<ChatExtractError> for Rejection {
+    fn from(error: ChatExtractError) -> Self {
         Self {
             error,
             invalid_json: false,
@@ -2269,7 +2273,7 @@ fn is_zero(n: &u32) -> bool {
 /// that matters), and the raw text's error otherwise.
 fn parse_value<T: DeserializeOwned>(
     response: &ChatResponse,
-    mode: ExtractionMode,
+    mode: ChatExtractionMode,
     provider: &str,
     repair: bool,
     schema: Option<&serde_json::Value>,
@@ -2282,7 +2286,7 @@ fn parse_value<T: DeserializeOwned>(
         &response.finish_reason
     {
         let usage = response.usage.as_ref();
-        return Err(ExtractError::Truncated {
+        return Err(ChatExtractError::Truncated {
             mode,
             provider: provider.to_owned(),
             finish_reason: finish_reason.clone(),
@@ -2292,21 +2296,21 @@ fn parse_value<T: DeserializeOwned>(
         .into());
     }
     let raw = match mode {
-        ExtractionMode::ForcedTool => {
+        ChatExtractionMode::ForcedTool => {
             let calls: Vec<_> = response
                 .tool_calls()
                 .filter(|call| call.name == EXTRACTION_TOOL)
                 .collect();
             match calls.as_slice() {
                 [] => {
-                    return Err(ExtractError::MissingToolCall {
+                    return Err(ChatExtractError::MissingToolCall {
                         provider: provider.to_owned(),
                     }
                     .into());
                 }
                 [call] => call.arguments.clone(),
                 many => {
-                    return Err(ExtractError::UnexpectedToolCallCount {
+                    return Err(ChatExtractError::UnexpectedToolCallCount {
                         provider: provider.to_owned(),
                         count: many.len(),
                     }
@@ -2317,7 +2321,7 @@ fn parse_value<T: DeserializeOwned>(
         _ => response
             .text()
             .filter(|text| !text.trim().is_empty())
-            .ok_or_else(|| ExtractError::MissingStructuredText {
+            .ok_or_else(|| ChatExtractError::MissingStructuredText {
                 provider: provider.to_owned(),
             })?,
     };
@@ -2345,7 +2349,7 @@ fn parse_value<T: DeserializeOwned>(
     Err(Rejection {
         invalid_json: is_json_syntax_error(&failure.error),
         undeclared: failure.undeclared,
-        error: ExtractError::Parse {
+        error: ChatExtractError::Parse {
             mode,
             provider: provider.to_owned(),
             message,
@@ -2357,7 +2361,11 @@ fn parse_value<T: DeserializeOwned>(
 
 /// The refusal in `response`, if it is one: a refusal the model wrote, or a
 /// `Refusal` or `ContentFilter` finish.
-fn refusal(response: &ChatResponse, mode: ExtractionMode, provider: &str) -> Option<ExtractError> {
+fn refusal(
+    response: &ChatResponse,
+    mode: ChatExtractionMode,
+    provider: &str,
+) -> Option<ChatExtractError> {
     let written = model_refusal(response);
     let declined = matches!(
         response.finish_reason,
@@ -2371,7 +2379,7 @@ fn refusal(response: &ChatResponse, mode: ExtractionMode, provider: &str) -> Opt
         (None, Some(explanation)) => (Some(explanation.to_owned()), RefusalSource::Provider),
         (None, None) => (None, RefusalSource::None),
     };
-    Some(ExtractError::Refused {
+    Some(ChatExtractError::Refused {
         mode,
         provider: provider.to_owned(),
         finish_reason: response.finish_reason.clone(),
@@ -2386,7 +2394,7 @@ fn model_refusal(response: &ChatResponse) -> Option<&str> {
     response.first_refusal()
 }
 
-/// The finish reason of a [`ExtractError::Truncated`] recorded before it
+/// The finish reason of a [`ChatExtractError::Truncated`] recorded before it
 /// had one: the output token limit.
 fn output_limit() -> FinishReason {
     FinishReason::Length
@@ -2438,7 +2446,7 @@ fn repair_candidate(raw: &str) -> Option<&str> {
 fn ask_again(
     request: &mut ChatRequest,
     response: ChatResponse,
-    mode: ExtractionMode,
+    mode: ChatExtractionMode,
     rejection: &Rejection,
 ) {
     let calls: Vec<_> = response.tool_calls().cloned().collect();
@@ -2447,25 +2455,27 @@ fn ask_again(
         request.push_message(response.into_assistant_message());
     }
     let problem = match &rejection.error {
-        ExtractError::Parse { message, .. } if rejection.invalid_json => {
+        ChatExtractError::Parse { message, .. } if rejection.invalid_json => {
             format!("it was not valid JSON: {message}")
         }
-        ExtractError::Parse {
+        ChatExtractError::Parse {
             message,
             path: Some(path),
             ..
         } => format!("it did not match the schema at `{path}`: {message}"),
-        ExtractError::Parse { message, .. } => format!("it did not match the schema: {message}"),
-        ExtractError::MissingStructuredText { .. } => "it contained no text".to_owned(),
-        ExtractError::MissingToolCall { .. } => {
+        ChatExtractError::Parse { message, .. } => {
+            format!("it did not match the schema: {message}")
+        }
+        ChatExtractError::MissingStructuredText { .. } => "it contained no text".to_owned(),
+        ChatExtractError::MissingToolCall { .. } => {
             format!("it did not call the `{EXTRACTION_TOOL}` tool")
         }
-        ExtractError::UnexpectedToolCallCount { count, .. } => {
+        ChatExtractError::UnexpectedToolCallCount { count, .. } => {
             format!("it called the `{EXTRACTION_TOOL}` tool {count} times instead of once")
         }
         other => other.to_string(),
     };
-    let forced = mode == ExtractionMode::ForcedTool;
+    let forced = mode == ChatExtractionMode::ForcedTool;
     // Every replayed tool call needs a result before the next turn, in any
     // mode (a native-mode request may carry the caller's tools). An ordinary
     // result, not a failed one: the text already says the call failed, and
@@ -2571,9 +2581,9 @@ mod tests {
 
         let provider = crate::mock::TestProvider::new();
         for mode in [
-            ExtractionMode::Auto,
-            ExtractionMode::Native,
-            ExtractionMode::ForcedTool,
+            ChatExtractionMode::Auto,
+            ChatExtractionMode::Native,
+            ChatExtractionMode::ForcedTool,
         ] {
             let request = ChatRequest::new("m")
                 .user("My invoice is wrong")
@@ -2592,8 +2602,8 @@ mod tests {
                 "{mode:?}"
             );
             let expected = match mode {
-                ExtractionMode::ForcedTool => ExtractionMode::ForcedTool,
-                _ => ExtractionMode::Native,
+                ChatExtractionMode::ForcedTool => ChatExtractionMode::ForcedTool,
+                _ => ChatExtractionMode::Native,
             };
             assert_eq!(extracted.metadata.mode, expected);
         }
@@ -2617,8 +2627,8 @@ mod tests {
         assert_eq!(extracted.value, alice());
         assert_eq!(
             extracted.metadata,
-            ExtractionMetadata {
-                mode: ExtractionMode::Native,
+            ChatExtractionMetadata {
+                mode: ChatExtractionMode::Native,
                 passes: 1,
                 repaired: false,
                 enforcement: SchemaEnforcement::Exact,
@@ -2646,7 +2656,7 @@ mod tests {
                     ChatCapability::ForcedToolChoice,
                 ]);
         let extracted = provider.extract::<Person>(&request()).await.unwrap();
-        assert_eq!(extracted.metadata.mode, ExtractionMode::ForcedTool);
+        assert_eq!(extracted.metadata.mode, ChatExtractionMode::ForcedTool);
         let sent = provider.last_request().unwrap();
         assert_eq!(
             sent.tool_choice,
@@ -2654,7 +2664,7 @@ mod tests {
                 name: EXTRACTION_TOOL.into()
             })
         );
-        assert!(sent.option::<ExtractionMode>().is_none());
+        assert!(sent.option::<ChatExtractionMode>().is_none());
     }
 
     /// The refusal an adapter returns, through `Degradations`, for a
@@ -2700,7 +2710,7 @@ mod tests {
         .with_chat_capability(ChatCapability::ToolCalls, CapabilitySupport::Unknown)
         .with_chat_capability(ChatCapability::ForcedToolChoice, CapabilitySupport::Unknown);
         let extracted = unknown.extract::<Person>(&request()).await.unwrap();
-        assert_eq!(extracted.metadata.mode, ExtractionMode::ForcedTool);
+        assert_eq!(extracted.metadata.mode, ChatExtractionMode::ForcedTool);
         let fallback = extracted.metadata.auto_fallback.unwrap();
         assert_eq!(fallback.stage, crate::UnsupportedStage::Provider);
         assert_eq!(fallback.field, RequestField::ResponseFormat);
@@ -2732,8 +2742,8 @@ mod tests {
         assert_eq!(extracted.value, alice());
         assert_eq!(
             extracted.metadata,
-            ExtractionMetadata {
-                mode: ExtractionMode::ForcedTool,
+            ChatExtractionMetadata {
+                mode: ChatExtractionMode::ForcedTool,
                 passes: 1,
                 repaired: false,
                 // The switch adds no degradation; the forced-tool pass
@@ -2762,7 +2772,7 @@ mod tests {
         let cases = [
             // An explicit mode is the caller's choice.
             (
-                request().with_option(ExtractionMode::Native),
+                request().with_option(ChatExtractionMode::Native),
                 refused(RequestField::ResponseFormat),
             ),
             // A refusal of another field, or one that names none (an
@@ -2792,8 +2802,8 @@ mod tests {
             let err = provider.extract::<Person>(&request).await.unwrap_err();
             assert_eq!(err.kind_name(), error.kind_name(), "{err:?}");
             assert_eq!(err.unsupported_field(), error.unsupported_field());
-            let record = ExtractionMetadata::from_error(&err).unwrap();
-            assert_eq!(record.mode, ExtractionMode::Native);
+            let record = ChatExtractionMetadata::from_error(&err).unwrap();
+            assert_eq!(record.mode, ChatExtractionMode::Native);
             assert_eq!(record.auto_fallback, None);
             assert_eq!(provider.call_count(), 1, "{error:?}");
         }
@@ -2806,14 +2816,17 @@ mod tests {
                 .error(refused(RequestField::ResponseFormat))
         })
         .with_supported_chat_capabilities(NATIVE_AND_TOOLS);
-        let err = Extractor::new()
+        let err = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request())
             .await
             .unwrap_err();
         assert_eq!(err.unsupported_field(), Some(RequestField::ResponseFormat));
-        let record = ExtractionMetadata::from_error(&err).unwrap();
-        assert_eq!((record.mode, record.passes), (ExtractionMode::Native, 1));
+        let record = ChatExtractionMetadata::from_error(&err).unwrap();
+        assert_eq!(
+            (record.mode, record.passes),
+            (ChatExtractionMode::Native, 1)
+        );
         assert_eq!(record.auto_fallback, None);
     }
 
@@ -2826,7 +2839,7 @@ mod tests {
         })
         .with_supported_chat_capabilities(NATIVE_AND_TOOLS);
         let extracted = provider.extract::<Person>(&request()).await.unwrap();
-        assert_eq!(extracted.metadata.mode, ExtractionMode::ForcedTool);
+        assert_eq!(extracted.metadata.mode, ChatExtractionMode::ForcedTool);
         assert_eq!(extracted.metadata.auto_fallback, Some(refusal_record()));
     }
 
@@ -2847,10 +2860,10 @@ mod tests {
              and forced-tool mode was refused too (cannot send `tools`: map-typed properties cannot be expressed)"
         );
         assert!(!err.message().contains(EXTRACTION_TOOL));
-        let record = ExtractionMetadata::from_error(&err).unwrap();
+        let record = ChatExtractionMetadata::from_error(&err).unwrap();
         assert_eq!(
             (record.mode, record.passes),
-            (ExtractionMode::ForcedTool, 0)
+            (ChatExtractionMode::ForcedTool, 0)
         );
         assert_eq!(record.auto_fallback, Some(refusal_record()));
         assert_eq!(provider.call_count(), 2);
@@ -2864,8 +2877,8 @@ mod tests {
         let request = request().tools([ToolDefinition::new("other", json!({"type": "object"}))]);
         for mode in [
             None,
-            Some(ExtractionMode::Native),
-            Some(ExtractionMode::ForcedTool),
+            Some(ChatExtractionMode::Native),
+            Some(ChatExtractionMode::ForcedTool),
         ] {
             for capabilities in [&NATIVE_AND_TOOLS[..], &[ChatCapability::ToolCalls][..]] {
                 let provider = MockProvider::with_text(r#"{"name":"Alice","age":31}"#)
@@ -2876,7 +2889,7 @@ mod tests {
                 };
                 let failure = failure(provider.extract::<Person>(&request).await.unwrap_err());
                 assert!(
-                    matches!(failure.error(), ExtractError::ToolConflict { .. }),
+                    matches!(failure.error(), ChatExtractError::ToolConflict { .. }),
                     "{mode:?}: {}",
                     failure.error()
                 );
@@ -2915,7 +2928,7 @@ mod tests {
         );
     }
 
-    async fn drain<S, T>(stream: &mut ExtractionStream<S, T>) -> usize
+    async fn drain<S, T>(stream: &mut ChatExtractionStream<S, T>) -> usize
     where
         S: Stream<Item = Result<StreamEvent>>,
     {
@@ -2986,11 +2999,11 @@ mod tests {
             CapabilitySupport::Supported,
         );
         let mut stream = provider.extract_stream::<Person>(&request()).await.unwrap();
-        assert_eq!(stream.mode(), ExtractionMode::ForcedTool);
+        assert_eq!(stream.mode(), ChatExtractionMode::ForcedTool);
         drain(&mut stream).await;
         let extracted = stream.finish().unwrap();
         assert_eq!(extracted.value, alice());
-        assert_eq!(extracted.metadata.mode, ExtractionMode::ForcedTool);
+        assert_eq!(extracted.metadata.mode, ChatExtractionMode::ForcedTool);
         assert_eq!(extracted.metadata.passes, 1);
         assert_eq!(extracted.metadata.auto_fallback, Some(refusal_record()));
         assert_eq!(provider.call_count(), 2);
@@ -3008,7 +3021,7 @@ mod tests {
             CapabilitySupport::Supported,
         );
         let mut stream = provider.extract_stream::<Person>(&request()).await.unwrap();
-        assert_eq!(stream.mode(), ExtractionMode::ForcedTool);
+        assert_eq!(stream.mode(), ChatExtractionMode::ForcedTool);
         drain(&mut stream).await;
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(stream.partial_output()).unwrap(),
@@ -3033,7 +3046,7 @@ mod tests {
         assert_eq!(events, expected);
         let extracted = stream.finish().unwrap();
         assert_eq!(extracted.value, alice());
-        assert_eq!(extracted.metadata.mode, ExtractionMode::Native);
+        assert_eq!(extracted.metadata.mode, ChatExtractionMode::Native);
         assert_eq!(extracted.metadata.auto_fallback, None);
 
         // A first item that is not a refusal of the response format is
@@ -3085,14 +3098,14 @@ mod tests {
             panic!("expected the forced-tool attempt's error");
         };
         assert!(matches!(err, Error::RateLimited { .. }), "{err:?}");
-        let record = ExtractionMetadata::from_error(&err).unwrap();
-        assert_eq!(record.mode, ExtractionMode::ForcedTool);
+        let record = ChatExtractionMetadata::from_error(&err).unwrap();
+        assert_eq!(record.mode, ChatExtractionMode::ForcedTool);
         assert_eq!(record.auto_fallback, Some(refusal_record()));
 
         // An explicit native stream never switches.
         let provider =
             MockStreamingProvider::build(|b| b.setup_error(refused(RequestField::ResponseFormat)));
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let Err(err) = provider.extract_stream::<Person>(&request).await else {
             panic!("expected the refusal");
         };
@@ -3102,16 +3115,17 @@ mod tests {
 
     #[test]
     fn the_auto_fallback_record_round_trips() {
-        let mut metadata = ExtractionMetadata::new(ExtractionMode::Native);
+        let mut metadata = ChatExtractionMetadata::new(ChatExtractionMode::Native);
         metadata.fall_back(refusal_record());
         let value = serde_json::to_value(&metadata).unwrap();
         assert_eq!(value["mode"], "forced_tool");
         assert_eq!(value["auto_fallback"]["field"], "response_format");
         assert_eq!(
-            serde_json::from_value::<ExtractionMetadata>(value).unwrap(),
+            serde_json::from_value::<ChatExtractionMetadata>(value).unwrap(),
             metadata
         );
-        let plain = serde_json::to_value(ExtractionMetadata::new(ExtractionMode::Native)).unwrap();
+        let plain =
+            serde_json::to_value(ChatExtractionMetadata::new(ChatExtractionMode::Native)).unwrap();
         assert!(plain.get("auto_fallback").is_none(), "{plain}");
     }
 
@@ -3134,7 +3148,7 @@ mod tests {
             panic!("expected extract error");
         };
         assert!(
-            matches!(failure.error(), ExtractError::Unsupported { .. }),
+            matches!(failure.error(), ChatExtractError::Unsupported { .. }),
             "{failure:?}"
         );
         assert!(failure.response().is_none());
@@ -3145,7 +3159,7 @@ mod tests {
     #[tokio::test]
     async fn explicit_mode_option_and_parse_errors() {
         let provider = MockProvider::with_text("not json");
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let err = provider.extract::<Person>(&request).await.unwrap_err();
         let Error::Extract { failure, .. } = err else {
             panic!("expected extract error");
@@ -3159,14 +3173,14 @@ mod tests {
     async fn unknown_capabilities_guess_native_output() {
         let provider = MockProvider::with_text(r#"{"name":"Alice","age":31}"#);
         let extracted = provider.extract::<Person>(&request()).await.unwrap();
-        assert_eq!(extracted.metadata.mode, ExtractionMode::Native);
+        assert_eq!(extracted.metadata.mode, ChatExtractionMode::Native);
         assert!(provider.last_request().unwrap().response_format.is_some());
 
         // Even when the tools are verified, forced choice is not.
         let provider = MockProvider::with_text(r#"{"name":"Alice","age":31}"#)
             .with_chat_capability(ChatCapability::ToolCalls, CapabilitySupport::Supported);
         let extracted = provider.extract::<Person>(&request()).await.unwrap();
-        assert_eq!(extracted.metadata.mode, ExtractionMode::Native);
+        assert_eq!(extracted.metadata.mode, ChatExtractionMode::Native);
     }
 
     /// Tier 4: without native output, unknown tool answers are a guess too.
@@ -3179,7 +3193,7 @@ mod tests {
                     CapabilitySupport::Unsupported,
                 );
         let extracted = provider.extract::<Person>(&request()).await.unwrap();
-        assert_eq!(extracted.metadata.mode, ExtractionMode::ForcedTool);
+        assert_eq!(extracted.metadata.mode, ChatExtractionMode::ForcedTool);
 
         let provider = MockProvider::empty()
             .with_chat_capability(
@@ -3189,7 +3203,7 @@ mod tests {
             .with_chat_capability(ChatCapability::ToolCalls, CapabilitySupport::Unsupported);
         let err = provider.extract::<Person>(&request()).await.unwrap_err();
         assert!(
-            matches!(err, Error::Extract { ref failure, .. } if matches!(failure.error(), ExtractError::Unsupported { .. })),
+            matches!(err, Error::Extract { ref failure, .. } if matches!(failure.error(), ChatExtractError::Unsupported { .. })),
             "{err:?}"
         );
         assert!(err.to_string().contains("capability resolver"), "{err}");
@@ -3200,7 +3214,7 @@ mod tests {
     async fn forced_tool_conflicts_with_request_tools() {
         let provider = MockProvider::empty();
         let request = request()
-            .with_option(ExtractionMode::ForcedTool)
+            .with_option(ChatExtractionMode::ForcedTool)
             .tools([ToolDefinition::new("other", json!({"type": "object"}))]);
         assert!(provider.extract::<Person>(&request).await.is_err());
     }
@@ -3217,9 +3231,11 @@ mod tests {
         );
         let request = ChatRequest::new("m")
             .user("Bob is 4")
-            .with_option(ExtractionMode::Native);
-        let extracted: Extracted<Person> =
-            Extractor::new().extract(&provider, &request).await.unwrap();
+            .with_option(ChatExtractionMode::Native);
+        let extracted: ChatExtracted<Person> = ChatExtractor::new()
+            .extract(&provider, &request)
+            .await
+            .unwrap();
         assert_eq!(extracted.value.name, "Bob");
     }
 
@@ -3247,13 +3263,13 @@ mod tests {
     #[tokio::test]
     async fn repair_is_opt_in_and_reported() {
         let fenced = "```json\n{\"name\":\"Alice\",\"age\":31}\n```";
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
 
         let strict = MockProvider::with_text(fenced);
         assert!(strict.extract::<Person>(&request).await.is_err());
 
         let provider = MockProvider::with_text(fenced);
-        let extracted = Extractor::new()
+        let extracted = ChatExtractor::new()
             .repair(true)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3269,8 +3285,8 @@ mod tests {
             b.text(r#"{"name":"Alice"}"#)
                 .text(r#"{"name":"Alice","age":31}"#)
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let extracted = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let extracted = ChatExtractor::new()
             .retries(2)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3294,8 +3310,8 @@ mod tests {
                 .text(r#"{"name":"Alice","age":31}"#)
         });
         // A model may call a tool it was not offered.
-        let request = request().with_option(ExtractionMode::Native);
-        let extracted = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let extracted = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3319,8 +3335,8 @@ mod tests {
             b.tool_call("c1", EXTRACTION_TOOL, json!({"name": "Alice"}))
                 .tool_call("c2", EXTRACTION_TOOL, json!({"name": "Alice", "age": 31}))
         });
-        let request = request().with_option(ExtractionMode::ForcedTool);
-        let extracted = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
+        let extracted = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3381,9 +3397,9 @@ mod tests {
             CapabilitySupport::Supported,
         );
         let request = request()
-            .with_option(ExtractionMode::ForcedTool)
+            .with_option(ChatExtractionMode::ForcedTool)
             .unsupported_policy(crate::UnsupportedPolicy::Error);
-        let extracted = Extractor::new()
+        let extracted = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3395,8 +3411,8 @@ mod tests {
     #[tokio::test]
     async fn retries_are_bounded_and_skip_provider_errors() {
         let provider = MockProvider::build(|b| b.text("nope").text("still nope"));
-        let request = request().with_option(ExtractionMode::Native);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let err = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3405,7 +3421,7 @@ mod tests {
         assert_eq!(provider.call_count(), 2);
 
         let failing = MockProvider::build(|b| b.error(Error::auth("bad key")));
-        let err = Extractor::new()
+        let err = ChatExtractor::new()
             .retries(3)
             .extract::<_, Person>(&failing, &request)
             .await
@@ -3440,15 +3456,15 @@ mod tests {
     async fn repair_reports_the_candidate_error_when_it_is_json() {
         let raw = "Here:\n{\"currency\":\"Gbp\"}";
         let provider = MockProvider::build(|b| b.text(raw).text(raw));
-        let request = request().with_option(ExtractionMode::Native);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let err = ChatExtractor::new()
             .repair(true)
             .retries(1)
             .extract::<_, Price>(&provider, &request)
             .await
             .unwrap_err();
         let failure = failure(err);
-        let ExtractError::Parse {
+        let ChatExtractError::Parse {
             message,
             raw: reported,
             ..
@@ -3470,14 +3486,14 @@ mod tests {
     async fn repair_keeps_the_raw_error_when_the_candidate_is_not_json() {
         let raw = "Here: {\"currency\": Usd}";
         let provider = MockProvider::with_text(raw);
-        let request = request().with_option(ExtractionMode::Native);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let err = ChatExtractor::new()
             .repair(true)
             .extract::<_, Price>(&provider, &request)
             .await
             .unwrap_err();
         let failure = failure(err);
-        let ExtractError::Parse {
+        let ChatExtractError::Parse {
             message,
             raw: reported,
             ..
@@ -3494,13 +3510,13 @@ mod tests {
 
     #[tokio::test]
     async fn retry_feedback_tells_json_errors_from_schema_errors() {
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
 
         let trailing_comma = MockProvider::build(|b| {
             b.text(r#"{"name":"Alice","age":31,}"#)
                 .text(r#"{"name":"Alice","age":31}"#)
         });
-        Extractor::new()
+        ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&trailing_comma, &request)
             .await
@@ -3513,7 +3529,7 @@ mod tests {
             b.text(r#"{"name":"Alice","age":"31"}"#)
                 .text(r#"{"name":"Alice","age":31}"#)
         });
-        Extractor::new()
+        ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&wrong_type, &request)
             .await
@@ -3529,7 +3545,7 @@ mod tests {
             b.text(r#"{"name":"Alice""#)
                 .text(r#"{"name":"Alice","age":31}"#)
         });
-        Extractor::new()
+        ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&cut_off, &request)
             .await
@@ -3545,8 +3561,8 @@ mod tests {
             )]))
             .tool_call("c2", EXTRACTION_TOOL, json!({"name": "Alice", "age": 31}))
         });
-        let request = request().with_option(ExtractionMode::ForcedTool);
-        Extractor::new()
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
+        ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3578,8 +3594,8 @@ mod tests {
         let raw = r#"{"items":[{"name":"a","price":1,"tags":null},{"name":"b","price":"2","tags":null}]}"#;
         let fixed = r#"{"items":[{"name":"a","price":1},{"name":"b","price":2}]}"#;
         let native = MockProvider::build(|b| b.text(raw).text(fixed));
-        let request = request().with_option(ExtractionMode::Native);
-        Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        ChatExtractor::new()
             .retries(1)
             .extract::<_, Order>(&native, &request)
             .await
@@ -3599,7 +3615,7 @@ mod tests {
                 .await
                 .unwrap_err(),
         );
-        let ExtractError::Parse { path, message, .. } = failure.error() else {
+        let ChatExtractError::Parse { path, message, .. } = failure.error() else {
             panic!("expected a parse failure, got {failure:?}");
         };
         assert_eq!(path.as_deref(), Some("items[1].price"));
@@ -3628,8 +3644,8 @@ mod tests {
             b.tool_call("c1", EXTRACTION_TOOL, json!({"name": "Alice", "age": "31"}))
                 .tool_call("c2", EXTRACTION_TOOL, json!({"name": "Alice", "age": 31}))
         });
-        let request = request().with_option(ExtractionMode::ForcedTool);
-        Extractor::new()
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
+        ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3646,7 +3662,8 @@ mod tests {
     #[tokio::test]
     async fn repaired_output_reports_the_candidate_path() {
         let raw = "Here you go:\n```json\n{\"items\":[{\"name\":\"a\",\"price\":-1}]}\n```";
-        let (path, message) = parse_failure_with::<Order>(raw, Extractor::new().repair(true)).await;
+        let (path, message) =
+            parse_failure_with::<Order>(raw, ChatExtractor::new().repair(true)).await;
         assert_eq!(path.as_deref(), Some("items[0].price"));
         assert!(message.contains("invalid value: integer `-1`"), "{message}");
     }
@@ -3656,22 +3673,22 @@ mod tests {
     where
         T: DeserializeOwned + JsonSchema + fmt::Debug + Send + 'static,
     {
-        parse_failure_with::<T>(raw, Extractor::new()).await
+        parse_failure_with::<T>(raw, ChatExtractor::new()).await
     }
 
-    async fn parse_failure_with<T>(raw: &str, extractor: Extractor) -> (Option<String>, String)
+    async fn parse_failure_with<T>(raw: &str, extractor: ChatExtractor) -> (Option<String>, String)
     where
         T: DeserializeOwned + JsonSchema + fmt::Debug + Send + 'static,
     {
         let provider = MockProvider::with_text(raw);
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let failure = failure(
             extractor
                 .extract::<_, T>(&provider, &request)
                 .await
                 .unwrap_err(),
         );
-        let ExtractError::Parse { path, message, .. } = failure.error() else {
+        let ChatExtractError::Parse { path, message, .. } = failure.error() else {
             panic!("expected a parse failure, got {failure:?}");
         };
         (path.clone(), message.clone())
@@ -3680,7 +3697,7 @@ mod tests {
     #[tokio::test]
     async fn streamed_native_extraction() {
         let provider = MockStreamingProvider::with_text(r#"{"name":"Alice","age":31}"#);
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let mut stream = provider.extract_stream::<Person>(&request).await.unwrap();
         let mut events = 0;
         while let Some(event) = stream.next().await {
@@ -3691,7 +3708,7 @@ mod tests {
         assert_eq!(stream.partial_output(), r#"{"name":"Alice","age":31}"#);
         let extracted = stream.finish().unwrap();
         assert_eq!(extracted.value, alice());
-        assert_eq!(extracted.metadata.mode, ExtractionMode::Native);
+        assert_eq!(extracted.metadata.mode, ChatExtractionMode::Native);
         assert!(provider.requests()[0].response_format.is_some());
     }
 
@@ -3718,7 +3735,7 @@ mod tests {
     #[tokio::test]
     async fn strict_nulls_are_normalized_in_both_modes() {
         let native = MockProvider::with_text(STRICT_NULLS);
-        let native_request = request().with_option(ExtractionMode::Native);
+        let native_request = request().with_option(ChatExtractionMode::Native);
         let extracted = native.extract::<Profile>(&native_request).await.unwrap();
         assert_eq!(extracted.value, alice_profile());
         assert!(!extracted.metadata.repaired);
@@ -3728,13 +3745,13 @@ mod tests {
             EXTRACTION_TOOL,
             serde_json::from_str::<serde_json::Value>(STRICT_NULLS).unwrap(),
         );
-        let forced_request = request().with_option(ExtractionMode::ForcedTool);
+        let forced_request = request().with_option(ChatExtractionMode::ForcedTool);
         let extracted = forced.extract::<Profile>(&forced_request).await.unwrap();
         assert_eq!(extracted.value, alice_profile());
 
         // Repair and normalization combine.
         let fenced = MockProvider::with_text(format!("```json\n{STRICT_NULLS}\n```"));
-        let extracted = Extractor::new()
+        let extracted = ChatExtractor::new()
             .repair(true)
             .extract::<_, Profile>(&fenced, &native_request)
             .await
@@ -3746,7 +3763,7 @@ mod tests {
     #[tokio::test]
     async fn strict_nulls_are_normalized_in_streamed_extraction() {
         let native = MockStreamingProvider::with_text(STRICT_NULLS);
-        let native_request = request().with_option(ExtractionMode::Native);
+        let native_request = request().with_option(ChatExtractionMode::Native);
         let mut stream = native
             .extract_stream::<Profile>(&native_request)
             .await
@@ -3759,7 +3776,7 @@ mod tests {
             EXTRACTION_TOOL,
             serde_json::from_str::<serde_json::Value>(STRICT_NULLS).unwrap(),
         ));
-        let forced_request = request().with_option(ExtractionMode::ForcedTool);
+        let forced_request = request().with_option(ChatExtractionMode::ForcedTool);
         let mut stream = forced
             .extract_stream::<Profile>(&forced_request)
             .await
@@ -3773,14 +3790,14 @@ mod tests {
         // `name` is required: its null is not a strict-mode stand-in.
         let raw = r#"{"name":null,"tags":null}"#;
         let provider = MockProvider::with_text(raw);
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let err = provider.extract::<Profile>(&request).await.unwrap_err();
         let Error::Extract { failure, .. } = err else {
             panic!("expected extract error");
         };
         assert_eq!(failure.error().raw_output(), Some(raw));
         // serde sees the null, not a missing field.
-        let ExtractError::Parse { message, .. } = failure.error() else {
+        let ChatExtractError::Parse { message, .. } = failure.error() else {
             panic!("expected a parse error");
         };
         assert!(message.starts_with("invalid type: null"), "{message}");
@@ -3793,7 +3810,7 @@ mod tests {
             EXTRACTION_TOOL,
             json!({"name": "Alice", "age": 31}),
         ));
-        let request = request().with_option(ExtractionMode::ForcedTool);
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
         let mut stream = provider.extract_stream::<Person>(&request).await.unwrap();
         while stream.next().await.is_some() {}
         assert_eq!(
@@ -3816,14 +3833,14 @@ mod tests {
             }),
             MockStreamEvent::from(Error::overloaded("busy")),
         ]);
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let mut stream = provider.extract_stream::<Person>(&request).await.unwrap();
         while stream.next().await.is_some() {}
         assert_eq!(stream.partial_output(), r#"{"name":"#);
         assert!(matches!(stream.finish(), Err(Error::Overloaded { .. })));
     }
 
-    fn failure(err: Error) -> ExtractFailure {
+    fn failure(err: Error) -> ChatExtractFailure {
         match err {
             Error::Extract { failure, .. } => *failure,
             other => panic!("expected an extraction failure, got {other:?}"),
@@ -3843,8 +3860,8 @@ mod tests {
             b.response(text_with_usage(r#"{"name":"Alice"}"#, 10, 4))
                 .response(text_with_usage(r#"{"name":"Alice","age":31}"#, 20, 6))
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let extracted = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let extracted = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3865,20 +3882,20 @@ mod tests {
             b.response(text_with_usage("nope", 10, 2))
                 .response(text_with_usage("still nope", 11, 3))
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let err = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
             .unwrap_err();
         assert!(!err.is_retryable());
         let failure = failure(err);
-        assert!(matches!(failure.error(), ExtractError::Parse { .. }));
+        assert!(matches!(failure.error(), ChatExtractError::Parse { .. }));
         assert_eq!(
             failure.response().and_then(ChatResponse::text).as_deref(),
             Some("still nope")
         );
-        assert_eq!(failure.metadata().mode, ExtractionMode::Native);
+        assert_eq!(failure.metadata().mode, ChatExtractionMode::Native);
         assert_eq!(failure.metadata().passes, 2);
         assert_eq!(
             failure.metadata().usage.as_ref().unwrap().input_tokens,
@@ -3902,8 +3919,8 @@ mod tests {
             )
             .text(r#"{"name":"Alice","age":31}"#)
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let err = ChatExtractor::new()
             .repair(true)
             .retries(2)
             .extract::<_, Person>(&provider, &request)
@@ -3914,8 +3931,8 @@ mod tests {
         assert!(
             matches!(
                 failure.error(),
-                ExtractError::Truncated {
-                    mode: ExtractionMode::Native,
+                ChatExtractError::Truncated {
+                    mode: ChatExtractionMode::Native,
                     ..
                 }
             ),
@@ -3945,8 +3962,8 @@ mod tests {
             )
             .text(r#"{"name":"Alice","age":31}"#)
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let err = ChatExtractor::new()
             .retries(2)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -3957,7 +3974,7 @@ mod tests {
         assert!(
             matches!(
                 failure.error(),
-                ExtractError::Truncated {
+                ChatExtractError::Truncated {
                     finish_reason: FinishReason::ContextWindow,
                     ..
                 }
@@ -3979,7 +3996,7 @@ mod tests {
                 .usage_value(usage)
                 .build()
         };
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
 
         let provider = MockProvider::with_response(truncated(
             Usage::new().output_tokens(400).reasoning_tokens(400),
@@ -3987,7 +4004,7 @@ mod tests {
         let reasoned = failure(provider.extract::<Person>(&request).await.unwrap_err());
         assert!(matches!(
             reasoned.error(),
-            ExtractError::Truncated {
+            ChatExtractError::Truncated {
                 output_tokens: Some(400),
                 reasoning_tokens: Some(400),
                 ..
@@ -4015,12 +4032,12 @@ mod tests {
                 .finish_reason(FinishReason::Length)
                 .build(),
         );
-        let request = request().with_option(ExtractionMode::ForcedTool);
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
         let failure = failure(provider.extract::<Person>(&request).await.unwrap_err());
         assert!(matches!(
             failure.error(),
-            ExtractError::Truncated {
-                mode: ExtractionMode::ForcedTool,
+            ChatExtractError::Truncated {
+                mode: ChatExtractionMode::ForcedTool,
                 ..
             }
         ));
@@ -4040,8 +4057,8 @@ mod tests {
                 b.response(declined(reason.clone()).build())
                     .text(r#"{"name":"Alice","age":31}"#)
             });
-            let request = request().with_option(ExtractionMode::Native);
-            let err = Extractor::new()
+            let request = request().with_option(ChatExtractionMode::Native);
+            let err = ChatExtractor::new()
                 .repair(true)
                 .retries(2)
                 .extract::<_, Person>(&provider, &request)
@@ -4050,7 +4067,7 @@ mod tests {
             assert_eq!(provider.call_count(), 1, "{reason}");
             assert!(!err.is_retryable());
             let failure = failure(err);
-            let ExtractError::Refused {
+            let ChatExtractError::Refused {
                 mode,
                 finish_reason,
                 text,
@@ -4060,7 +4077,7 @@ mod tests {
             else {
                 panic!("a refusal expected: {failure:?}");
             };
-            assert_eq!(*mode, ExtractionMode::Native);
+            assert_eq!(*mode, ChatExtractionMode::Native);
             assert_eq!(finish_reason.as_ref(), Some(&reason));
             // Nothing explains it: the text the model wrote before the
             // finish is partial output, not the refusal.
@@ -4092,13 +4109,13 @@ mod tests {
             .build()
             .provider_data(provider_data);
         let provider = MockProvider::with_response(response);
-        let request = request().with_option(ExtractionMode::ForcedTool);
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
         let failure = failure(provider.extract::<Person>(&request).await.unwrap_err());
         assert!(
             matches!(
                 failure.error(),
-                ExtractError::Refused {
-                    mode: ExtractionMode::ForcedTool,
+                ChatExtractError::Refused {
+                    mode: ChatExtractionMode::ForcedTool,
                     text: Some(text),
                     source: RefusalSource::Provider,
                     ..
@@ -4120,14 +4137,14 @@ mod tests {
     async fn a_streamed_refusal_fails_at_finish() {
         let provider =
             MockStreamingProvider::from_responses([declined(FinishReason::ContentFilter).build()]);
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let mut stream = provider.extract_stream::<Person>(&request).await.unwrap();
         while stream.next().await.is_some() {}
         let failure = failure(stream.finish().unwrap_err());
         assert!(
             matches!(
                 failure.error(),
-                ExtractError::Refused {
+                ChatExtractError::Refused {
                     finish_reason: Some(FinishReason::ContentFilter),
                     ..
                 }
@@ -4144,9 +4161,9 @@ mod tests {
                 .finish_reason(FinishReason::Other("malformed_function_call".into()))
                 .build(),
         );
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let odd = failure(provider.extract::<Person>(&request).await.unwrap_err());
-        let ExtractError::Parse { message, .. } = odd.error() else {
+        let ChatExtractError::Parse { message, .. } = odd.error() else {
             panic!("a parse failure expected: {odd:?}");
         };
         assert!(
@@ -4157,7 +4174,7 @@ mod tests {
         // A normal finish adds nothing.
         let provider = MockProvider::with_text("{\"name\":");
         let normal = failure(provider.extract::<Person>(&request).await.unwrap_err());
-        let ExtractError::Parse { message, .. } = normal.error() else {
+        let ChatExtractError::Parse { message, .. } = normal.error() else {
             panic!("a parse failure expected: {normal:?}");
         };
         assert!(!message.contains("finish reason"), "{message}");
@@ -4167,10 +4184,13 @@ mod tests {
     async fn blank_output_is_missing_structured_text() {
         for text in ["", "  \n\t "] {
             let provider = MockProvider::with_text(text);
-            let request = request().with_option(ExtractionMode::Native);
+            let request = request().with_option(ChatExtractionMode::Native);
             let failure = failure(provider.extract::<Person>(&request).await.unwrap_err());
             assert!(
-                matches!(failure.error(), ExtractError::MissingStructuredText { .. }),
+                matches!(
+                    failure.error(),
+                    ChatExtractError::MissingStructuredText { .. }
+                ),
                 "{text:?}: {failure:?}"
             );
         }
@@ -4178,8 +4198,8 @@ mod tests {
 
     #[test]
     fn refusal_errors_round_trip() {
-        let error = ExtractError::Refused {
-            mode: ExtractionMode::Native,
+        let error = ChatExtractError::Refused {
+            mode: ChatExtractionMode::Native,
             provider: "acme".into(),
             finish_reason: Some(FinishReason::ContentFilter),
             text: Some("filtered".into()),
@@ -4188,7 +4208,7 @@ mod tests {
         let json = serde_json::to_value(&error).unwrap();
         assert_eq!(json["type"], "refused");
         assert_eq!(json["source"], "provider");
-        let back: ExtractError = serde_json::from_value(json).unwrap();
+        let back: ChatExtractError = serde_json::from_value(json).unwrap();
         assert_eq!(back.to_string(), "acme: the model refused: filtered");
     }
 
@@ -4206,8 +4226,8 @@ mod tests {
             b.response(text_with_usage(r#"{"name":"Alice"}"#, 500, 50))
                 .error(rate_limited())
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let err = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -4219,8 +4239,8 @@ mod tests {
         assert!(err.is_retryable());
         assert_eq!(err.retry_after(), Some(std::time::Duration::from_secs(7)));
 
-        let metadata = ExtractionMetadata::from_error(&err).unwrap();
-        assert_eq!(metadata.mode, ExtractionMode::Native);
+        let metadata = ChatExtractionMetadata::from_error(&err).unwrap();
+        assert_eq!(metadata.mode, ChatExtractionMode::Native);
         assert_eq!(metadata.passes, 1);
         let usage = metadata.usage.unwrap();
         assert_eq!(
@@ -4232,27 +4252,27 @@ mod tests {
     #[tokio::test]
     async fn provider_errors_on_the_first_pass_carry_an_empty_record() {
         let provider = MockProvider::build(|b| b.error(rate_limited()));
-        let request = request().with_option(ExtractionMode::ForcedTool);
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
         let err = provider.extract::<Person>(&request).await.unwrap_err();
         assert!(matches!(err, Error::RateLimited { .. }), "{err:?}");
         assert_eq!(
-            ExtractionMetadata::from_error(&err),
-            Some(ExtractionMetadata::new(ExtractionMode::ForcedTool))
+            ChatExtractionMetadata::from_error(&err),
+            Some(ChatExtractionMetadata::new(ChatExtractionMode::ForcedTool))
         );
     }
 
     #[tokio::test]
     async fn stream_setup_errors_carry_an_empty_record() {
         let provider = MockStreamingProvider::build(|b| b.setup_error(rate_limited()));
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let Err(err) = provider.extract_stream::<Person>(&request).await else {
             panic!("expected a setup error");
         };
         assert!(matches!(err, Error::RateLimited { .. }), "{err:?}");
         assert_eq!(err.retry_after(), Some(std::time::Duration::from_secs(7)));
         assert_eq!(
-            ExtractionMetadata::from_error(&err),
-            Some(ExtractionMetadata::new(ExtractionMode::Native))
+            ChatExtractionMetadata::from_error(&err),
+            Some(ChatExtractionMetadata::new(ChatExtractionMode::Native))
         );
     }
 
@@ -4265,15 +4285,15 @@ mod tests {
             }),
             MockStreamEvent::from(Error::overloaded("busy")),
         ]);
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let mut stream = provider.extract_stream::<Person>(&request).await.unwrap();
         while stream.next().await.is_some() {}
         let err = stream.finish().unwrap_err();
         assert!(matches!(err, Error::Overloaded { .. }), "{err:?}");
         assert!(err.is_retryable());
         assert_eq!(
-            ExtractionMetadata::from_error(&err),
-            Some(ExtractionMetadata::new(ExtractionMode::Native))
+            ChatExtractionMetadata::from_error(&err),
+            Some(ChatExtractionMetadata::new(ChatExtractionMode::Native))
         );
     }
 
@@ -4298,12 +4318,12 @@ mod tests {
     #[tokio::test]
     async fn a_stream_failing_mid_way_keeps_its_usage_and_degradations() {
         let provider = MockStreamingProvider::with_stream(failing_mid_stream());
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let mut stream = provider.extract_stream::<Person>(&request).await.unwrap();
         while stream.next().await.is_some() {}
         let err = stream.finish().unwrap_err();
         assert!(matches!(err, Error::Overloaded { .. }), "{err:?}");
-        let record = ExtractionMetadata::from_error(&err).unwrap();
+        let record = ChatExtractionMetadata::from_error(&err).unwrap();
         // Billed, but not a pass: the stream returned no response.
         assert_eq!(record.passes, 0);
         assert_eq!(
@@ -4324,12 +4344,12 @@ mod tests {
         let mut events = failing_mid_stream();
         events.pop();
         let provider = MockStreamingProvider::with_stream(events);
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let mut stream = provider.extract_stream::<Person>(&request).await.unwrap();
         while stream.next().await.is_some() {}
         let err = stream.finish().unwrap_err();
         assert!(matches!(err, Error::Stream { .. }), "{err:?}");
-        let record = ExtractionMetadata::from_error(&err).unwrap();
+        let record = ChatExtractionMetadata::from_error(&err).unwrap();
         assert_eq!(record.passes, 0);
         assert_eq!(record.usage.and_then(|u| u.input_tokens), Some(900));
     }
@@ -4353,8 +4373,8 @@ mod tests {
         let mut stream = provider.extract_stream::<Person>(&request()).await.unwrap();
         while stream.next().await.is_some() {}
         let err = stream.finish().unwrap_err();
-        let record = ExtractionMetadata::from_error(&err).unwrap();
-        assert_eq!(record.mode, ExtractionMode::ForcedTool);
+        let record = ChatExtractionMetadata::from_error(&err).unwrap();
+        assert_eq!(record.mode, ChatExtractionMode::ForcedTool);
         assert_eq!(record.auto_fallback, Some(refusal_record()));
         assert_eq!(record.passes, 0);
         assert_eq!(record.usage.and_then(|u| u.input_tokens), Some(900));
@@ -4366,32 +4386,32 @@ mod tests {
             b.response(text_with_usage("nope", 10, 2))
                 .error(rate_limited().with_fallback_from(Error::timeout("primary")))
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let err = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
             .unwrap_err();
         assert!(matches!(err, Error::RateLimited { .. }), "{err:?}");
-        assert_eq!(ExtractionMetadata::from_error(&err).unwrap().passes, 1);
+        assert_eq!(ChatExtractionMetadata::from_error(&err).unwrap().passes, 1);
         let primary = err.fallback_from().unwrap();
         assert!(matches!(primary, Error::Timeout { .. }), "{primary:?}");
-        assert!(ExtractionMetadata::from_error(primary).is_none());
+        assert!(ChatExtractionMetadata::from_error(primary).is_none());
     }
 
     #[tokio::test]
     async fn errors_without_a_record_report_none() {
-        assert_eq!(ExtractionMetadata::from_error(&rate_limited()), None);
+        assert_eq!(ChatExtractionMetadata::from_error(&rate_limited()), None);
         // A variant without a context cannot carry the record.
         let provider = MockProvider::build(|b| {
             b.error(Error::serialization(
                 serde_json::from_str::<serde_json::Value>("{").unwrap_err(),
             ))
         });
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let err = provider.extract::<Person>(&request).await.unwrap_err();
         assert!(matches!(err, Error::Serialization { .. }));
-        assert_eq!(ExtractionMetadata::from_error(&err), None);
+        assert_eq!(ChatExtractionMetadata::from_error(&err), None);
     }
 
     #[tokio::test]
@@ -4400,8 +4420,8 @@ mod tests {
             b.response(text_with_usage(r#"{"name":"Alice"}"#, 500, 50))
                 .error(rate_limited().with_body("secret body"))
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let mut err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let mut err = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -4412,16 +4432,16 @@ mod tests {
             .insert("vendor.detail".into(), json!("may quote input"));
 
         let log = serde_json::to_value(err.as_log()).unwrap();
-        assert_eq!(log["allama.extraction"]["passes"], 1);
-        assert_eq!(log["allama.extraction"]["mode"], "native");
-        assert_eq!(log["allama.extraction"]["usage"]["input_tokens"], 500);
+        assert_eq!(log["allama.chat.extraction"]["passes"], 1);
+        assert_eq!(log["allama.chat.extraction"]["mode"], "native");
+        assert_eq!(log["allama.chat.extraction"]["usage"]["input_tokens"], 500);
         assert!(log.get("vendor.detail").is_none());
         assert!(!log.to_string().contains("may quote input"));
         assert_eq!(
             err.as_log().to_string(),
             "kind=rate_limited provider=mock status=429 body_len=11 \
-             allama.extraction.mode=native allama.extraction.passes=1 \
-             allama.extraction.input_tokens=500 allama.extraction.output_tokens=50 \
+             allama.chat.extraction.mode=native allama.chat.extraction.passes=1 \
+             allama.chat.extraction.input_tokens=500 allama.chat.extraction.output_tokens=50 \
              message=\"HTTP 429\""
         );
     }
@@ -4436,7 +4456,7 @@ mod tests {
         let failure = failure(provider.extract::<Person>(&request()).await.unwrap_err());
         assert!(matches!(
             failure.error(),
-            ExtractError::MissingStructuredText { .. }
+            ChatExtractError::MissingStructuredText { .. }
         ));
         let calls: Vec<_> = failure.response().unwrap().tool_calls().collect();
         assert_eq!(calls.len(), 1);
@@ -4449,8 +4469,8 @@ mod tests {
         let request = request()
             .temperature(0.0)
             .seed(7)
-            .with_option(ExtractionMode::Native);
-        Extractor::new()
+            .with_option(ChatExtractionMode::Native);
+        ChatExtractor::new()
             .extract::<_, Person>(&provider, &request)
             .await
             .unwrap();
@@ -4464,16 +4484,16 @@ mod tests {
             .text("Here: {\"name\":\"Alice\",\"age\":31}")
             .usage(5, 5)
             .build();
-        let extracted = Extractor::new()
+        let extracted = ChatExtractor::new()
             .repair(true)
-            .parse::<Person>(response.clone(), ExtractionMode::Native)
+            .parse::<Person>(response.clone(), ChatExtractionMode::Native)
             .unwrap();
         assert_eq!(extracted.value, alice());
         assert_eq!(extracted.response, response);
         assert_eq!(
             extracted.metadata,
-            ExtractionMetadata {
-                mode: ExtractionMode::Native,
+            ChatExtractionMetadata {
+                mode: ChatExtractionMode::Native,
                 passes: 0,
                 repaired: true,
                 enforcement: SchemaEnforcement::NotEnforced,
@@ -4485,18 +4505,18 @@ mod tests {
         );
 
         let strict = failure(
-            Extractor::new()
-                .parse::<Person>(response.clone(), ExtractionMode::Native)
+            ChatExtractor::new()
+                .parse::<Person>(response.clone(), ChatExtractionMode::Native)
                 .unwrap_err(),
         );
-        assert!(matches!(strict.error(), ExtractError::Parse { .. }));
+        assert!(matches!(strict.error(), ChatExtractError::Parse { .. }));
         assert_eq!(strict.response(), Some(&response));
 
         let tool = ChatResponseBuilder::new()
             .tool_call("c", EXTRACTION_TOOL, json!({"name": "Alice", "age": 31}))
             .build();
-        let extracted = Extractor::new()
-            .parse::<Person>(tool, ExtractionMode::ForcedTool)
+        let extracted = ChatExtractor::new()
+            .parse::<Person>(tool, ChatExtractionMode::ForcedTool)
             .unwrap();
         assert_eq!(extracted.value, alice());
     }
@@ -4506,13 +4526,13 @@ mod tests {
         let mut response = ChatResponse::new(vec![crate::ContentBlock::text("{}")]);
         response.provider = Some("demo".into());
         let failure = failure(
-            Extractor::new()
-                .parse::<Person>(response, ExtractionMode::Auto)
+            ChatExtractor::new()
+                .parse::<Person>(response, ChatExtractionMode::Auto)
                 .unwrap_err(),
         );
         assert!(matches!(
             failure.error(),
-            ExtractError::Unsupported { provider, .. } if provider == "demo"
+            ChatExtractError::Unsupported { provider, .. } if provider == "demo"
         ));
         assert!(failure.response().is_some());
     }
@@ -4520,11 +4540,11 @@ mod tests {
     #[tokio::test]
     async fn streamed_failures_carry_the_collected_response() {
         let provider = MockStreamingProvider::from_responses([text_with_usage("nope", 3, 1)]);
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let mut stream = provider.extract_stream::<Person>(&request).await.unwrap();
         while stream.next().await.is_some() {}
         let failure = failure(stream.finish().unwrap_err());
-        assert!(matches!(failure.error(), ExtractError::Parse { .. }));
+        assert!(matches!(failure.error(), ChatExtractError::Parse { .. }));
         assert_eq!(failure.metadata().passes, 1);
         assert_eq!(
             failure.metadata().usage.as_ref().unwrap().input_tokens,
@@ -4539,7 +4559,7 @@ mod tests {
     #[tokio::test]
     async fn error_log_omits_the_failed_response() {
         let provider = MockProvider::with_text("secret model output");
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let err = provider.extract::<Person>(&request).await.unwrap_err();
 
         let log = serde_json::to_value(err.as_log()).unwrap();
@@ -4562,7 +4582,7 @@ mod tests {
     async fn the_synthetic_tool_is_strict() {
         let provider =
             MockProvider::with_tool_call("c", EXTRACTION_TOOL, json!({"name": "Alice", "age": 31}));
-        let request = request().with_option(ExtractionMode::ForcedTool);
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
         let extracted = provider.extract::<Person>(&request).await.unwrap();
         assert_eq!(extracted.metadata.enforcement, SchemaEnforcement::Exact);
         let sent = provider.last_request().unwrap();
@@ -4580,12 +4600,12 @@ mod tests {
     async fn the_callers_parallel_tool_calls_is_kept() {
         for model in ["gpt-4.1", "ft:gpt-4o-mini-2024-07-18:acme::abc123"] {
             for (setting, mode) in [
-                (None, ExtractionMode::ForcedTool),
-                (Some(true), ExtractionMode::ForcedTool),
-                (Some(false), ExtractionMode::ForcedTool),
-                (Some(true), ExtractionMode::Native),
+                (None, ChatExtractionMode::ForcedTool),
+                (Some(true), ChatExtractionMode::ForcedTool),
+                (Some(false), ChatExtractionMode::ForcedTool),
+                (Some(true), ChatExtractionMode::Native),
             ] {
-                let provider = if mode == ExtractionMode::Native {
+                let provider = if mode == ChatExtractionMode::Native {
                     MockProvider::with_text(r#"{"name":"Alice","age":31}"#)
                 } else {
                     MockProvider::with_tool_call(
@@ -4622,7 +4642,7 @@ mod tests {
                 .warning(Warning::unsupported(RequestField::Seed, "seed dropped"))
                 .build(),
         );
-        let request = request().with_option(ExtractionMode::ForcedTool);
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
         let extracted = provider.extract::<Person>(&request).await.unwrap();
         assert_eq!(extracted.value, alice());
         assert_eq!(
@@ -4654,7 +4674,7 @@ mod tests {
                 .warning(approximated(RequestField::ResponseFormat))
                 .build(),
         );
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let extracted = provider.extract::<Person>(&request).await.unwrap();
         assert_eq!(
             extracted.metadata.enforcement,
@@ -4675,7 +4695,7 @@ mod tests {
                 .warning(strict_dropped(RequestField::Tools))
                 .build(),
         );
-        let native = request().with_option(ExtractionMode::Native);
+        let native = request().with_option(ChatExtractionMode::Native);
         let extracted = provider.extract::<Person>(&native).await.unwrap();
         assert_eq!(extracted.metadata.enforcement, SchemaEnforcement::Exact);
         assert!(extracted.metadata.degradations.is_empty());
@@ -4688,7 +4708,7 @@ mod tests {
                 .warning(strict_dropped(RequestField::ResponseFormat))
                 .build(),
         );
-        let request = request().with_option(ExtractionMode::ForcedTool);
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
         let extracted = provider.extract::<Person>(&request).await.unwrap();
         assert_eq!(extracted.metadata.enforcement, SchemaEnforcement::Exact);
         assert!(extracted.metadata.degradations.is_empty());
@@ -4710,8 +4730,8 @@ mod tests {
                     .build(),
             )
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let extracted = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let extracted = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -4750,8 +4770,8 @@ mod tests {
             b.response(degraded(r#"{"name":"Alice"}"#))
                 .response(degraded(r#"{"name":"Alice","age":31}"#))
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let extracted = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let extracted = ChatExtractor::new()
             .retries(1)
             .extract::<_, Person>(&provider, &request)
             .await
@@ -4775,9 +4795,9 @@ mod tests {
                 .warning(strict_dropped(RequestField::ResponseFormat))
                 .build(),
         );
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let failure = failure(provider.extract::<Person>(&request).await.unwrap_err());
-        assert!(matches!(failure.error(), ExtractError::Parse { .. }));
+        assert!(matches!(failure.error(), ChatExtractError::Parse { .. }));
         assert_eq!(
             failure.metadata().enforcement,
             SchemaEnforcement::NotEnforced
@@ -4803,7 +4823,7 @@ mod tests {
         assert!(failure.metadata().degradations.is_empty());
     }
 
-    fn failure_of<T: fmt::Debug>(result: Result<T>) -> ExtractFailure {
+    fn failure_of<T: fmt::Debug>(result: Result<T>) -> ChatExtractFailure {
         failure(result.unwrap_err())
     }
 
@@ -4815,7 +4835,7 @@ mod tests {
                 .warning(strict_dropped(RequestField::ResponseFormat))
                 .build()
         };
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
 
         let provider =
             MockStreamingProvider::from_responses([degraded(r#"{"name":"Alice","age":31}"#)]);
@@ -4855,8 +4875,8 @@ mod tests {
     #[test]
     fn parse_normalizes_strict_nulls_and_keeps_the_raw_output() {
         let response = ChatResponseBuilder::new().text(STRICT_NULLS).build();
-        let extracted = Extractor::new()
-            .parse::<Profile>(response, ExtractionMode::Native)
+        let extracted = ChatExtractor::new()
+            .parse::<Profile>(response, ChatExtractionMode::Native)
             .unwrap();
         assert_eq!(extracted.value, alice_profile());
         assert_eq!(
@@ -4871,17 +4891,17 @@ mod tests {
                 serde_json::from_str::<serde_json::Value>(STRICT_NULLS).unwrap(),
             )
             .build();
-        let extracted = Extractor::new()
-            .parse::<Profile>(tool, ExtractionMode::ForcedTool)
+        let extracted = ChatExtractor::new()
+            .parse::<Profile>(tool, ChatExtractionMode::ForcedTool)
             .unwrap();
         assert_eq!(extracted.value, alice_profile());
 
         // `name` is required: its null is not a stand-in, and the raw output
         // is the text the model sent, not the normalized value.
         let raw = r#"{"name":null,"tags":null}"#;
-        let failure = failure_of(Extractor::new().parse::<Profile>(
+        let failure = failure_of(ChatExtractor::new().parse::<Profile>(
             ChatResponseBuilder::new().text(raw).build(),
-            ExtractionMode::Native,
+            ChatExtractionMode::Native,
         ));
         assert_eq!(failure.error().raw_output(), Some(raw));
     }
@@ -4916,9 +4936,9 @@ mod tests {
         let provider = MockProvider::with_response(approximate_text(
             r#"{"name": "Ada", "contact": {"e_mail": "ada@example.com"}}"#,
         ));
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let failure = failure(provider.extract::<Customer>(&request).await.unwrap_err());
-        let ExtractError::Parse {
+        let ChatExtractError::Parse {
             message, path, raw, ..
         } = failure.error()
         else {
@@ -4943,8 +4963,8 @@ mod tests {
             b.response(approximate_text(r#"{"name": "Ada", "e_mail": "x"}"#))
                 .response(approximate_text(r#"{"name": "Ada", "contact": null}"#))
         });
-        let request = request().with_option(ExtractionMode::Native);
-        let extracted = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let extracted = ChatExtractor::new()
             .retries(1)
             .extract::<_, Customer>(&provider, &request)
             .await
@@ -4964,10 +4984,10 @@ mod tests {
         let provider = MockProvider::with_response(approximate_text(
             r#"{"name": "Ada", "email": "ada@example.com"}"#,
         ));
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let failure = failure(provider.extract::<Customer>(&request).await.unwrap_err());
         assert!(
-            matches!(failure.error(), ExtractError::Parse { path: Some(path), .. } if path == "email"),
+            matches!(failure.error(), ChatExtractError::Parse { path: Some(path), .. } if path == "email"),
             "{failure:?}"
         );
     }
@@ -4987,12 +5007,12 @@ mod tests {
     /// serde alone would read `{"e_mail": ..}` as `Email { email: None }`.
     #[tokio::test]
     async fn untagged_enums_with_optional_branches_are_checked_against_every_branch() {
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let provider =
             MockProvider::with_response(approximate_text(r#"{"reach": {"e_mail": "x"}}"#));
         let failure = failure(provider.extract::<Lead>(&request).await.unwrap_err());
         assert!(
-            matches!(failure.error(), ExtractError::Parse { path: Some(path), .. } if path == "reach.e_mail"),
+            matches!(failure.error(), ChatExtractError::Parse { path: Some(path), .. } if path == "reach.e_mail"),
             "{failure:?}"
         );
         let provider =
@@ -5016,7 +5036,7 @@ mod tests {
         let provider = MockProvider::with_response(approximate_text(
             r#"{"labels": {"any": "x"}, "unlisted": 1}"#,
         ));
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let extracted = provider.extract::<Tagged>(&request).await.unwrap();
         assert_eq!(extracted.value.labels["any"], "x");
         assert_eq!(extracted.value.extra["unlisted"], 1);
@@ -5026,9 +5046,9 @@ mod tests {
     #[tokio::test]
     async fn undeclared_keys_can_be_allowed_and_exact_passes_are_not_checked() {
         let output = r#"{"name": "Ada", "e_mail": "x"}"#;
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let provider = MockProvider::with_response(approximate_text(output));
-        let extracted = Extractor::new()
+        let extracted = ChatExtractor::new()
             .allow_undeclared_keys(true)
             .extract::<_, Customer>(&provider, &request)
             .await
@@ -5048,15 +5068,15 @@ mod tests {
                 r#"{"name": "Ada", "x": 1}"#,
             )])
         };
-        let err = Extractor::new()
-            .parse::<Customer>(response(), ExtractionMode::Native)
+        let err = ChatExtractor::new()
+            .parse::<Customer>(response(), ChatExtractionMode::Native)
             .unwrap_err();
         let failure = failure(err);
         assert_eq!(failure.metadata().undeclared_key_rejections, 1);
         assert!(
-            Extractor::new()
+            ChatExtractor::new()
                 .allow_undeclared_keys(true)
-                .parse::<Customer>(response(), ExtractionMode::Native)
+                .parse::<Customer>(response(), ChatExtractionMode::Native)
                 .is_ok()
         );
     }
@@ -5066,7 +5086,7 @@ mod tests {
         let provider = MockStreamingProvider::from_responses([approximate_text(
             r#"{"name": "Ada", "e_mail": "x"}"#,
         )]);
-        let request = request().with_option(ExtractionMode::Native);
+        let request = request().with_option(ChatExtractionMode::Native);
         let mut stream = provider.extract_stream::<Customer>(&request).await.unwrap();
         while stream.next().await.is_some() {}
         let failure = failure(stream.finish().unwrap_err());
@@ -5140,7 +5160,7 @@ mod tests {
                 .warning(not_constrained_tool())
                 .build(),
         );
-        let request = request().with_option(ExtractionMode::ForcedTool);
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
         let extracted = provider.extract::<Customer>(&request).await.unwrap();
         assert_eq!(
             extracted.metadata.degradations[0].message,
@@ -5162,13 +5182,13 @@ mod tests {
                 .with_provider_name("enforcement-events");
                 let request = ChatRequest::new("enforcement-model")
                     .user("Ada")
-                    .with_option(ExtractionMode::Native);
+                    .with_option(ChatExtractionMode::Native);
                 provider.extract::<Customer>(&request).await.unwrap();
             }
         });
         let ours: Vec<_> = events
             .iter()
-            .filter(|e| e.code.as_deref() == Some("extraction.approximate.Customer"))
+            .filter(|e| e.code.as_deref() == Some("chat.extraction.approximate.Customer"))
             .collect();
         assert_eq!(ours.len(), 2, "{events:?}");
         assert_eq!(ours[0].level, tracing::Level::WARN);
@@ -5189,15 +5209,15 @@ mod tests {
             warnings: vec![not_constrained_tool()],
             coverage: crate::ValidationCoverage::Encoding,
         };
-        let request = request().with_option(ExtractionMode::ForcedTool);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::ForcedTool);
+        let err = ChatExtractor::new()
             .min_enforcement(SchemaEnforcement::Approximate)
             .extract::<_, Customer>(&provider, &request)
             .await
             .unwrap_err();
         assert_eq!(provider.inner.call_count(), 0);
         let failure = failure(err);
-        let ExtractError::EnforcementBelow {
+        let ChatExtractError::EnforcementBelow {
             required,
             achieved,
             reason,
@@ -5217,7 +5237,7 @@ mod tests {
         assert_eq!(failure.metadata().passes, 0);
 
         // A floor the plan meets lets the call through.
-        let extracted = Extractor::new()
+        let extracted = ChatExtractor::new()
             .min_enforcement(SchemaEnforcement::NotEnforced)
             .extract::<_, Customer>(&provider, &request)
             .await;
@@ -5234,8 +5254,8 @@ mod tests {
             warnings: Vec::new(),
             coverage: crate::ValidationCoverage::Capabilities,
         };
-        let request = request().with_option(ExtractionMode::Native);
-        let err = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let err = ChatExtractor::new()
             .min_enforcement(SchemaEnforcement::Exact)
             .extract::<_, Customer>(&provider, &request)
             .await
@@ -5245,7 +5265,7 @@ mod tests {
         assert!(
             matches!(
                 failure.error(),
-                ExtractError::EnforcementBelow {
+                ChatExtractError::EnforcementBelow {
                     achieved: SchemaEnforcement::Approximate,
                     ..
                 }
@@ -5270,8 +5290,8 @@ mod tests {
         let provider = MockStreamingProvider::from_responses([approximate_text(
             r#"{"name": "Ada", "contact": null}"#,
         )]);
-        let request = request().with_option(ExtractionMode::Native);
-        let mut stream = Extractor::new()
+        let request = request().with_option(ChatExtractionMode::Native);
+        let mut stream = ChatExtractor::new()
             .min_enforcement(SchemaEnforcement::Exact)
             .extract_stream::<_, Customer>(&provider, &request)
             .await
@@ -5280,7 +5300,7 @@ mod tests {
         let failure = failure(stream.finish().unwrap_err());
         assert!(matches!(
             failure.error(),
-            ExtractError::EnforcementBelow { .. }
+            ChatExtractError::EnforcementBelow { .. }
         ));
     }
 
@@ -5301,10 +5321,10 @@ mod tests {
             warnings: vec![approximated(RequestField::ResponseFormat)],
             coverage: crate::ValidationCoverage::Encoding,
         };
-        let plan = Extractor::new()
+        let plan = ChatExtractor::new()
             .plan::<Customer>(&provider, &request())
             .unwrap();
-        assert_eq!(plan.mode, ExtractionMode::Native);
+        assert_eq!(plan.mode, ChatExtractionMode::Native);
         assert_eq!(plan.enforcement, SchemaEnforcement::Approximate);
         assert_eq!(plan.degradations.len(), 1);
         assert_eq!(plan.coverage, crate::ValidationCoverage::Encoding);
@@ -5314,22 +5334,22 @@ mod tests {
         // An `Auto` plan follows a refused response format.
         let provider = MockProvider::with_error(refused(RequestField::ResponseFormat))
             .with_supported_chat_capabilities(NATIVE_AND_TOOLS);
-        let plan = Extractor::new().plan::<Customer>(&provider, &request());
+        let plan = ChatExtractor::new().plan::<Customer>(&provider, &request());
         // The default validation checks capabilities only: nothing refuses.
         let plan = plan.unwrap();
-        assert_eq!(plan.mode, ExtractionMode::Native);
+        assert_eq!(plan.mode, ChatExtractionMode::Native);
         assert_eq!(plan.coverage, crate::ValidationCoverage::Capabilities);
     }
 
     #[test]
     fn metadata_without_enforcement_fields_deserializes() {
-        let metadata: ExtractionMetadata =
+        let metadata: ChatExtractionMetadata =
             serde_json::from_value(json!({"mode": "native", "passes": 1, "repaired": false}))
                 .unwrap();
         assert_eq!(metadata.enforcement, SchemaEnforcement::NotEnforced);
         assert!(metadata.degradations.is_empty());
 
-        let mut degraded = ExtractionMetadata::new(ExtractionMode::ForcedTool);
+        let mut degraded = ChatExtractionMetadata::new(ChatExtractionMode::ForcedTool);
         degraded.record_pass(
             &ChatResponseBuilder::new()
                 .warning(strict_dropped(RequestField::Tools))
@@ -5340,7 +5360,7 @@ mod tests {
         assert_eq!(value["enforcement"], "not_enforced");
         assert_eq!(value["degradations"][0]["subject"]["field"], "tools");
         assert_eq!(
-            serde_json::from_value::<ExtractionMetadata>(value).unwrap(),
+            serde_json::from_value::<ChatExtractionMetadata>(value).unwrap(),
             degraded
         );
     }

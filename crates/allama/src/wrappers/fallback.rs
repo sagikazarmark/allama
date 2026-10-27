@@ -863,7 +863,7 @@ pub fn should_fallback(error: &Error) -> bool {
         | Error::UnexpectedResponse { .. }
         | Error::Serialization { .. } => false,
         Error::Provider { .. } if error.status() == Some(CLIENT_CLOSED_REQUEST) => false,
-        #[cfg(feature = "extract")]
+        #[cfg(feature = "chat-extract")]
         Error::Extract { .. } => false,
         _ => true,
     }

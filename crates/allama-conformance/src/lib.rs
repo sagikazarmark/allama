@@ -244,7 +244,7 @@
 //!   crate whose own `reqwest` feature is off in the test build adds
 //!   `allama-http` with that feature as a dev-dependency.
 //! - `extract` (default): the extraction scenarios in [`e2e`] (requires
-//!   `allama/extract`).
+//!   `allama/chat-extract`).
 //!
 //! The contracts that wait ([`assert_retry_respects_hint`]) need a Tokio
 //! runtime with timers, such as `#[tokio::test]`.

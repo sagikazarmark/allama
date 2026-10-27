@@ -13,7 +13,7 @@
 //! fixed.
 //!
 //! No decision model? Extract into an enum with a chat model
-//! ([`extract`][crate::extract]): you get a label without probabilities; it
+//! ([`extract`][crate::chat::extract]): you get a label without probabilities; it
 //! is not a [`DecisionProvider`].
 //!
 //! ```
@@ -59,8 +59,8 @@
 //! attributes).
 //!
 #![cfg_attr(
-    not(feature = "extract"),
-    doc = "[crate::extract]: crate#cargo-features"
+    not(feature = "chat-extract"),
+    doc = "[crate::chat::extract]: crate#cargo-features"
 )]
 
 mod input;

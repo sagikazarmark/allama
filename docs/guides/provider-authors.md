@@ -462,7 +462,7 @@ need the verbatim response. When your API declines on the model's behalf
 and explains why (a refusal stop reason with details, a safety finish with
 a message), keep its decline data in your response-level provider data and
 store the explanation's text, verbatim, under `DECLINE_EXPLANATION_KEY` in
-your namespace too, so extraction's `ExtractError::Refused` quotes it. A
+your namespace too, so extraction's `ChatExtractError::Refused` quotes it. A
 refusal the model writes is content, not provider data.
 
 Tool call ids cross providers too: a history carries the ids the first
@@ -1046,7 +1046,7 @@ A partly rewritten schema is never sent without strict.
 The same holds when the endpoint or model has no strict mode at all: report
 the dropped `strict` as an unsupported hint on `RequestField::Tools` or
 `RequestField::ResponseFormat`, never drop it silently. Extraction reads
-those warnings into `ExtractionMetadata::enforcement`, counting only the
+those warnings into `ChatExtractionMetadata::enforcement`, counting only the
 field its mode relies on (the response format in `Native` mode, the tools
 in `ForcedTool` mode): an `Unsupported` warning means `NotEnforced`, any
 other warning `Approximate`, none `Exact`. `UnsupportedPolicy::Error` is how

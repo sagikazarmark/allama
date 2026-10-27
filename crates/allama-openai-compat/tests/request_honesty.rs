@@ -178,7 +178,9 @@ async fn chat_stream_probe(
 /// strict degradation, and counts no pass.
 #[tokio::test]
 async fn streamed_extraction_failing_mid_way_keeps_usage_and_degradations() {
-    use allama::extract::{ExtractExt, ExtractionMetadata, ExtractionMode, SchemaEnforcement};
+    use allama::chat::extract::{
+        ChatExtractExt, ChatExtractionMetadata, ChatExtractionMode, SchemaEnforcement,
+    };
 
     #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
     #[allow(dead_code)]
@@ -204,13 +206,13 @@ async fn streamed_extraction_failing_mid_way_keeps_usage_and_degradations() {
         .unwrap();
     let request = ChatRequest::new("m")
         .user("Ada")
-        .with_option(ExtractionMode::Native);
+        .with_option(ChatExtractionMode::Native);
     let mut stream = provider.extract_stream::<Person>(&request).await.unwrap();
     while stream.next_event().await.is_some() {}
     let err = stream.finish().unwrap_err();
     assert!(!matches!(err, Error::Extract { .. }), "{err:?}");
 
-    let record = ExtractionMetadata::from_error(&err).unwrap();
+    let record = ChatExtractionMetadata::from_error(&err).unwrap();
     assert_eq!(record.passes, 0);
     assert_eq!(
         record.usage.as_ref().and_then(|u| u.input_tokens),
@@ -230,7 +232,7 @@ async fn streamed_extraction_failing_mid_way_keeps_usage_and_degradations() {
 /// the schema was not enforced; under `Error` it fails before sending.
 #[tokio::test]
 async fn extraction_on_presets_without_strict_is_not_enforced() {
-    use allama::extract::{ExtractExt, ExtractionMode, SchemaEnforcement};
+    use allama::chat::extract::{ChatExtractExt, ChatExtractionMode, SchemaEnforcement};
 
     #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
     struct Person {
@@ -264,8 +266,16 @@ async fn extraction_on_presets_without_strict_is_not_enforced() {
     };
     for name in ["together", "fireworks", "deepinfra"] {
         for (mode, field, answer) in [
-            (ExtractionMode::Native, RequestField::ResponseFormat, text()),
-            (ExtractionMode::ForcedTool, RequestField::Tools, tool_call()),
+            (
+                ChatExtractionMode::Native,
+                RequestField::ResponseFormat,
+                text(),
+            ),
+            (
+                ChatExtractionMode::ForcedTool,
+                RequestField::Tools,
+                tool_call(),
+            ),
         ] {
             let request = ChatRequest::new("m").user("Ada").with_option(mode);
             let transport = ReplayTransport::new([answer]);
@@ -273,7 +283,7 @@ async fn extraction_on_presets_without_strict_is_not_enforced() {
                 .http_transport(transport.clone())
                 .build()
                 .unwrap();
-            if name == "ollama" && mode == ExtractionMode::ForcedTool {
+            if name == "ollama" && mode == ChatExtractionMode::ForcedTool {
                 // Ollama ignores `tool_choice`, so forcing the tool is
                 // refused before sending.
                 let err = provider.extract::<Person>(&request).await.unwrap_err();

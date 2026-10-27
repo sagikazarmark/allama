@@ -129,7 +129,7 @@
 //!   call, and the JSON Schema passes.
 //! - [`warning`]: warnings, the unsupported-feature policy, and warning
 //!   events.
-//! - [`extract`] (feature `extract`): typed structured extraction.
+//! - [`chat::extract`] (feature `chat-extract`): chat extraction, typed structured output from a chat model.
 //! - [`provider_data`]: provider-scoped data and replay rules.
 //! - [`history`]: versioned conversation history for persistence, and
 //!   tool-call validation before sending.
@@ -160,7 +160,7 @@
 //! | --- | --- | --- |
 //! | `warning-events` (default) | Every warning a call reports is also a `tracing` event ([`warning::emit`]), deduplicated by its code, with a target per kind; [`RetryingProvider`](wrappers::RetryingProvider) retries are `allama::retry` events and [`FallbackProvider`](wrappers::FallbackProvider) failovers `allama::fallback` events | `tracing` |
 //! | `schema` | `allama::schemars`, `ToolDefinition::from_schema`, `ResponseFormat::from_schema`, field paths in `ToolArgumentsError` | `schemars`, `serde_path_to_error` |
-//! | `extract` | `allama::extract` (`ExtractExt::extract`, `Extractor`), also in the prelude; implies `schema` | `schemars`, `serde_path_to_error` |
+//! | `chat-extract` | `allama::chat::extract` (`ChatExtractExt::extract`, `ChatExtractor`), also in the prelude; implies `schema`; `extract` is an alias | `schemars`, `serde_path_to_error` |
 //! | `derive` | `#[derive(Decision, ChoiceSet, Scale)]` in [`decision`] | `allama-derive` (`syn`, `quote`, `proc-macro2`, `heck`) |
 //! | `mock` | `allama::mock`: `MockProvider`, `MockStreamingProvider`, `MockEmbeddingProvider`, `MockDecisionProvider`, and other test doubles | nothing |
 //! | `tracing` | `wrappers::TracingProvider` (OpenTelemetry GenAI spans), with the resilience summary wrappers report through `wrappers::call_scope`, and retry and fallback attempt events | `tracing` |
@@ -295,12 +295,12 @@
 //!
 //! An extraction may take several provider calls (retries are opt-in), and a
 //! failed one was still billed. Both outcomes carry the same
-//! [`ExtractionMetadata`][extract::ExtractionMetadata], with the usage of
+//! [`ChatExtractionMetadata`][chat::extract::ChatExtractionMetadata], with the usage of
 //! every pass summed; a failure also keeps the last response:
 //!
 //! ```
-//! # #[cfg(feature = "extract")] {
-//! use allama::extract::Extractor;
+//! # #[cfg(feature = "chat-extract")] {
+//! use allama::chat::extract::ChatExtractor;
 //! use allama::schemars::{self, JsonSchema};
 //! use allama::{ChatProvider, ChatRequest, Error, Usage};
 //!
@@ -314,7 +314,7 @@
 //!     request: &ChatRequest,
 //!     bill: impl Fn(&Usage),
 //! ) -> allama::Result<Invoice> {
-//!     let result = Extractor::new()
+//!     let result = ChatExtractor::new()
 //!         .retries(1)
 //!         .extract::<_, Invoice>(provider, request)
 //!         .await;
@@ -334,7 +334,7 @@
 //! ```
 //!
 //! For one call without recovery, `provider.extract::<T>(&request)`
-//! ([`ExtractExt`][extract::ExtractExt]) is enough.
+//! ([`ChatExtractExt`][chat::extract::ChatExtractExt]) is enough.
 //!
 //! ## Embeddings at scale
 //!
@@ -495,10 +495,10 @@
     "/docs/guides/applications.md",
 )]
 #![cfg_attr(
-    not(feature = "extract"),
-    doc = "[`extract`]: crate#cargo-features\n\
-           [extract::ExtractionMetadata]: crate#cargo-features\n\
-           [extract::ExtractExt]: crate#cargo-features"
+    not(feature = "chat-extract"),
+    doc = "[`chat::extract`]: crate#cargo-features\n\
+           [chat::extract::ChatExtractionMetadata]: crate#cargo-features\n\
+           [chat::extract::ChatExtractExt]: crate#cargo-features"
 )]
 
 mod capability;
@@ -516,8 +516,6 @@ pub mod adapter;
 pub mod chat;
 pub mod decision;
 pub mod embedding;
-#[cfg(feature = "extract")]
-pub mod extract;
 pub mod history;
 #[cfg(any(test, feature = "mock"))]
 pub mod mock;
@@ -714,6 +712,6 @@ pub mod prelude {
         ToolDefinition, UnsupportedPolicy, Usage,
     };
 
-    #[cfg(feature = "extract")]
-    pub use crate::extract::ExtractExt;
+    #[cfg(feature = "chat-extract")]
+    pub use crate::chat::extract::ChatExtractExt;
 }

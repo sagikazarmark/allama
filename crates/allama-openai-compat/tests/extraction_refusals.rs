@@ -8,7 +8,9 @@
 // The target type is only deserialized into, never read.
 #![allow(dead_code)]
 
-use allama::extract::{ExtractError, ExtractExt, ExtractionMode, Extractor, RefusalSource};
+use allama::chat::extract::{
+    ChatExtractError, ChatExtractExt, ChatExtractionMode, ChatExtractor, RefusalSource,
+};
 use allama::prelude::*;
 use allama::schemars::{self, JsonSchema};
 use allama::{Error, FinishReason};
@@ -29,7 +31,7 @@ struct Invoice {
 fn request() -> ChatRequest {
     ChatRequest::new("m")
         .user("total?")
-        .with_option(ExtractionMode::Native)
+        .with_option(ChatExtractionMode::Native)
 }
 
 fn chat_completions(response: ReplayResponse) -> (Provider, ReplayTransport) {
@@ -63,7 +65,7 @@ fn assert_refused(error: Error) {
     assert!(
         matches!(
             failure.error(),
-            ExtractError::Refused {
+            ChatExtractError::Refused {
                 finish_reason: Some(FinishReason::Refusal),
                 source: RefusalSource::Model,
                 text: Some(text),
@@ -86,7 +88,7 @@ async fn chat_completions_refusals_fail_extraction_once() {
         })
         .to_string(),
     ));
-    let error = Extractor::new()
+    let error = ChatExtractor::new()
         .retries(2)
         .extract::<_, Invoice>(&provider, &request())
         .await
@@ -118,7 +120,7 @@ async fn responses_refusals_fail_extraction_once() {
         json!({"id": "resp_1", "model": "m", "status": "completed", "output": [message]})
             .to_string(),
     ));
-    let error = Extractor::new()
+    let error = ChatExtractor::new()
         .retries(2)
         .extract::<_, Invoice>(&provider, &request())
         .await

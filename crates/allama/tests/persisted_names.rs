@@ -70,27 +70,29 @@ fn errors_use_one_tagging_convention() {
     assert!(primary.fallback_from().is_none());
 }
 
-#[cfg(feature = "extract")]
+#[cfg(feature = "chat-extract")]
 #[test]
 fn extraction_errors_are_internally_tagged() {
     let fixture = fixture();
     let errors: Vec<Error> = round_trips(&fixture["extraction_errors"]);
     {
-        use allama::extract::ExtractError;
+        use allama::chat::extract::ChatExtractError;
 
         let kinds: Vec<&str> = errors
             .iter()
             .map(|error| match error {
                 Error::Extract { failure, .. } => match failure.error() {
-                    ExtractError::Unsupported { .. } => "unsupported",
-                    ExtractError::ToolConflict { .. } => "tool_conflict",
-                    ExtractError::MissingStructuredText { .. } => "missing_structured_text",
-                    ExtractError::MissingToolCall { .. } => "missing_tool_call",
-                    ExtractError::UnexpectedToolCallCount { .. } => "unexpected_tool_call_count",
-                    ExtractError::Truncated { .. } => "truncated",
-                    ExtractError::Refused { .. } => "refused",
-                    ExtractError::EnforcementBelow { .. } => "enforcement_below",
-                    ExtractError::Parse { .. } => "parse",
+                    ChatExtractError::Unsupported { .. } => "unsupported",
+                    ChatExtractError::ToolConflict { .. } => "tool_conflict",
+                    ChatExtractError::MissingStructuredText { .. } => "missing_structured_text",
+                    ChatExtractError::MissingToolCall { .. } => "missing_tool_call",
+                    ChatExtractError::UnexpectedToolCallCount { .. } => {
+                        "unexpected_tool_call_count"
+                    }
+                    ChatExtractError::Truncated { .. } => "truncated",
+                    ChatExtractError::Refused { .. } => "refused",
+                    ChatExtractError::EnforcementBelow { .. } => "enforcement_below",
+                    ChatExtractError::Parse { .. } => "parse",
                     _ => "unknown",
                 },
                 _ => "not an extraction error",

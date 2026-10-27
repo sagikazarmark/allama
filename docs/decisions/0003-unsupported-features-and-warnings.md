@@ -169,7 +169,7 @@ adapters can follow it.
   than JSON Schema and serde: a misnamed key otherwise becomes a silent
   default. `allow_undeclared_keys(true)` opts out.
 - Enforcement is a warning event per provider, model and type (code
-  `extraction.<enforcement>.<Type>`), not an entry in `response.warnings`.
+  `extraction.<enforcement>.<Type>`; `chat.extraction.<enforcement>.<Type>` since ADR 0018), not an entry in `response.warnings`.
 - `Auto` mode prefers a verified mode to a guess: native when structured
   output is `Supported`, forced tool when both tool answers are, native
   when structured output is `Unknown`, forced tool when no tool answer is

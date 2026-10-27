@@ -12,7 +12,7 @@
 //! It uses only public API and copies into an application with:
 //!
 //! ```toml
-//! allama = { version = "0.1", features = ["extract"] }
+//! allama = { version = "0.1", features = ["chat-extract"] }
 //! allama-providers = "0.1"
 //! serde = { version = "1", features = ["derive"] }
 //! serde_json = "1"
@@ -21,7 +21,7 @@
 
 use std::process::ExitCode;
 
-use allama::extract::Extracted;
+use allama::chat::extract::ChatExtracted;
 use allama::prelude::*;
 use allama::schemars::{self, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -60,7 +60,7 @@ async fn run() -> Result<()> {
         .system("Extract a concise summary and whether the request mentions Rust.")
         .user(prompt);
 
-    let extracted: Extracted<RequestSummary> = provider.extract(&request).await?;
+    let extracted: ChatExtracted<RequestSummary> = provider.extract(&request).await?;
 
     // How strictly the provider held the output to the schema: `Exact`
     // means constrained decoding; anything less was checked after the fact.

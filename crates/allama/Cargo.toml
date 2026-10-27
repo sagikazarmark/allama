@@ -15,7 +15,10 @@ exclude = ["tests/fixtures/otlp", "tests/otelcol.rs"]
 [features]
 default = ["warning-events"]
 derive = ["dep:allama-derive"]
-extract = ["schema"]
+# Chat extraction (`allama::chat::extract`). `extract` is its former name,
+# kept as an alias.
+chat-extract = ["schema"]
+extract = ["chat-extract"]
 mock = []
 # `serde_path_to_error` names the field a tool call or extracted value got
 # wrong.
@@ -96,7 +99,7 @@ required-features = ["mock"]
 
 [[example]]
 name = "extract"
-required-features = ["mock", "extract"]
+required-features = ["mock", "chat-extract"]
 
 [[example]]
 name = "tracing"
@@ -108,7 +111,7 @@ required-features = ["mock", "tracing"]
 
 [[example]]
 name = "extractor"
-required-features = ["mock", "extract"]
+required-features = ["mock", "chat-extract"]
 
 [[example]]
 name = "exchange_log"

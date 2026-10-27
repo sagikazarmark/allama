@@ -752,7 +752,7 @@ impl ResponseFormat {
     ///   adapter rewrites the schema into that subset: every property
     ///   becomes required, and an optional one becomes nullable, so the
     ///   model sends `null` where it would have left a field out
-    ///   ([`Extractor`][crate::extract::Extractor] removes those `null`s
+    ///   ([`ChatExtractor`][crate::chat::extract::ChatExtractor] removes those `null`s
     ///   before deserializing). Each new schema also adds latency to its
     ///   first request, while OpenAI builds its grammar; later requests
     ///   with the same schema reuse it.
@@ -770,8 +770,8 @@ impl ResponseFormat {
     /// assert!(matches!(format, ResponseFormat::JsonSchema { strict: Some(true), .. }));
     /// ```
     #[cfg_attr(
-        not(feature = "extract"),
-        doc = "[crate::extract::Extractor]: crate#cargo-features"
+        not(feature = "chat-extract"),
+        doc = "[crate::chat::extract::ChatExtractor]: crate#cargo-features"
     )]
     #[must_use]
     pub fn json_schema(schema: serde_json::Value) -> Self {
@@ -789,7 +789,7 @@ impl ResponseFormat {
     /// `T` implements [`crate::schemars::JsonSchema`]: derive it through the
     /// [`allama::schemars`](crate::schemars) re-export to stay on the same
     /// `schemars` version. To get a typed value back, use extraction
-    /// (`allama::extract`, feature `extract`), which also parses and checks
+    /// (`allama::chat::extract`, feature `extract`), which also parses and checks
     /// the output.
     ///
     /// ```

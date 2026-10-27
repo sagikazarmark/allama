@@ -186,12 +186,12 @@ mod tests {
         assert_eq!(DecisionCapability::VARIANTS, DecisionCapability::ALL);
     }
 
-    #[cfg(feature = "extract")]
+    #[cfg(feature = "chat-extract")]
     #[test]
     fn every_extraction_enum_round_trips_through_its_name() {
-        use crate::extract::{ExtractionMode, SchemaEnforcement};
+        use crate::chat::extract::{ChatExtractionMode, SchemaEnforcement};
 
-        names_agree(ExtractionMode::VARIANTS, &["auto", "native", "forced_tool"]);
+        names_agree(ChatExtractionMode::VARIANTS, &["auto", "native", "forced_tool"]);
         names_agree(
             SchemaEnforcement::VARIANTS,
             &["exact", "approximate", "not_enforced"],

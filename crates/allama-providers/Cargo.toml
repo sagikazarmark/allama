@@ -58,7 +58,7 @@ rustls-ring = [
 allama = { workspace = true }
 
 # Provider crates without their default features: this crate forwards the
-# TLS backend choice and leaves `extract` to the application (`allama/extract`).
+# TLS backend choice and leaves `extract` to the application (`allama/chat-extract`).
 allama-anthropic = { workspace = true, optional = true }
 allama-gemini = { workspace = true, optional = true }
 allama-openai = { workspace = true, optional = true }

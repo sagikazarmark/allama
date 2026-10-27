@@ -19,17 +19,17 @@
 //!
 //! `extract` and `extract_enum_root` require the `extract` feature.
 
-#[cfg(feature = "extract")]
-use allama::extract::ExtractExt;
+#[cfg(feature = "chat-extract")]
+use allama::chat::extract::ChatExtractExt;
 use allama::{
     CapabilitySupport, ChatProvider, ChatRequest, ChatStreamExt, ContentPart, EmbeddingCapability,
     EmbeddingInput, EmbeddingInputType, EmbeddingPart, EmbeddingProvider, EmbeddingRequest, Error,
     FinishReason, ReasoningConfig, ResponseFormat, StreamEvent, ToolDefinition,
 };
 use futures_util::StreamExt;
-#[cfg(feature = "extract")]
+#[cfg(feature = "chat-extract")]
 use schemars::JsonSchema;
-#[cfg(feature = "extract")]
+#[cfg(feature = "chat-extract")]
 use serde::Deserialize;
 use serde_json::json;
 
@@ -241,7 +241,7 @@ pub async fn structured_output(provider: &impl ChatProvider, model: &str) {
 
 /// Validate typed extraction: uses native structured output when the provider
 /// supports it, otherwise falls back to a forced tool call.
-#[cfg(feature = "extract")]
+#[cfg(feature = "chat-extract")]
 pub async fn extract<P: ChatProvider + Sync>(provider: &P, model: &str) {
     #[derive(JsonSchema, Deserialize)]
     struct Greeting {
@@ -267,7 +267,7 @@ pub async fn extract<P: ChatProvider + Sync>(provider: &P, model: &str) {
 /// Passes when the extraction succeeds (warnings allowed) or is refused as
 /// unsupported before sending; fails when the provider is sent a request it
 /// rejects as invalid (an HTTP 400).
-#[cfg(feature = "extract")]
+#[cfg(feature = "chat-extract")]
 pub async fn extract_enum_root<P: ChatProvider + Sync>(provider: &P, model: &str) {
     #[derive(JsonSchema, Deserialize)]
     #[serde(rename_all = "lowercase")]
@@ -286,7 +286,7 @@ pub async fn extract_enum_root<P: ChatProvider + Sync>(provider: &P, model: &str
         Error::Extract { failure, .. } => {
             matches!(
                 failure.error(),
-                allama::extract::ExtractError::Unsupported { .. }
+                allama::chat::extract::ChatExtractError::Unsupported { .. }
             )
         }
         _ => false,

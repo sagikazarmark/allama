@@ -25,9 +25,9 @@
   a conversation continues on another provider, for example after a failover.
 - 🧱 **Composable wrappers.** Retries with a budget, fallback, timeouts,
   model mapping and OpenTelemetry tracing are ordinary providers you stack.
-- 🧾 **Typed extraction.** `extract::<T>()` picks native structured output or
-  a forced tool call, and reports how strictly the provider enforced the
-  schema.
+- 🧾 **Chat extraction.** `extract::<T>()` drives a chat model through native
+  structured output or a forced tool call, and reports how strictly the
+  provider enforced the schema.
 - 🧮 **Beyond chat.** Embeddings (text and multimodal) and decision models
   (typed answers with probabilities) are sibling traits with the same design.
 - 🗺️ **Model addresses.** `openai:gpt-5.5` picks the provider and the model
@@ -226,7 +226,7 @@ Every feature but `warning-events` is off by default.
 | --- | --- |
 | `warning-events` (default) | Every warning is also a `tracing` event under `allama::warning`, deduplicated by code |
 | `schema` | `ToolDefinition::from_schema`, `ResponseFormat::from_schema`, `allama::schemars` |
-| `extract` | `allama::extract` (`ExtractExt::extract`); implies `schema` |
+| `chat-extract` | `allama::chat::extract` (`ChatExtractExt::extract`); implies `schema`; `extract` is its former name, kept as an alias |
 | `derive` | `#[derive(Decision, ChoiceSet, Scale)]` for typed decisions |
 | `mock` | `allama::mock`: mock providers and other test doubles |
 | `tracing` | `wrappers::TracingProvider`: OpenTelemetry GenAI spans |

@@ -39,7 +39,7 @@ namespace (`allama_cloudflare_worker::NAMESPACE`).
   from another provider, or a synthesized one) is replaced by a stable
   nine-character id derived from it, the same for the call and its result.
 - Structured output through `response_format` (Workers AI JSON Mode,
-  non-streaming). `allama`'s `ExtractExt` works through its blanket impl.
+  non-streaming). `allama`'s `ChatExtractExt` works through its blanket impl.
 - Both response shapes Workers AI returns: the native
   `{ response, tool_calls, usage }` shape (flat or OpenAI-style tool calls)
   and the chat-completion `{ choices, usage }` shape newer models use, often

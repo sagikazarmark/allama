@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use allama::extract::{ExtractExt, Extracted, ExtractionMode, SchemaEnforcement};
+use allama::chat::extract::{ChatExtractExt, ChatExtracted, ChatExtractionMode, SchemaEnforcement};
 use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama::{DynChatProvider, RequestField, Subject, UnsupportedPolicy, Warning, WarningKind};
@@ -72,7 +72,7 @@ impl Api {
         self,
         request: &ChatRequest,
         arguments: Value,
-    ) -> (Result<Extracted<T>>, Vec<Value>)
+    ) -> (Result<ChatExtracted<T>>, Vec<Value>)
     where
         T: JsonSchema + DeserializeOwned + Send,
     {
@@ -529,7 +529,7 @@ struct Person {
 fn person_request(model: &str) -> ChatRequest {
     ChatRequest::new(model)
         .user("Ada Lovelace wrote the first program.")
-        .with_option(ExtractionMode::ForcedTool)
+        .with_option(ChatExtractionMode::ForcedTool)
 }
 
 /// The synthetic extraction tool is strict, rewritten into the dialect, and

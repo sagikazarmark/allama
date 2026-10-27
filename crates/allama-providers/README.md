@@ -177,7 +177,7 @@ key reserved for it.
 
 All features are on by default; disable default features to pick some.
 The provider crates come without their own default features: `extract` is
-not forced on (enable `allama/extract` yourself), and the TLS backend is
+not forced on (enable `allama/chat-extract` yourself), and the TLS backend is
 one of this crate's `default-tls` (default), `rustls`, `native-tls` or
 `rustls-ring` (`ring` instead of `aws-lc-rs`, for static musl builds
 without cmake) features, forwarded to every enabled provider. Every

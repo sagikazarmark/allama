@@ -120,7 +120,7 @@ which mock to pick and when scripted errors surface.
 | Policy | `UnsupportedPolicy` (warn or fail on unsupported hints) |
 | Provider authoring | `adapter::{chat, embedding, decision, schema}` (`prepare`, `preflight`, `WireSupport`, the JSON Schema passes), `adapter::Degradations` |
 | Errors | `Error` (`RateLimited`, `QuotaExhausted`, `ContextLengthExceeded`, `Stream { kind }`, …) with `retry_after`, `request_id`, `is_retryable` |
-| Composition | `wrappers::{RetryingProvider, FallbackProvider, TimeoutProvider, MapModelProvider, MapRequestProvider, RecordingProvider, TracingProvider}`, `extract::ExtractExt`, typed lookup through wrappers (`ProviderIdentityExt::downcast_ref`) |
+| Composition | `wrappers::{RetryingProvider, FallbackProvider, TimeoutProvider, MapModelProvider, MapRequestProvider, RecordingProvider, TracingProvider}`, `extract::ChatExtractExt`, typed lookup through wrappers (`ProviderIdentityExt::downcast_ref`) |
 | Persistence | `history::History` (versioned envelope), `history::retain_portable_content` for client-held history; requests and responses are `Serialize`/`Deserialize` |
 
 ## Features
@@ -133,7 +133,7 @@ The only default feature is `warning-events`. A library that depends on
 | `warning-events` (default) | every warning a call reports is also a `tracing` event (targets `allama::warning::<kind>`, deduplicated by code), and retries and failovers are `allama::retry` and `allama::fallback` events |
 | `schema` | `ToolDefinition::from_schema::<T>()`, `ResponseFormat::from_schema::<T>()` and `allama::adapter::schema::schema_for` via `schemars`, re-exported as `allama::schemars`; field paths in `ToolArgumentsError` via `serde_path_to_error` |
 | `derive` | `#[derive(Decision, ChoiceSet, Scale)]` for typed decisions (`allama-derive`) |
-| `extract` | structured extraction (`ExtractExt`, `Extractor`); implies `schema` |
+| `extract` | structured extraction (`ChatExtractExt`, `ChatExtractor`); implies `schema` |
 | `mock` | test doubles: `MockProvider`, `MockStreamingProvider`, `MockEmbeddingProvider`, `MockDecisionProvider`, `FunctionProvider`, `TestProvider` |
 | `tracing` | OpenTelemetry GenAI spans via `wrappers::TracingProvider` |
 

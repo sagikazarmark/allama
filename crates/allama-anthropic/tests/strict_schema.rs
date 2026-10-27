@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use allama::extract::{ExtractExt, ExtractionMode, SchemaEnforcement};
+use allama::chat::extract::{ChatExtractExt, ChatExtractionMode, SchemaEnforcement};
 use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama::{RequestField, Subject, UnsupportedPolicy, Warning, WarningKind};
@@ -156,7 +156,7 @@ struct Person {
 fn extraction_request(model: &str) -> ChatRequest {
     ChatRequest::new(model)
         .user("I was charged twice this month.")
-        .with_option(ExtractionMode::ForcedTool)
+        .with_option(ChatExtractionMode::ForcedTool)
 }
 
 /// Forced-tool extraction into a struct with a `HashMap` keeps working under
@@ -360,8 +360,8 @@ fn ticket_tool_stream() -> ReplayResponse {
 
 /// What the forced-tool attempt of an `Auto` extraction into `Ticket`
 /// reports: the switch, and the strict synthetic tool sent non-strict.
-fn assert_fell_back_unenforced(metadata: &allama::extract::ExtractionMetadata) {
-    assert_eq!(metadata.mode, ExtractionMode::ForcedTool);
+fn assert_fell_back_unenforced(metadata: &allama::chat::extract::ChatExtractionMetadata) {
+    assert_eq!(metadata.mode, ChatExtractionMode::ForcedTool);
     let fallback = metadata.auto_fallback.as_ref().expect("auto_fallback");
     assert_eq!(fallback.field, RequestField::ResponseFormat);
     assert!(fallback.message.contains("map-typed"), "{fallback:?}");
@@ -405,7 +405,7 @@ async fn streamed_auto_extraction_into_a_map_falls_back_to_forced_tool_under_war
         .extract_stream::<Ticket>(&auto_extraction_request())
         .await
         .unwrap();
-    assert_eq!(stream.mode(), ExtractionMode::ForcedTool);
+    assert_eq!(stream.mode(), ChatExtractionMode::ForcedTool);
     while let Some(event) = futures_util::StreamExt::next(&mut stream).await {
         event.unwrap();
     }
@@ -446,8 +446,8 @@ async fn auto_extraction_into_a_map_fails_under_error_after_the_fallback() {
     );
     assert!(!message.contains("submit_structured_output"), "{message}");
     assert!(!message.contains("was sent"), "{message}");
-    let record = allama::extract::ExtractionMetadata::from_error(&err).unwrap();
-    assert_eq!(record.mode, ExtractionMode::ForcedTool);
+    let record = allama::chat::extract::ChatExtractionMetadata::from_error(&err).unwrap();
+    assert_eq!(record.mode, ChatExtractionMode::ForcedTool);
     assert_eq!(
         record.auto_fallback.map(|f| f.field),
         Some(RequestField::ResponseFormat)

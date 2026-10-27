@@ -137,8 +137,8 @@ pub struct ErrorContext {
     /// allama.
     ///
     /// Extraction attaches its pass record (mode, passes, summed usage) to
-    /// provider errors under `allama.extraction`; read it with
-    /// `ExtractionMetadata::from_error`.
+    /// provider errors under `allama.chat.extraction`; read it with
+    /// `ChatExtractionMetadata::from_error`.
     /// [`embed_chunked`](crate::EmbeddingProviderExt::embed_chunked)
     /// attaches its progress (inputs completed, summed usage) under
     /// `allama.embedding`; read it with
@@ -210,7 +210,7 @@ impl<'de> Deserialize<'de> for FallbackFrom {
 }
 
 /// The [`ErrorContext::metadata`] key of an extraction's pass record.
-pub(crate) const EXTRACTION_METADATA_KEY: &str = "allama.extraction";
+pub(crate) const EXTRACTION_METADATA_KEY: &str = "allama.chat.extraction";
 
 /// The [`ErrorContext::metadata`] key of a chunked embedding's progress.
 pub(crate) const EMBEDDING_METADATA_KEY: &str = "allama.embedding";
@@ -386,7 +386,7 @@ impl Withheld {
     }
 
     /// Text that the error's `Display` does not show either.
-    #[cfg(feature = "extract")]
+    #[cfg(feature = "chat-extract")]
     pub(crate) fn new(text: &str) -> Self {
         Self {
             bytes: text.len(),
@@ -658,7 +658,7 @@ impl StreamErrorKind {
 /// [Serialization and stability](crate#serialization-and-stability)).
 ///
 #[cfg_attr(
-    not(feature = "extract"),
+    not(feature = "chat-extract"),
     doc = "[`Error::Extract`]: crate#cargo-features"
 )]
 #[derive(Clone, Serialize, Deserialize)]
@@ -942,12 +942,12 @@ pub enum Error {
     /// request conflicted with the selected mode, or the output could not be
     /// used.
     ///
-    /// The [`ExtractFailure`](crate::extract::ExtractFailure) carries why,
+    /// The [`ChatExtractFailure`](crate::chat::extract::ChatExtractFailure) carries why,
     /// the last provider response, and the pass record (calls made, summed
     /// usage). Not retryable and not eligible for fallback. Provider errors
     /// during an extraction are returned as themselves, not wrapped here;
     /// their context carries the pass record instead
-    /// ([`ExtractionMetadata::from_error`](crate::extract::ExtractionMetadata::from_error)).
+    /// ([`ChatExtractionMetadata::from_error`](crate::chat::extract::ChatExtractionMetadata::from_error)).
     ///
     /// Build it with [`Error::extract`]. Every variant is
     /// `#[non_exhaustive]`, so a struct expression does not compile
@@ -955,11 +955,11 @@ pub enum Error {
     /// it, match on `&result`, or bind it whole with
     /// `err @ Error::Extract { .. }`; to rebuild one you took apart, use
     /// `Error::extract(*failure)`.
-    #[cfg(feature = "extract")]
+    #[cfg(feature = "chat-extract")]
     #[non_exhaustive]
     Extract {
         /// The failed extraction.
-        failure: Box<crate::extract::ExtractFailure>,
+        failure: Box<crate::chat::extract::ChatExtractFailure>,
     },
 }
 
@@ -1137,9 +1137,9 @@ impl Error {
     }
 
     /// Build an [`Error::Extract`].
-    #[cfg(feature = "extract")]
+    #[cfg(feature = "chat-extract")]
     #[must_use]
-    pub fn extract(failure: crate::extract::ExtractFailure) -> Self {
+    pub fn extract(failure: crate::chat::extract::ChatExtractFailure) -> Self {
         Self::Extract {
             failure: Box::new(failure),
         }
@@ -1245,7 +1245,7 @@ impl Error {
             | Error::ContentFiltered { context, .. }
             | Error::Stream { context, .. } => Some(context.as_ref()),
             Error::Serialization { .. } => None,
-            #[cfg(feature = "extract")]
+            #[cfg(feature = "chat-extract")]
             Error::Extract { .. } => None,
         }
     }
@@ -1290,7 +1290,7 @@ impl Error {
             | Error::ContentFiltered { context, .. }
             | Error::Stream { context, .. } => Some(context.as_mut()),
             Error::Serialization { .. } => None,
-            #[cfg(feature = "extract")]
+            #[cfg(feature = "chat-extract")]
             Error::Extract { .. } => None,
         }
     }
@@ -1550,7 +1550,7 @@ impl Error {
     /// assert_eq!(err.to_string(), "rejected: budget guard");
     /// ```
     #[cfg_attr(
-        not(feature = "extract"),
+        not(feature = "chat-extract"),
         doc = "[`Error::Extract`]: crate#cargo-features"
     )]
     #[must_use]
@@ -1591,7 +1591,7 @@ impl Error {
     /// ([`Error::Serialization`], [`Error::Extract`]).
     ///
     #[cfg_attr(
-        not(feature = "extract"),
+        not(feature = "chat-extract"),
         doc = "[`Error::Extract`]: crate#cargo-features"
     )]
     #[must_use]
@@ -1642,7 +1642,7 @@ impl Error {
     /// );
     /// ```
     #[cfg_attr(
-        not(feature = "extract"),
+        not(feature = "chat-extract"),
         doc = "[`Error::Extract`]: crate#cargo-features"
     )]
     #[must_use]
@@ -1670,7 +1670,7 @@ impl Error {
             | Error::ContentFiltered { message, .. }
             | Error::Stream { message, .. } => *message = format!("{prefix}: {message}"),
             Error::Serialization { error } => error.prefix(prefix),
-            #[cfg(feature = "extract")]
+            #[cfg(feature = "chat-extract")]
             Error::Extract { .. } => {}
         }
     }
@@ -1699,7 +1699,7 @@ impl Error {
             | Error::ContentFiltered { message, .. }
             | Error::Stream { message, .. } => message.clone(),
             Error::Serialization { error } => error.to_string(),
-            #[cfg(feature = "extract")]
+            #[cfg(feature = "chat-extract")]
             Error::Extract { failure } => failure.to_string(),
         }
     }
@@ -1893,7 +1893,7 @@ impl Error {
             Error::ContextLengthExceeded { .. } => "context_length_exceeded",
             Error::ContentFiltered { .. } => "content_filtered",
             Error::Stream { .. } => "stream",
-            #[cfg(feature = "extract")]
+            #[cfg(feature = "chat-extract")]
             Error::Extract { .. } => "extract",
         }
     }
@@ -2006,7 +2006,7 @@ impl fmt::Display for Error {
             Error::Stream { kind, message, .. } => {
                 write!(f, "stream error ({}): {message}", kind.as_str())
             }
-            #[cfg(feature = "extract")]
+            #[cfg(feature = "chat-extract")]
             Error::Extract { failure } => write!(f, "extraction error: {failure}"),
         }?;
         if let Some(upstream) = self.upstream_message() {
@@ -2055,7 +2055,7 @@ impl fmt::Debug for Error {
                     .field("error", &Withheld::shown_by_display(&error.to_string()))
                     .finish();
             }
-            #[cfg(feature = "extract")]
+            #[cfg(feature = "chat-extract")]
             Error::Extract { failure } => {
                 return f.debug_struct("Extract").field("failure", failure).finish();
             }
@@ -2098,14 +2098,14 @@ impl fmt::Debug for Error {
 /// So `anyhow`'s `{:#}` and other report chains print each text once.
 ///
 #[cfg_attr(
-    not(feature = "extract"),
+    not(feature = "chat-extract"),
     doc = "[`Error::Extract`]: crate#cargo-features"
 )]
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Serialization { error } => error.source(),
-            #[cfg(feature = "extract")]
+            #[cfg(feature = "chat-extract")]
             Self::Extract { failure } => failure.source(),
             _ => {
                 let source = self.context()?.source()?;
@@ -2328,7 +2328,7 @@ impl std::error::Error for ParseEnumError {}
 /// - the body's length, never its text;
 /// - the constructor message only when it is
 ///   [`Authored`](MessageOrigin::Authored) (see [`Error::authored`]);
-/// - the pass record an extraction attached under `allama.extraction` in
+/// - the pass record an extraction attached under `allama.chat.extraction` in
 ///   [`ErrorContext::metadata`]: usage, not input, so cost logs keep the
 ///   tokens an extraction spent before a provider error. The serde form has
 ///   the whole record; `Display` shows its mode, passes, and input and
@@ -2415,7 +2415,7 @@ impl<'a> ErrorLog<'a> {
     fn message(self) -> Option<String> {
         match self.error {
             Error::Serialization { .. } => None,
-            #[cfg(feature = "extract")]
+            #[cfg(feature = "chat-extract")]
             Error::Extract { failure } => Some(failure.error().log_message()),
             error => (error.message_origin() == MessageOrigin::Authored).then(|| error.message()),
         }
@@ -3454,20 +3454,22 @@ mod tests {
         assert_eq!(err.as_log().to_string(), "kind=serialization");
     }
 
-    #[cfg(feature = "extract")]
+    #[cfg(feature = "chat-extract")]
     #[test]
     fn extraction_logs_omit_parse_detail() {
-        use crate::extract::{ExtractError, ExtractFailure, ExtractionMetadata, ExtractionMode};
+        use crate::chat::extract::{
+            ChatExtractError, ChatExtractFailure, ChatExtractionMetadata, ChatExtractionMode,
+        };
 
-        let parse = ExtractError::Parse {
-            mode: ExtractionMode::Native,
+        let parse = ChatExtractError::Parse {
+            mode: ChatExtractionMode::Native,
             provider: "demo".into(),
             raw: "{\"ssn\": \"SENTINEL\"}".into(),
             message: "\"SENTINEL\" is not of type integer".into(),
             path: Some("SENTINEL_KEY".into()),
         };
-        let metadata = ExtractionMetadata::new(ExtractionMode::Native);
-        let err = Error::extract(ExtractFailure::new(parse, metadata));
+        let metadata = ChatExtractionMetadata::new(ChatExtractionMode::Native);
+        let err = Error::extract(ChatExtractFailure::new(parse, metadata));
         assert_eq!(
             err.as_log().to_string(),
             r#"kind=extract message="demo: failed to parse the output using mode Native""#
@@ -3478,16 +3480,18 @@ mod tests {
 
     /// An extraction error's chain prints its
     /// failure once, with the provider prefix other errors use.
-    #[cfg(feature = "extract")]
+    #[cfg(feature = "chat-extract")]
     #[test]
     fn an_extraction_error_chain_prints_the_failure_once() {
-        use crate::extract::{ExtractError, ExtractFailure, ExtractionMetadata, ExtractionMode};
+        use crate::chat::extract::{
+            ChatExtractError, ChatExtractFailure, ChatExtractionMetadata, ChatExtractionMode,
+        };
 
-        let failure = ExtractError::MissingToolCall {
+        let failure = ChatExtractError::MissingToolCall {
             provider: "demo".into(),
         };
-        let metadata = ExtractionMetadata::new(ExtractionMode::ForcedTool);
-        let err = Error::extract(ExtractFailure::new(failure, metadata));
+        let metadata = ChatExtractionMetadata::new(ChatExtractionMode::ForcedTool);
+        let err = Error::extract(ChatExtractFailure::new(failure, metadata));
         assert_eq!(
             chain(&err),
             [
@@ -3496,33 +3500,35 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "extract")]
+    #[cfg(feature = "chat-extract")]
     #[test]
     fn extraction_debug_never_shows_the_models_text() {
-        use crate::extract::{
-            ExtractError, ExtractFailure, ExtractionMetadata, ExtractionMode, RefusalSource,
+        use crate::chat::extract::{
+            ChatExtractError, ChatExtractFailure, ChatExtractionMetadata, ChatExtractionMode,
+            RefusalSource,
         };
         use crate::{ChatResponse, ContentBlock, FinishReason};
 
         let response = ChatResponse::new(vec![ContentBlock::text("RESPONSE {\"ssn\": 1}")]);
-        let parse = ExtractError::Parse {
-            mode: ExtractionMode::Native,
+        let parse = ChatExtractError::Parse {
+            mode: ChatExtractionMode::Native,
             provider: "demo".into(),
             raw: "{\"ssn\": \"SENTINEL\"}".into(),
             message: "\"SENTINEL\" is not of type integer".into(),
             path: Some("SENTINEL_KEY".into()),
         };
-        let refused = ExtractError::Refused {
-            mode: ExtractionMode::Native,
+        let refused = ChatExtractError::Refused {
+            mode: ChatExtractionMode::Native,
             provider: "demo".into(),
             finish_reason: Some(FinishReason::Refusal),
             text: Some("I won't share SENTINEL".into()),
             source: RefusalSource::Model,
         };
-        let metadata = ExtractionMetadata::new(ExtractionMode::Native);
-        let parse_err =
-            Error::extract(ExtractFailure::new(parse, metadata.clone()).with_response(response));
-        let refused_err = Error::extract(ExtractFailure::new(refused, metadata));
+        let metadata = ChatExtractionMetadata::new(ChatExtractionMode::Native);
+        let parse_err = Error::extract(
+            ChatExtractFailure::new(parse, metadata.clone()).with_response(response),
+        );
+        let refused_err = Error::extract(ChatExtractFailure::new(refused, metadata));
         // Also in a failover's chain.
         let nested = Error::timeout("t").with_fallback_from(parse_err.clone());
         for err in [&parse_err, &refused_err, &nested] {
@@ -3535,10 +3541,10 @@ mod tests {
 
         assert_eq!(
             format!("{parse_err:?}"),
-            "Extract { failure: ExtractFailure { error: Parse { mode: Native, \
+            "Extract { failure: ChatExtractFailure { error: Parse { mode: Native, \
              provider: \"demo\", raw: <withheld 19 bytes>, message: <withheld 33 \
              bytes; print with {err}>, path: <withheld 12 bytes; print with {err}> }, \
-             response: <withheld>, metadata: ExtractionMetadata { mode: Native, \
+             response: <withheld>, metadata: ChatExtractionMetadata { mode: Native, \
              passes: 0, enforcement: NotEnforced } } }"
         );
         let debug = format!("{refused_err:?}");
@@ -3552,16 +3558,18 @@ mod tests {
         assert!(!debug.contains("response"), "{debug}");
     }
 
-    #[cfg(feature = "extract")]
+    #[cfg(feature = "chat-extract")]
     #[test]
     fn extraction_failures_serialize_under_failure() {
-        use crate::extract::{ExtractError, ExtractFailure, ExtractionMetadata, ExtractionMode};
+        use crate::chat::extract::{
+            ChatExtractError, ChatExtractFailure, ChatExtractionMetadata, ChatExtractionMode,
+        };
 
-        let failure = ExtractFailure::new(
-            ExtractError::ToolConflict {
+        let failure = ChatExtractFailure::new(
+            ChatExtractError::ToolConflict {
                 provider: "demo".into(),
             },
-            ExtractionMetadata::new(ExtractionMode::ForcedTool),
+            ChatExtractionMetadata::new(ChatExtractionMode::ForcedTool),
         );
         let json = serde_json::to_value(Error::extract(failure)).unwrap();
         assert_eq!(json["type"], "extract");
@@ -3571,7 +3579,10 @@ mod tests {
         let Error::Extract { failure, .. } = back else {
             panic!("an extraction failure expected: {back:?}");
         };
-        assert!(matches!(failure.error(), ExtractError::ToolConflict { .. }));
+        assert!(matches!(
+            failure.error(),
+            ChatExtractError::ToolConflict { .. }
+        ));
     }
 
     #[test]
@@ -3669,16 +3680,18 @@ mod tests {
         assert_eq!(back.message(), err.message());
     }
 
-    #[cfg(feature = "extract")]
+    #[cfg(feature = "chat-extract")]
     #[test]
     fn message_prefix_leaves_extract_unchanged() {
-        use crate::extract::{ExtractError, ExtractFailure, ExtractionMetadata, ExtractionMode};
+        use crate::chat::extract::{
+            ChatExtractError, ChatExtractFailure, ChatExtractionMetadata, ChatExtractionMode,
+        };
 
-        let failure = ExtractFailure::new(
-            ExtractError::ToolConflict {
+        let failure = ChatExtractFailure::new(
+            ChatExtractError::ToolConflict {
                 provider: "demo".into(),
             },
-            ExtractionMetadata::new(ExtractionMode::Native),
+            ChatExtractionMetadata::new(ChatExtractionMode::Native),
         );
         let err = Error::extract(failure);
         let prefixed = err.clone().with_message_prefix("step");

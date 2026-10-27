@@ -134,7 +134,7 @@ async fn anthropic_latest_extract() {
 #[tokio::test]
 #[ignore]
 async fn anthropic_strict_numeric_fields() {
-    use allama::extract::{ExtractExt, ExtractionMode, SchemaEnforcement};
+    use allama::chat::extract::{ChatExtractExt, ChatExtractionMode, SchemaEnforcement};
     use allama::prelude::*;
 
     #[derive(Debug, serde::Deserialize, allama::schemars::JsonSchema)]
@@ -146,7 +146,7 @@ async fn anthropic_strict_numeric_fields() {
     }
 
     let provider = make_provider();
-    for mode in [ExtractionMode::Native, ExtractionMode::ForcedTool] {
+    for mode in [ChatExtractionMode::Native, ChatExtractionMode::ForcedTool] {
         let request = ChatRequest::new(model())
             .user("Three widgets at 2.5 each, ordered 2026-01-02T10:00:00Z.")
             .with_option(mode);

@@ -41,7 +41,7 @@ uuid = { workspace = true, features = ["v4"] }
 uuid = { workspace = true, features = ["js"] }
 
 [dev-dependencies]
-allama-conformance = { workspace = true, features = ["extract", "server"] }
+allama-conformance = { workspace = true, features = ["chat-extract", "server"] }
 
 criterion = { workspace = true }
 futures-executor = { workspace = true }

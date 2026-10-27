@@ -466,7 +466,7 @@ impl fmt::Display for Usage {
 ///
 /// Only reported counters count: `None` when reasoning was not reported or
 /// was zero.
-#[cfg(any(feature = "extract", feature = "warning-events"))]
+#[cfg(any(feature = "chat-extract", feature = "warning-events"))]
 pub(crate) fn reasoning_share(
     output_tokens: Option<u64>,
     reasoning_tokens: Option<u64>,
@@ -634,7 +634,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(feature = "extract", feature = "warning-events"))]
+    #[cfg(any(feature = "chat-extract", feature = "warning-events"))]
     fn reasoning_share_is_said_only_from_reported_reasoning() {
         assert_eq!(
             reasoning_share(Some(400), Some(400)).as_deref(),

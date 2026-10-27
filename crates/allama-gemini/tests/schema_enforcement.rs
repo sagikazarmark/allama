@@ -7,7 +7,9 @@
 // The fixture types are only deserialized into, never read.
 #![allow(dead_code)]
 
-use allama::extract::{ExtractExt, ExtractionMetadata, ExtractionMode, SchemaEnforcement};
+use allama::chat::extract::{
+    ChatExtractExt, ChatExtractionMetadata, ChatExtractionMode, SchemaEnforcement,
+};
 use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama::{RequestField, Subject, WarningKind};
@@ -212,10 +214,10 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
 /// the body sent.
 async fn run_shape(
     target: Target,
-    mode: ExtractionMode,
+    mode: ChatExtractionMode,
     name: &str,
     answer: Value,
-) -> (ExtractionMetadata, Value) {
+) -> (ChatExtractionMetadata, Value) {
     match name {
         "documented unit enum" => target.extract::<Wrapped<Documented>>(mode, answer).await,
         "externally tagged" => target.extract::<Wrapped<External>>(mode, answer).await,
@@ -228,12 +230,16 @@ async fn run_shape(
 }
 
 impl Target {
-    async fn extract<T>(self, mode: ExtractionMode, answer: Value) -> (ExtractionMetadata, Value)
+    async fn extract<T>(
+        self,
+        mode: ChatExtractionMode,
+        answer: Value,
+    ) -> (ChatExtractionMetadata, Value)
     where
         T: JsonSchema + DeserializeOwned + Send + std::fmt::Debug,
     {
         let response = match mode {
-            ExtractionMode::Native => self.text(&answer.to_string()),
+            ChatExtractionMode::Native => self.text(&answer.to_string()),
             _ => self.tool_call(&answer.to_string()),
         };
         let transport = ReplayTransport::new([response]);
@@ -255,7 +261,7 @@ impl Target {
 async fn schemars_enum_shapes_are_exact() {
     for (name, answer) in exact_shapes() {
         let (metadata, sent) =
-            run_shape(Target::Gemini, ExtractionMode::Native, name, answer).await;
+            run_shape(Target::Gemini, ChatExtractionMode::Native, name, answer).await;
         assert_eq!(
             metadata.enforcement,
             SchemaEnforcement::Exact,
@@ -278,7 +284,7 @@ async fn schemars_enum_shapes_are_exact() {
 async fn an_internally_tagged_newtype_is_sent_merged() {
     let (metadata, sent) = Target::Gemini
         .extract::<Wrapped<Internal>>(
-            ExtractionMode::Native,
+            ChatExtractionMode::Native,
             json!({"v": {"kind": "New", "inner_field": 1, "note": null}}),
         )
         .await;
@@ -321,7 +327,7 @@ async fn constructs_outside_the_subset_are_approximate() {
     }
 
     let (metadata, sent) = Target::Gemini
-        .extract::<Payload>(ExtractionMode::Native, json!({"data": {"any": true}}))
+        .extract::<Payload>(ChatExtractionMode::Native, json!({"data": {"any": true}}))
         .await;
     assert_approximated(&metadata, "unconstrained `true`");
     assert_eq!(
@@ -330,18 +336,18 @@ async fn constructs_outside_the_subset_are_approximate() {
     );
 
     let (metadata, _) = Target::Gemini
-        .extract::<Wrapped<Fixed>>(ExtractionMode::Native, json!({"v": {"a": 1}}))
+        .extract::<Wrapped<Fixed>>(ChatExtractionMode::Native, json!({"v": {"a": 1}}))
         .await;
     assert_approximated(&metadata, "`const`");
 
     let (metadata, _) = Target::Gemini
-        .extract::<Wrapped<Overlapping>>(ExtractionMode::Native, json!({"v": 2}))
+        .extract::<Wrapped<Overlapping>>(ChatExtractionMode::Native, json!({"v": 2}))
         .await;
     assert_approximated(&metadata, "`oneOf`");
 }
 
 #[track_caller]
-fn assert_approximated(metadata: &ExtractionMetadata, needle: &str) {
+fn assert_approximated(metadata: &ChatExtractionMetadata, needle: &str) {
     assert_eq!(
         metadata.enforcement,
         SchemaEnforcement::Approximate,
@@ -368,7 +374,7 @@ fn assert_approximated(metadata: &ExtractionMetadata, needle: &str) {
 #[tokio::test]
 async fn forced_tool_extraction_is_not_enforced() {
     let (metadata, _) = Target::Gemini
-        .extract::<Wrapped<Documented>>(ExtractionMode::ForcedTool, json!({"v": "First"}))
+        .extract::<Wrapped<Documented>>(ChatExtractionMode::ForcedTool, json!({"v": "First"}))
         .await;
     assert_eq!(metadata.enforcement, SchemaEnforcement::NotEnforced);
     assert_eq!(metadata.degradations[0].kind, WarningKind::Unsupported);

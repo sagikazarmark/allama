@@ -1,4 +1,4 @@
-//! What an extraction can know before it sends ([`ExtractionPlan`]), the
+//! What an extraction can know before it sends ([`ChatExtractionPlan`]), the
 //! enforcement floor, and how enforcement is reported in terms of the
 //! caller's type.
 
@@ -8,8 +8,8 @@ use schemars::JsonSchema;
 use serde_json::Value;
 
 use super::{
-    AutoFallback, EXTRACTION_TOOL, ExtractError, ExtractFailure, ExtractionMetadata,
-    ExtractionMode, Extractor, SchemaEnforcement, counted_field, derive_request, is_about,
+    AutoFallback, ChatExtractError, ChatExtractFailure, ChatExtractionMetadata, ChatExtractionMode,
+    ChatExtractor, EXTRACTION_TOOL, SchemaEnforcement, counted_field, derive_request, is_about,
     requested_mode, schema_name, select_mode,
 };
 use crate::{
@@ -18,13 +18,13 @@ use crate::{
 };
 
 /// What an extraction of `T` would do, found without sending anything
-/// ([`Extractor::plan`]).
+/// ([`ChatExtractor::plan`]).
 ///
 /// ```
 /// # #[cfg(feature = "mock")]
 /// # fn example() -> allama::Result<()> {
 /// use allama::ChatRequest;
-/// use allama::extract::{ExtractionMode, Extractor, SchemaEnforcement};
+/// use allama::chat::extract::{ChatExtractionMode, ChatExtractor, SchemaEnforcement};
 /// use allama::mock::MockProvider;
 /// use allama::schemars::{self, JsonSchema};
 ///
@@ -34,25 +34,25 @@ use crate::{
 /// }
 ///
 /// let provider = MockProvider::with_text("{}");
-/// let request = ChatRequest::new("m").user("Ada").with_option(ExtractionMode::Native);
-/// let plan = Extractor::new().plan::<Person>(&provider, &request)?;
-/// assert_eq!(plan.mode, ExtractionMode::Native);
+/// let request = ChatRequest::new("m").user("Ada").with_option(ChatExtractionMode::Native);
+/// let plan = ChatExtractor::new().plan::<Person>(&provider, &request)?;
+/// assert_eq!(plan.mode, ChatExtractionMode::Native);
 /// assert_eq!(plan.enforcement, SchemaEnforcement::Exact);
 /// # Ok(()) }
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub struct ExtractionPlan {
+pub struct ChatExtractionPlan {
     /// The mode the extraction would use: `ForcedTool` after an
     /// [automatic fallback](super#automatic-fallback-to-forced-tool-mode).
-    pub mode: ExtractionMode,
+    pub mode: ChatExtractionMode,
     /// The enforcement the first pass would report, from the provider's
     /// validation. With [`ValidationCoverage::Capabilities`] the adapter's
     /// encoding did not run, so this is an upper bound: an adapter reports
     /// most degradations while encoding.
     pub enforcement: SchemaEnforcement,
     /// The warnings that decide [`enforcement`](Self::enforcement), in terms
-    /// of the caller's type, as [`ExtractionMetadata::degradations`] would
+    /// of the caller's type, as [`ChatExtractionMetadata::degradations`] would
     /// hold them.
     pub degradations: Vec<Warning>,
     /// The refusal that would switch an `Auto` extraction to forced-tool
@@ -62,7 +62,7 @@ pub struct ExtractionPlan {
     pub coverage: ValidationCoverage,
 }
 
-impl Extractor {
+impl ChatExtractor {
     /// Plan an extraction of `T` from `request` without sending it: the mode
     /// it would use, the enforcement its first pass would report, and how
     /// much of that the provider could check.
@@ -84,7 +84,7 @@ impl Extractor {
         &self,
         provider: &(impl ChatProvider + ?Sized),
         request: &ChatRequest,
-    ) -> Result<ExtractionPlan> {
+    ) -> Result<ChatExtractionPlan> {
         Target::new::<T>(provider.provider_name(), &request.model).plan(provider, request, false)
     }
 
@@ -104,10 +104,10 @@ impl Extractor {
         if plan.coverage != ValidationCoverage::Encoding || plan.enforcement.satisfies(floor) {
             return Ok(());
         }
-        let mut metadata = ExtractionMetadata::new(plan.mode);
+        let mut metadata = ChatExtractionMetadata::new(plan.mode);
         metadata.auto_fallback = plan.auto_fallback;
-        Err(ExtractFailure::new(
-            ExtractError::EnforcementBelow {
+        Err(ChatExtractFailure::new(
+            ChatExtractError::EnforcementBelow {
                 required: floor,
                 achieved: plan.enforcement,
                 reason: reason(&plan.degradations),
@@ -118,11 +118,14 @@ impl Extractor {
     }
 
     /// The failure for a pass whose enforcement is below the floor.
-    pub(super) fn below_floor(&self, metadata: &ExtractionMetadata) -> Option<ExtractFailure> {
+    pub(super) fn below_floor(
+        &self,
+        metadata: &ChatExtractionMetadata,
+    ) -> Option<ChatExtractFailure> {
         let floor = self.min_enforcement?;
         (!metadata.enforcement.satisfies(floor)).then(|| {
-            ExtractFailure::new(
-                ExtractError::EnforcementBelow {
+            ChatExtractFailure::new(
+                ChatExtractError::EnforcementBelow {
                     required: floor,
                     achieved: metadata.enforcement,
                     reason: reason(&metadata.degradations),
@@ -134,7 +137,7 @@ impl Extractor {
 
     /// Whether a pass with `metadata`'s enforcement is checked for
     /// undeclared keys: every pass that is not `Exact`, unless allowed.
-    pub(super) fn rejects_undeclared(&self, metadata: &ExtractionMetadata) -> bool {
+    pub(super) fn rejects_undeclared(&self, metadata: &ChatExtractionMetadata) -> bool {
         !self.allow_undeclared_keys && metadata.enforcement != SchemaEnforcement::Exact
     }
 }
@@ -206,7 +209,7 @@ impl Target {
     pub(super) fn derive(
         &self,
         request: &ChatRequest,
-        metadata: &ExtractionMetadata,
+        metadata: &ChatExtractionMetadata,
     ) -> Result<ChatRequest> {
         derive_request(
             request,
@@ -215,14 +218,14 @@ impl Target {
             &self.name,
             self.schema.clone(),
         )
-        .map_err(|error| ExtractFailure::new(error, metadata.clone()).into())
+        .map_err(|error| ChatExtractFailure::new(error, metadata.clone()).into())
     }
 
     /// The error a call that failed returns: a refusal before sending in
     /// terms of the caller's type, and in `Auto` mode after a fallback, the
     /// native refusal as the primary cause. Any other error is returned as
     /// itself.
-    pub(super) fn pre_send_error(&self, error: Error, metadata: &ExtractionMetadata) -> Error {
+    pub(super) fn pre_send_error(&self, error: Error, metadata: &ChatExtractionMetadata) -> Error {
         if error.unsupported_stage() != Some(crate::UnsupportedStage::BeforeSending) {
             return metadata.attach_to(error);
         }
@@ -278,7 +281,7 @@ impl Target {
     /// Emit the enforcement of a pass that is not `Exact` as a warning
     /// event in terms of the caller's type, coded per type so it is logged
     /// at `WARN` once per provider, model and type.
-    pub(super) fn report_enforcement(&self, metadata: &ExtractionMetadata) {
+    pub(super) fn report_enforcement(&self, metadata: &ChatExtractionMetadata) {
         let (kind, how) = match metadata.enforcement {
             SchemaEnforcement::Exact => return,
             SchemaEnforcement::Approximate => (WarningKind::Approximated, "approximately"),
@@ -300,22 +303,22 @@ impl Target {
         )
         .with_provider(self.provider.clone());
         warning.code = Some(Cow::Owned(format!(
-            "extraction.{}.{}",
+            "chat.extraction.{}.{}",
             metadata.enforcement, self.label
         )));
         crate::warning::emit(&self.provider, &self.model, &mut warning);
     }
 
-    /// See [`Extractor::plan`].
+    /// See [`ChatExtractor::plan`].
     pub(super) fn plan<P: ChatProvider + ?Sized>(
         &self,
         provider: &P,
         request: &ChatRequest,
         stream: bool,
-    ) -> Result<ExtractionPlan> {
+    ) -> Result<ChatExtractionPlan> {
         let requested = requested_mode(request);
         let (mode, guessed) = select_mode(provider, request);
-        let mut metadata = ExtractionMetadata::new(mode);
+        let mut metadata = ChatExtractionMetadata::new(mode);
         let mut request = request.clone();
         request.system.clear();
         request.messages = vec![Message::user("placeholder")];
@@ -340,7 +343,7 @@ impl Target {
                             degradations.push(warning);
                         }
                     }
-                    return Ok(ExtractionPlan {
+                    return Ok(ChatExtractionPlan {
                         mode: metadata.mode,
                         enforcement: SchemaEnforcement::from_degradations(&degradations),
                         degradations,
