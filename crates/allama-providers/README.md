@@ -46,8 +46,9 @@ async fn main() -> anyhow::Result<()> {
 ```
 
 `chat::from_provider("anthropic")` returns the provider alone, for choosing
-the model per request. The `embedding` and `decision` modules have the same
-pair for embeddings and decision models.
+the model per request. The `embedding`, `decision` and `extraction`
+modules have the same pair for embeddings, decision models and extraction
+models (the last unstable, ADR 0018).
 
 ## Retries by default
 
@@ -276,7 +277,7 @@ when the constructor leaves one untaken, so a tenant's scope is never
 dropped silently.
 
 A provider you build yourself gets the same stack from `chat::wrap`,
-`embedding::wrap` or `decision::wrap`. Do not wrap the result in another
+`embedding::wrap`, `decision::wrap` or `extraction::wrap`. Do not wrap the result in another
 `RetryingProvider`: it already retries.
 
 ```rust,ignore

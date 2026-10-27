@@ -4,7 +4,7 @@ use std::sync::{Arc, LazyLock};
 
 use allama::{
     ChatProvider, DecisionProvider, DynChatProvider, DynDecisionProvider, DynEmbeddingProvider,
-    EmbeddingProvider, Error, Result,
+    DynExtractionProvider, EmbeddingProvider, Error, ExtractionProvider, Result,
 };
 
 use crate::address::is_valid_key;
@@ -216,6 +216,54 @@ impl Registry {
         self
     }
 
+    /// Register the extraction provider for `key`, replacing any previous
+    /// one. Like [`register_chat`](Self::register_chat), it takes no
+    /// [`ProviderSettings`].
+    ///
+    /// Extraction lookups are unstable, like
+    /// [`ExtractionProvider`](allama::ExtractionProvider) (ADR 0018).
+    ///
+    /// # Panics
+    ///
+    /// Panics when `key` is not a valid provider key (see
+    /// [`ModelAddress`]), since an address could not name it.
+    pub fn register_extraction<F, P>(&mut self, key: impl Into<String>, constructor: F) -> &mut Self
+    where
+        F: Fn() -> Result<P> + Send + Sync + 'static,
+        P: ExtractionProvider + 'static,
+    {
+        let key = key.into();
+        let constructor = without_settings(key.clone(), constructor);
+        self.register_extraction_with(key, constructor)
+    }
+
+    /// Register the extraction provider for `key`, built with the lookup's
+    /// [`AdapterSettings`], replacing any previous one. Like
+    /// [`register_chat_with`](Self::register_chat_with), a lookup fails when
+    /// the constructor leaves a setting untaken.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `key` is not a valid provider key (see
+    /// [`ModelAddress`]), since an address could not name it.
+    pub fn register_extraction_with<F, P>(
+        &mut self,
+        key: impl Into<String>,
+        constructor: F,
+    ) -> &mut Self
+    where
+        F: Fn(&mut AdapterSettings) -> Result<P> + Send + Sync + 'static,
+        P: ExtractionProvider + 'static,
+    {
+        let key = key.into();
+        let entry = self.entry(key.clone());
+        entry.extraction = Some(Arc::new(move |settings| {
+            let provider = build(&key, Operation::Extraction, settings, &constructor)?;
+            Ok(stack::extraction(provider, settings))
+        }));
+        self
+    }
+
     /// The registered provider keys, sorted.
     pub fn keys(&self) -> impl Iterator<Item = &str> {
         self.providers.keys().map(String::as_str)
@@ -386,6 +434,62 @@ impl Registry {
         Ok((self.decision_from_provider_with(&key, settings)?, model))
     }
 
+    /// Build the extraction provider registered for `key`.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Configuration`] when `key` is unknown or is
+    /// registered without an extraction provider (the message lists the
+    /// keys that offer extractions), and with the constructor's error
+    /// otherwise.
+    pub fn extraction_from_provider(&self, key: &str) -> Result<DynExtractionProvider> {
+        self.extraction_from_provider_with(key, &ProviderSettings::default())
+    }
+
+    /// Build the extraction provider registered for `key` with `settings`,
+    /// such as a credential scope.
+    ///
+    /// # Errors
+    ///
+    /// As [`Registry::extraction_from_provider`].
+    pub fn extraction_from_provider_with(
+        &self,
+        key: &str,
+        settings: &ProviderSettings,
+    ) -> Result<DynExtractionProvider> {
+        match self.providers.get(key).and_then(|c| c.extraction.as_ref()) {
+            Some(constructor) => constructor(settings),
+            None => Err(self.missing(key, Operation::Extraction)),
+        }
+    }
+
+    /// Build the extraction provider for a `provider:model` address and
+    /// return it with the model id.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Configuration`] when the address is not a
+    /// [`ModelAddress`], and as [`Registry::extraction_from_provider`]
+    /// otherwise.
+    pub fn extraction_from_model(&self, address: &str) -> Result<(DynExtractionProvider, String)> {
+        self.extraction_from_model_with(address, &ProviderSettings::default())
+    }
+
+    /// Build the extraction provider for a `provider:model` address with
+    /// `settings`, and return it with the model id.
+    ///
+    /// # Errors
+    ///
+    /// As [`Registry::extraction_from_model`].
+    pub fn extraction_from_model_with(
+        &self,
+        address: &str,
+        settings: &ProviderSettings,
+    ) -> Result<(DynExtractionProvider, String)> {
+        let (key, model) = self.parse_address(address)?.into_parts();
+        Ok((self.extraction_from_provider_with(&key, settings)?, model))
+    }
+
     /// Whether `key` has a constructor for `operation`.
     #[cfg(test)]
     pub(crate) fn supports(&self, key: &str, operation: Operation) -> bool {
@@ -498,12 +602,15 @@ type EmbeddingConstructor =
     Arc<dyn Fn(&ProviderSettings) -> Result<DynEmbeddingProvider> + Send + Sync>;
 type DecisionConstructor =
     Arc<dyn Fn(&ProviderSettings) -> Result<DynDecisionProvider> + Send + Sync>;
+type ExtractionConstructor =
+    Arc<dyn Fn(&ProviderSettings) -> Result<DynExtractionProvider> + Send + Sync>;
 
 #[derive(Clone, Default)]
 struct Constructors {
     chat: Option<ChatConstructor>,
     embedding: Option<EmbeddingConstructor>,
     decision: Option<DecisionConstructor>,
+    extraction: Option<ExtractionConstructor>,
 }
 
 impl Constructors {
@@ -512,6 +619,7 @@ impl Constructors {
             Operation::Chat => self.chat.is_some(),
             Operation::Embedding => self.embedding.is_some(),
             Operation::Decision => self.decision.is_some(),
+            Operation::Extraction => self.extraction.is_some(),
         }
     }
 }
@@ -522,6 +630,7 @@ impl fmt::Debug for Constructors {
             .field("chat", &self.chat.is_some())
             .field("embedding", &self.embedding.is_some())
             .field("decision", &self.decision.is_some())
+            .field("extraction", &self.extraction.is_some())
             .finish()
     }
 }
@@ -532,10 +641,16 @@ pub(crate) enum Operation {
     Chat,
     Embedding,
     Decision,
+    Extraction,
 }
 
 impl Operation {
-    const ALL: [Self; 3] = [Self::Chat, Self::Embedding, Self::Decision];
+    const ALL: [Self; 4] = [
+        Self::Chat,
+        Self::Embedding,
+        Self::Decision,
+        Self::Extraction,
+    ];
 
     /// The operation as a modifier of "provider" ("chat provider",
     /// "embedding provider"), which is also its module's name.
@@ -544,6 +659,7 @@ impl Operation {
             Self::Chat => "chat",
             Self::Embedding => "embedding",
             Self::Decision => "decision",
+            Self::Extraction => "extraction",
         }
     }
 }
@@ -554,6 +670,7 @@ impl fmt::Display for Operation {
             Self::Chat => "chat",
             Self::Embedding => "embeddings",
             Self::Decision => "decisions",
+            Self::Extraction => "extractions",
         })
     }
 }
@@ -598,7 +715,7 @@ where
         if let Some(setting) = settings.untaken() {
             return Err(setting.refuse(
                 &format!("provider `{key}` was registered without settings"),
-                "register it with `register_chat_with` (or its embedding and decision twins)",
+                "register it with `register_chat_with` (or its embedding, decision and extraction twins)",
             ));
         }
         constructor()

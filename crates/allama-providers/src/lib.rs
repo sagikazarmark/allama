@@ -45,6 +45,8 @@
 //! - [`embedding`]: [`embedding::from_provider`] and
 //!   [`embedding::from_model`].
 //! - [`decision`]: [`decision::from_provider`] and [`decision::from_model`].
+//! - [`extraction`]: [`extraction::from_provider`] and
+//!   [`extraction::from_model`] (unstable, ADR 0018).
 //!
 //! Each has a `_with` twin taking [`ProviderSettings`], such as a credential
 //! scope.
@@ -190,8 +192,8 @@
 //! `chat::from_model` resolves to.
 //!
 //! A provider you build yourself, outside any registry, gets the same
-//! wrappers from [`chat::wrap`], [`embedding::wrap`] or
-//! [`decision::wrap`]. They refuse the settings only a constructor can
+//! wrappers from [`chat::wrap`], [`embedding::wrap`], [`decision::wrap`] or
+//! [`extraction::wrap`]. They refuse the settings only a constructor can
 //! apply, as a lookup of a constructor registered without settings does:
 //!
 //! ```no_run
@@ -215,6 +217,7 @@ mod stack;
 pub mod chat;
 pub mod decision;
 pub mod embedding;
+pub mod extraction;
 
 pub use address::ModelAddress;
 pub use registry::Registry;
