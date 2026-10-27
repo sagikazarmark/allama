@@ -699,7 +699,20 @@ The responsibilities are split:
 `embed` does the same with `allama::adapter::embedding::prepare`, and its dry run
 `validate_embedding_request` runs the same `encode`
 (`allama_conformance::assert_embedding_validation_agrees` checks it);
-`decide` does the same with `allama::adapter::decision::prepare`.
+`decide` does the same with `allama::adapter::decision::prepare`, and
+`extract_values` with `allama::adapter::extraction::prepare`.
+
+An extraction adapter (`ExtractionProvider`, unstable, [ADR
+0018](../decisions/0018-extraction-models.md)) has two rules of its own.
+Every field parameter is semantic: send it as given, or refuse the field
+with `Degradations::reject` before sending; nothing is folded into the
+instructions. And a text span is a byte range into the request's input
+that equals the value: convert the provider's offsets (its unit, its copy
+of the input), fall back to finding the value, and drop a span you cannot
+place with a `Dropped` warning rather than report one that lies. Provider
+statistics about an answer (a confidence, a guess for a null) are provider
+data keyed by field name, as `allama-cloudflare` keeps Clairic's; call
+`ExtractionResponse::validate` on what you decode.
 
 ### Wire support: the standard degradation pass
 
@@ -1374,7 +1387,7 @@ let response = if streaming {
 ```
 
 - **Transport options.** Call `HttpRequest::apply_options` with the options
-  of the request you serve (chat, embedding, or decision) and your
+  of the request you serve (chat, embedding, decision, or extraction) and your
   credential slot, after setting every header of your own, including your
   configured key. It applies the caller's `allama_http::HttpRequestOptions`:
   a plain header replaces yours of the same name, and the credentials
@@ -1945,8 +1958,9 @@ features = ["reqwest"] }`) and hands the provider an
    contract that does not apply to your adapter (no wire stream, no HTTP)
    goes in `.skip([Contract::..])`, so nothing is skipped silently. `.known_gaps(..)` lists acknowledged defects, and fails once
    one is fixed. Every contract also stays a public function, for a test
-   that pins one behavior. `assert_embedding_adapter` and
-   `assert_decision_adapter` are the same for embeddings and decisions.
+   that pins one behavior. `assert_embedding_adapter`,
+   `assert_decision_adapter` and `assert_extraction_adapter` are the same
+   for embeddings, decisions and extractions.
 
    The contracts it runs:
    - **Decoding**: `allama_conformance::decoding` decodes each captured
@@ -2004,8 +2018,10 @@ features = ["reqwest"] }`) and hands the provider an
      also assert that it does. `assert_embedding_validation_agrees` with
      `embedding_drift_requests(model)` and
      `assert_decision_validation_agrees` with
-     `decision_drift_requests(model)` are the same contract for `embed`
-     and `decide`.
+     `decision_drift_requests(model)` and
+     `assert_extraction_validation_agrees` with
+     `extraction_drift_requests(model)` are the same contract for `embed`,
+     `decide` and `extract_values`.
    - **Negative capability audit (C3)**:
      `allama_conformance::capabilities::assert_unsupported_chat_capabilities_refused`
      (and the embedding variant) checks that a request using a capability
@@ -2146,8 +2162,10 @@ timing wrapper.
 - **Transparent wrapper (C4)**:
   [`assert_chat_wrapper`](https://docs.rs/allama-conformance/latest/allama_conformance/fn.assert_chat_wrapper.html)
   (or [`assert_wrapper`](https://docs.rs/allama-conformance/latest/allama_conformance/fn.assert_wrapper.html)
-  for a wrapper over every provider trait, and the
-  embedding and decision variants) builds your wrapper around a
+  for a wrapper over chat, embeddings and decisions, the embedding and
+  decision variants, and `assert_extraction_wrapper` for the unstable
+  extraction trait, which `assert_wrapper` leaves out) builds your wrapper
+  around a
   [`TransparencyProbe`](https://docs.rs/allama-conformance/latest/allama_conformance/struct.TransparencyProbe.html)
   and checks two things. It forwards the provider
   name, typed lookup, capability answers, limits, and validation, both
@@ -2177,7 +2195,8 @@ timing wrapper.
   impl<P: ProviderIdentity> ProviderIdentity for MyWrapper<P> {
       allama::wrappers::forward_provider_identity!(inner);
   }
-  // Likewise `forward_embedding_questions!` and `forward_decision_questions!`.
+  // Likewise `forward_embedding_questions!`, `forward_decision_questions!`
+  // and `forward_extraction_questions!`.
   ```
 
   A wrapper that answers a question itself (it maps the model or
@@ -2407,8 +2426,9 @@ registry.register_chat("acme", AcmeProvider::from_env);
 ```
 
 `registry.chat_from_model("acme:acme-large")` then builds the provider and
-returns the model id. Register an embedding constructor with
-`register_embedding` the same way. The lookup wraps your provider in the
+returns the model id. Register an embedding, decision or extraction
+constructor with `register_embedding`, `register_decision` or
+`register_extraction` the same way. The lookup wraps your provider in the
 same stack as a built-in one: retries by default, and the per-attempt
 timeout and unsupported-feature policy the `ProviderSettings` ask for. So
 do not retry inside the adapter, or retries nest.

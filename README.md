@@ -11,8 +11,8 @@
 
 - 🔌 **One API, many providers.** OpenAI (Responses and Chat Completions),
   Anthropic, Gemini, a dozen OpenAI-compatible endpoints (Groq, OpenRouter,
-  Ollama, vLLM, Azure, …), Cloudflare Workers AI, and System One decision
-  models.
+  Ollama, vLLM, Azure, …), Cloudflare Workers AI, System One decision
+  models, and Cloudflare's Clairic extraction model.
 - 🧭 **Portable where it is real.** Messages, tools, streaming, structured
   output, reasoning effort, prompt caching, files, usage and errors share one
   model. Everything else is a typed provider option or namespaced provider
@@ -28,8 +28,10 @@
 - 🧾 **Chat extraction.** `extract::<T>()` drives a chat model through native
   structured output or a forced tool call, and reports how strictly the
   provider enforced the schema.
-- 🧮 **Beyond chat.** Embeddings (text and multimodal) and decision models
-  (typed answers with probabilities) are sibling traits with the same design.
+- 🧮 **Beyond chat.** Embeddings (text and multimodal), decision models
+  (typed answers with probabilities) and extraction models (typed values
+  with null probabilities and spans; unstable) are sibling traits with the
+  same design.
 - 🗺️ **Model addresses.** `openai:gpt-5.5` picks the provider and the model
   from one configuration string, with a grammar that stays put.
 - 🌐 **Runtime-agnostic.** The core depends on no async runtime, builds for
@@ -41,16 +43,17 @@
 - 🧪 **Testable.** Mock providers, and a replay transport that runs real
   adapters over recorded wire data.
 
-| Provider | Crate | Model address key | Chat | Embeddings | Decisions |
-| --- | --- | --- | :---: | :---: | :---: |
-| OpenAI Responses API | [`allama-openai`](crates/allama-openai) | `openai`, `openai-responses` | ✓ | | |
-| OpenAI Chat Completions | [`allama-openai`](crates/allama-openai) | `openai-chat` (chat), `openai` (embeddings) | ✓ | ✓ | |
-| Anthropic | [`allama-anthropic`](crates/allama-anthropic) | `anthropic` | ✓ | | |
-| Gemini | [`allama-gemini`](crates/allama-gemini) | `gemini` | ✓ | ✓ | |
-| OpenAI-compatible endpoints | [`allama-openai-compat`](crates/allama-openai-compat) | `azure`, `groq`, `ollama`, `openrouter`, … | ✓ | ✓ | |
-| Azure OpenAI Responses API | [`allama-openai-compat`](crates/allama-openai-compat) | `azure-responses` | ✓ | | |
-| Cloudflare Workers AI (inside a Worker) | [`allama-cloudflare-worker`](crates/allama-cloudflare-worker) | | ✓ | ✓ | |
-| System One (TypeSafe, Ollama, gateways) | [`allama-systemone`](crates/allama-systemone) | `typesafe`, `ollama`, … | | | ✓ |
+| Provider | Crate | Model address key | Chat | Embeddings | Decisions | Extraction |
+| --- | --- | --- | :---: | :---: | :---: | :---: |
+| OpenAI Responses API | [`allama-openai`](crates/allama-openai) | `openai`, `openai-responses` | ✓ | | | |
+| OpenAI Chat Completions | [`allama-openai`](crates/allama-openai) | `openai-chat` (chat), `openai` (embeddings) | ✓ | ✓ | | |
+| Anthropic | [`allama-anthropic`](crates/allama-anthropic) | `anthropic` | ✓ | | | |
+| Gemini | [`allama-gemini`](crates/allama-gemini) | `gemini` | ✓ | ✓ | | |
+| OpenAI-compatible endpoints | [`allama-openai-compat`](crates/allama-openai-compat) | `azure`, `groq`, `ollama`, `openrouter`, … | ✓ | ✓ | | |
+| Azure OpenAI Responses API | [`allama-openai-compat`](crates/allama-openai-compat) | `azure-responses` | ✓ | | | |
+| Cloudflare Workers AI (REST) | [`allama-cloudflare`](crates/allama-cloudflare) | `cloudflare` | | | | ✓ |
+| Cloudflare Workers AI (inside a Worker) | [`allama-cloudflare-worker`](crates/allama-cloudflare-worker) | | ✓ | ✓ | ✓ | ✓ |
+| System One (TypeSafe, Ollama, gateways) | [`allama-systemone`](crates/allama-systemone) | `typesafe`, `ollama`, `cloudflare`, … | | | ✓ | |
 
 `openai:` is the Responses API, the default for chat and the right choice for
 reasoning models; `openai-chat:` is Chat Completions, for when you need that
@@ -211,6 +214,7 @@ ALLAMA_MODEL=ollama:qwen3:1.7b cargo run -p allama-examples --example axum_sse  
 ALLAMA_MODEL=ollama:qwen3:1.7b cargo run -p allama-examples --example provider_extract  # typed extraction
 ALLAMA_EMBEDDING_MODEL=ollama:nomic-embed-text cargo run -p allama-examples --example provider_embedding
 cargo run -p allama-examples --example provider_decision  # Ollama 0.35+ after `ollama pull nimble`
+CLOUDFLARE_ACCOUNT_ID=… CLOUDFLARE_API_TOKEN=… cargo run -p allama-examples --example provider_extraction
 cargo run -p allama-examples --example middleware         # a custom wrapper, no provider needed
 cargo run -p allama --example otel --features mock,tracing
 ```

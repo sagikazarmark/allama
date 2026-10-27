@@ -122,6 +122,7 @@ version = "0.2.0"
 dependencies = [
  "allama",
  "allama-anthropic",
+ "allama-cloudflare",
  "allama-cloudflare-worker",
  "allama-conformance",
  "allama-gemini",
