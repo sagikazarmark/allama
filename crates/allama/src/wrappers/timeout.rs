@@ -10,8 +10,8 @@ use futures_util::future::{Either, select};
 
 use crate::{
     ChatProvider, ChatRequest, ChatResponse, DecisionProvider, DecisionRequest, DecisionResponse,
-    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, Error, ProviderIdentity, Result,
-    StreamEvent,
+    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, Error, ExtractionProvider,
+    ExtractionRequest, ExtractionResponse, ProviderIdentity, Result, StreamEvent,
 };
 
 /// Time bounds enforced by [`TimeoutProvider`]. Each bound is optional.
@@ -347,6 +347,19 @@ impl<T: DecisionProvider> DecisionProvider for TimeoutProvider<T> {
     super::forward_decision_questions!(inner);
 }
 
+impl<T: ExtractionProvider> ExtractionProvider for TimeoutProvider<T> {
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        self.bounded(
+            "extraction request",
+            self.policy.effective().request,
+            self.inner.extract_values(request),
+        )
+        .await
+    }
+
+    super::forward_extraction_questions!(inner);
+}
+
 impl<T: ProviderIdentity> ProviderIdentity for TimeoutProvider<T> {
     super::forward_provider_identity!(inner);
 }
@@ -465,22 +478,6 @@ where
             }
         }
     }
-}
-
-impl<T: crate::ExtractionProvider> crate::ExtractionProvider for TimeoutProvider<T> {
-    async fn extract_values(
-        &self,
-        request: &crate::ExtractionRequest,
-    ) -> Result<crate::ExtractionResponse> {
-        self.bounded(
-            "extraction request",
-            self.policy.effective().request,
-            self.inner.extract_values(request),
-        )
-        .await
-    }
-
-    super::forward_extraction_questions!(inner);
 }
 
 #[cfg(test)]

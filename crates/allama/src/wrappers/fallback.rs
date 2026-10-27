@@ -12,8 +12,9 @@ use crate::{
     ChatStream, ChatValidation, DecisionCapability, DecisionLimits, DecisionProvider,
     DecisionRequest, DecisionResponse, DecisionValidation, EmbeddingCapability, EmbeddingLimits,
     EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, EmbeddingValidation, Error,
-    FallbackValidation, ProviderData, ProviderDataEntry, ProviderIdentity, Result, StreamEvent,
-    Subject, Validation, Warning, WarningCause, WarningKind,
+    ExtractionCapability, ExtractionLimits, ExtractionProvider, ExtractionRequest,
+    ExtractionResponse, ExtractionValidation, FallbackValidation, ProviderData, ProviderDataEntry,
+    ProviderIdentity, Result, StreamEvent, Subject, Validation, Warning, WarningCause, WarningKind,
 };
 
 /// Fails over to a second provider when the primary fails before producing
@@ -573,6 +574,77 @@ where
     }
 }
 
+impl<P, F> ExtractionProvider for FallbackProvider<P, F>
+where
+    P: ExtractionProvider,
+    F: ExtractionProvider,
+{
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        let primary_error = match side(&self.primary, self.primary.extract_values(request)).await {
+            Ok(response) => return Ok(response),
+            Err(error) if self.should_fail_over(&error) => error,
+            Err(error) => return Err(error),
+        };
+        self.fail_over(&primary_error);
+
+        match side(&self.fallback, self.fallback.extract_values(request)).await {
+            Ok(mut response) => {
+                let served = response
+                    .provider
+                    .get_or_insert_with(|| self.fallback.provider_name().to_owned().into())
+                    .clone();
+                record_attempt(
+                    &mut response.provider_data,
+                    self.primary.provider_name(),
+                    &primary_error,
+                );
+                response.warnings.push(self.failover_warning(
+                    &request.model,
+                    &primary_error,
+                    &served,
+                    true,
+                ));
+                Ok(response)
+            }
+            Err(fallback_error) => Err(fallback_error.with_fallback_from(primary_error)),
+        }
+    }
+
+    fn extraction_capability(
+        &self,
+        model: &str,
+        capability: ExtractionCapability,
+    ) -> CapabilitySupport {
+        merge_capability_support(
+            self.primary.extraction_capability(model, capability),
+            self.fallback.extraction_capability(model, capability),
+        )
+    }
+
+    /// The smaller known limit of the two sides, field by field.
+    fn extraction_limits(&self, model: &str) -> ExtractionLimits {
+        let primary = self.primary.extraction_limits(model);
+        let fallback = self.fallback.extraction_limits(model);
+        let mut limits = ExtractionLimits::new();
+        limits.max_fields = smaller_limit(primary.max_fields, fallback.max_fields);
+        limits.max_images = smaller_limit(primary.max_images, fallback.max_images);
+        limits.max_forecast_horizon =
+            smaller_limit(primary.max_forecast_horizon, fallback.max_forecast_horizon);
+        limits
+    }
+
+    fn validate_extraction_request(
+        &self,
+        request: &ExtractionRequest,
+    ) -> Result<ExtractionValidation> {
+        self.pair_validation(
+            &request.model,
+            self.primary.validate_extraction_request(request),
+            || self.fallback.validate_extraction_request(request),
+        )
+    }
+}
+
 impl<P: ProviderIdentity, F: ProviderIdentity> ProviderIdentity for FallbackProvider<P, F> {
     /// The wrapper reports the primary identity; the provider that actually
     /// served a request is in [`ChatResponse::provider`].
@@ -900,80 +972,6 @@ fn served_by(mut response: EmbeddingResponse, provider: &str) -> EmbeddingRespon
         response.provider = Some(provider.to_owned().into());
     }
     response
-}
-
-impl<P, F> crate::ExtractionProvider for FallbackProvider<P, F>
-where
-    P: crate::ExtractionProvider,
-    F: crate::ExtractionProvider,
-{
-    async fn extract_values(
-        &self,
-        request: &crate::ExtractionRequest,
-    ) -> Result<crate::ExtractionResponse> {
-        let primary_error = match side(&self.primary, self.primary.extract_values(request)).await {
-            Ok(response) => return Ok(response),
-            Err(error) if self.should_fail_over(&error) => error,
-            Err(error) => return Err(error),
-        };
-        self.fail_over(&primary_error);
-
-        match side(&self.fallback, self.fallback.extract_values(request)).await {
-            Ok(mut response) => {
-                let served = response
-                    .provider
-                    .get_or_insert_with(|| self.fallback.provider_name().to_owned().into())
-                    .clone();
-                record_attempt(
-                    &mut response.provider_data,
-                    self.primary.provider_name(),
-                    &primary_error,
-                );
-                response.warnings.push(self.failover_warning(
-                    &request.model,
-                    &primary_error,
-                    &served,
-                    true,
-                ));
-                Ok(response)
-            }
-            Err(fallback_error) => Err(fallback_error.with_fallback_from(primary_error)),
-        }
-    }
-
-    fn extraction_capability(
-        &self,
-        model: &str,
-        capability: crate::ExtractionCapability,
-    ) -> CapabilitySupport {
-        merge_capability_support(
-            self.primary.extraction_capability(model, capability),
-            self.fallback.extraction_capability(model, capability),
-        )
-    }
-
-    /// The smaller known limit of the two sides, field by field.
-    fn extraction_limits(&self, model: &str) -> crate::ExtractionLimits {
-        let primary = self.primary.extraction_limits(model);
-        let fallback = self.fallback.extraction_limits(model);
-        let mut limits = crate::ExtractionLimits::new();
-        limits.max_fields = smaller_limit(primary.max_fields, fallback.max_fields);
-        limits.max_images = smaller_limit(primary.max_images, fallback.max_images);
-        limits.max_forecast_horizon =
-            smaller_limit(primary.max_forecast_horizon, fallback.max_forecast_horizon);
-        limits
-    }
-
-    fn validate_extraction_request(
-        &self,
-        request: &crate::ExtractionRequest,
-    ) -> Result<crate::ExtractionValidation> {
-        self.pair_validation(
-            &request.model,
-            self.primary.validate_extraction_request(request),
-            || self.fallback.validate_extraction_request(request),
-        )
-    }
 }
 
 #[cfg(test)]

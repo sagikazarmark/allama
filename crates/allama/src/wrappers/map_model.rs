@@ -6,7 +6,9 @@ use crate::{
     CapabilitySupport, ChatCapability, ChatProvider, ChatRequest, ChatResponse, ChatValidation,
     DecisionCapability, DecisionLimits, DecisionProvider, DecisionRequest, DecisionResponse,
     DecisionValidation, EmbeddingCapability, EmbeddingLimits, EmbeddingProvider, EmbeddingRequest,
-    EmbeddingResponse, EmbeddingValidation, ProviderIdentity, Result,
+    EmbeddingResponse, EmbeddingValidation, ExtractionCapability, ExtractionLimits,
+    ExtractionProvider, ExtractionRequest, ExtractionResponse, ExtractionValidation,
+    ProviderIdentity, Result,
 };
 
 /// Rewrites model ids before requests reach the wrapped provider.
@@ -145,10 +147,7 @@ where
         self.mapped(request, &request.model, |r, model| r.model = model)
     }
 
-    fn extraction_request<'r>(
-        &self,
-        request: &'r crate::ExtractionRequest,
-    ) -> Cow<'r, crate::ExtractionRequest> {
+    fn extraction_request<'r>(&self, request: &'r ExtractionRequest) -> Cow<'r, ExtractionRequest> {
         self.mapped(request, &request.model, |r, model| r.model = model)
     }
 }
@@ -243,6 +242,39 @@ where
     }
 }
 
+impl<P, F> ExtractionProvider for MapModelProvider<P, F>
+where
+    P: ExtractionProvider,
+    F: Fn(&str) -> Cow<'_, str> + Send + Sync,
+{
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        self.inner
+            .extract_values(&self.extraction_request(request))
+            .await
+    }
+
+    fn extraction_capability(
+        &self,
+        model: &str,
+        capability: ExtractionCapability,
+    ) -> CapabilitySupport {
+        self.inner
+            .extraction_capability(&self.map_model(model), capability)
+    }
+
+    fn extraction_limits(&self, model: &str) -> ExtractionLimits {
+        self.inner.extraction_limits(&self.map_model(model))
+    }
+
+    fn validate_extraction_request(
+        &self,
+        request: &ExtractionRequest,
+    ) -> Result<ExtractionValidation> {
+        self.inner
+            .validate_extraction_request(&self.extraction_request(request))
+    }
+}
+
 impl<P, F> ProviderIdentity for MapModelProvider<P, F>
 where
     P: ProviderIdentity,
@@ -264,42 +296,6 @@ where
 impl<P, F> fmt::Debug for MapModelProvider<P, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MapModelProvider").finish_non_exhaustive()
-    }
-}
-
-impl<P, F> crate::ExtractionProvider for MapModelProvider<P, F>
-where
-    P: crate::ExtractionProvider,
-    F: Fn(&str) -> Cow<'_, str> + Send + Sync,
-{
-    async fn extract_values(
-        &self,
-        request: &crate::ExtractionRequest,
-    ) -> Result<crate::ExtractionResponse> {
-        self.inner
-            .extract_values(&self.extraction_request(request))
-            .await
-    }
-
-    fn extraction_capability(
-        &self,
-        model: &str,
-        capability: crate::ExtractionCapability,
-    ) -> CapabilitySupport {
-        self.inner
-            .extraction_capability(&self.map_model(model), capability)
-    }
-
-    fn extraction_limits(&self, model: &str) -> crate::ExtractionLimits {
-        self.inner.extraction_limits(&self.map_model(model))
-    }
-
-    fn validate_extraction_request(
-        &self,
-        request: &crate::ExtractionRequest,
-    ) -> Result<crate::ExtractionValidation> {
-        self.inner
-            .validate_extraction_request(&self.extraction_request(request))
     }
 }
 

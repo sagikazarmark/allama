@@ -10,8 +10,8 @@ use web_time::Instant;
 use crate::chat::stream::StreamCollector;
 use crate::{
     ChatProvider, ChatRequest, ChatResponse, DecisionProvider, DecisionRequest, DecisionResponse,
-    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, Error, ProviderIdentity, Result,
-    StreamEvent, Usage, Warning,
+    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, Error, ExtractionProvider,
+    ExtractionRequest, ExtractionResponse, ProviderIdentity, Result, StreamEvent, Usage, Warning,
 };
 
 /// Hands every warning a call reports to a callback: for metrics, alerts or
@@ -321,6 +321,25 @@ impl<P: DecisionProvider> DecisionProvider for ObserveProvider<P> {
     super::forward_decision_questions!(inner);
 }
 
+impl<P: ExtractionProvider> ExtractionProvider for ObserveProvider<P> {
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        let started = Instant::now();
+        let result = self.inner.extract_values(request).await;
+        self.outcome(&CallOutcome::unary(
+            CallKind::Extraction,
+            &request.model,
+            started,
+            &result,
+            |response| (response.provider.as_deref(), response.usage.as_ref()),
+        ));
+        let response = result?;
+        self.observe(&request.model, &response.warnings);
+        Ok(response)
+    }
+
+    super::forward_extraction_questions!(inner);
+}
+
 impl<P: ProviderIdentity> ProviderIdentity for ObserveProvider<P> {
     super::forward_provider_identity!(inner);
 }
@@ -434,28 +453,6 @@ impl<S: Stream<Item = Result<StreamEvent>>> Stream for ObserveStream<S> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.inner.size_hint()
     }
-}
-
-impl<P: crate::ExtractionProvider> crate::ExtractionProvider for ObserveProvider<P> {
-    async fn extract_values(
-        &self,
-        request: &crate::ExtractionRequest,
-    ) -> Result<crate::ExtractionResponse> {
-        let started = Instant::now();
-        let result = self.inner.extract_values(request).await;
-        self.outcome(&CallOutcome::unary(
-            CallKind::Extraction,
-            &request.model,
-            started,
-            &result,
-            |response| (response.provider.as_deref(), response.usage.as_ref()),
-        ));
-        let response = result?;
-        self.observe(&request.model, &response.warnings);
-        Ok(response)
-    }
-
-    super::forward_extraction_questions!(inner);
 }
 
 #[cfg(test)]

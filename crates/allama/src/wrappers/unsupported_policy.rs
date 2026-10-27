@@ -4,8 +4,9 @@ use std::fmt;
 use crate::{
     CapabilitySupport, ChatCapability, ChatProvider, ChatRequest, ChatResponse, ChatValidation,
     DecisionProvider, DecisionRequest, DecisionResponse, EmbeddingCapability, EmbeddingLimits,
-    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, EmbeddingValidation, ProviderIdentity,
-    Result, UnsupportedPolicy,
+    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, EmbeddingValidation,
+    ExtractionProvider, ExtractionRequest, ExtractionResponse, ProviderIdentity, Result,
+    UnsupportedPolicy,
 };
 
 /// Sets a provider-level default [`UnsupportedPolicy`]: a request that
@@ -139,6 +140,14 @@ impl<P: DecisionProvider> DecisionProvider for UnsupportedPolicyProvider<P> {
     super::forward_decision_questions!(inner);
 }
 
+impl<P: ExtractionProvider> ExtractionProvider for UnsupportedPolicyProvider<P> {
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        self.inner.extract_values(request).await
+    }
+
+    super::forward_extraction_questions!(inner);
+}
+
 impl<P: ProviderIdentity> ProviderIdentity for UnsupportedPolicyProvider<P> {
     super::forward_provider_identity!(inner);
 }
@@ -158,17 +167,6 @@ impl<P> fmt::Debug for UnsupportedPolicyProvider<P> {
             .field("policy", &self.policy)
             .finish_non_exhaustive()
     }
-}
-
-impl<P: crate::ExtractionProvider> crate::ExtractionProvider for UnsupportedPolicyProvider<P> {
-    async fn extract_values(
-        &self,
-        request: &crate::ExtractionRequest,
-    ) -> Result<crate::ExtractionResponse> {
-        self.inner.extract_values(request).await
-    }
-
-    super::forward_extraction_questions!(inner);
 }
 
 #[cfg(test)]

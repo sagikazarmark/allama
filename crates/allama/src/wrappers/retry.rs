@@ -21,7 +21,7 @@ use crate::warning::AttemptScope;
 use crate::{
     ChatProvider, ChatRequest, ChatResponse, ChatStream, DecisionProvider, DecisionRequest,
     DecisionResponse, EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, Error,
-    ProviderIdentity, Result,
+    ExtractionProvider, ExtractionRequest, ExtractionResponse, ProviderIdentity, Result,
 };
 
 /// Retries transient errors against the same provider (chat, embeddings, and
@@ -305,6 +305,14 @@ impl<T: DecisionProvider> DecisionProvider for RetryingProvider<T> {
     }
 
     super::forward_decision_questions!(inner);
+}
+
+impl<T: ExtractionProvider> ExtractionProvider for RetryingProvider<T> {
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        self.retry(|| self.inner.extract_values(request)).await
+    }
+
+    super::forward_extraction_questions!(inner);
 }
 
 impl<T: ProviderIdentity> ProviderIdentity for RetryingProvider<T> {
@@ -724,17 +732,6 @@ fn random_unit() -> f64 {
     }
     // The top 53 bits fill an f64 mantissa exactly.
     (hasher.finish() >> 11) as f64 / (1u64 << 53) as f64
-}
-
-impl<T: crate::ExtractionProvider> crate::ExtractionProvider for RetryingProvider<T> {
-    async fn extract_values(
-        &self,
-        request: &crate::ExtractionRequest,
-    ) -> Result<crate::ExtractionResponse> {
-        self.retry(|| self.inner.extract_values(request)).await
-    }
-
-    super::forward_extraction_questions!(inner);
 }
 
 #[cfg(test)]
