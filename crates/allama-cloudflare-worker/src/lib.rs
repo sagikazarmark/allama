@@ -140,6 +140,7 @@ mod conformance_tests;
 mod decision;
 mod embedding;
 mod error;
+mod extraction;
 mod options;
 mod streaming;
 mod wire;
@@ -149,8 +150,18 @@ use std::sync::Arc;
 use allama::ChatCapabilityResolver;
 use wasm_bindgen::JsValue;
 
+pub use allama_cloudflare::ExtractionRequestOptions;
 pub use allama_systemone::Confidence;
 pub use options::{ChatRequestOptions, DecisionRequestOptions, EmbeddingRequestOptions};
+
+/// Clairic's statistics in an extraction response's provider data, from
+/// `allama-cloudflare`, whose codec this crate runs the model with (the
+/// two transports share the namespace `cloudflare-workers-ai`).
+pub mod extraction_data {
+    pub use allama_cloudflare::{
+        AnswerExtras, Confidence, Distribution, Distributions, Guesses, RunDetails, TokenCounts,
+    };
+}
 
 /// The Workers AI binding's output object, kept in
 /// [`ChatResponse::provider_data`](allama::ChatResponse::provider_data) when
@@ -181,7 +192,8 @@ pub const NAMESPACE: &str = "cloudflare-workers-ai";
 pub const PROVIDER_NAME: &str = "cloudflare";
 
 /// Cloudflare Workers AI provider implementing [`allama::ChatProvider`],
-/// [`allama::EmbeddingProvider`] and [`allama::DecisionProvider`].
+/// [`allama::EmbeddingProvider`], [`allama::DecisionProvider`] and
+/// [`allama::ExtractionProvider`] (unstable, ADR 0018).
 ///
 /// Calls Workers AI models through the Worker's AI binding, the runtime's
 /// internal binding rather than HTTP.

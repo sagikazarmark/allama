@@ -12,11 +12,13 @@ of its types: pass `&worker::Env` or `&worker::Ai` (or a
 
 - you are already running inside a Cloudflare Worker (`wasm32-unknown-unknown`)
 - you want to call Workers AI through the shared `allama::ChatProvider`,
-  `allama::EmbeddingProvider` and `allama::DecisionProvider` traits
+  `allama::EmbeddingProvider`, `allama::DecisionProvider` and
+  `allama::ExtractionProvider` (unstable, ADR 0018) traits
 - you want native binding-based execution instead of outbound HTTP calls
 
 Outside a Worker, use `allama-openai-compat`'s Cloudflare preset (chat and
-embeddings) and `allama-systemone`'s (decisions) instead.
+embeddings), `allama-systemone`'s (decisions) and `allama-cloudflare`
+(extraction) instead.
 
 ## Identity
 
@@ -61,6 +63,8 @@ namespace (`allama_cloudflare_worker::NAMESPACE`).
   the BGE English v1.5 models) is the model's to enforce.
 - Decisions with Clef models (`@cf/cloudflare/clef`,
   `@cf/cloudflare/clef-flash`; see [Decisions](#decisions)).
+- Extraction with Clairic (`@cf/cloudflare/clairic`; see
+  [Extraction](#extraction)).
 
 Tool calls, structured output, image input, image detail and reasoning
 configuration are `Unknown`, as on the compat crate's Cloudflare preset:
@@ -155,6 +159,49 @@ async fn triage(env: &worker::Env, ticket: &str) -> allama::Result<Triage> {
 The typed example uses `allama`'s `derive` feature. Binding call options
 and model inputs this crate does not model go in `DecisionRequestOptions`
 (`run_options`, `extra`), under the `cloudflare-workers-ai` namespace.
+
+## Extraction
+
+Clairic is Cloudflare's extraction model: it answers named, typed fields
+about an input (text, images) with values instead of writing text: a span
+of the input, a number read or computed, a date, a duration, a list, an
+estimate inside bounds you declare, or a forecast of a series, each scalar
+one a value or null with the probability that the input does not determine
+it. In `allama` it is an `ExtractionProvider`, **unstable** (ADR 0018).
+Its input and output are `allama-cloudflare`'s wire format without the
+REST envelope, encoded and decoded with that crate's codec, so both
+transports send and read alike and share the options type
+(`ExtractionRequestOptions`, re-exported) and provider data
+(`extraction_data::{Confidence, Guesses, Distributions, RunDetails}`, namespace
+`cloudflare-workers-ai`):
+
+- the model selector Clairic reads (`clairic`) is the last segment of the
+  model name;
+- `ExtractionRequest::images` go as `{"content_type", "base64"}`, inline
+  only;
+- every field kind is `Supported`, `ExtractionCapability::ImageInput` is
+  `Unknown` (model data), and `extraction_limits` claims no limit, as over
+  REST (ADR 0015);
+- text spans are placed as byte spans into the request's input; one the
+  codec cannot place is dropped with a `dropped.span` warning;
+- the binding call's options (an AI Gateway) go in
+  `ExtractionRequestOptions::run_options`.
+
+```rust,no_run
+use allama::extraction::{Field, ListItemKind};
+use allama::{ExtractionProvider, ExtractionRequest};
+use allama_cloudflare_worker::Provider;
+
+async fn claim(env: &worker::Env, email: &str) -> allama::Result<Option<f64>> {
+    let provider = Provider::from_env(env, "AI")?;
+    let request = ExtractionRequest::new("@cf/cloudflare/clairic", email)
+        .field("order_id", Field::text().instructions("Order number"))
+        .field("amount_paid", Field::number().decimals(2).unit("USD"))
+        .field("damage", Field::list(ListItemKind::Text).instructions("Each kind of damage"));
+    let response = provider.extract_values(&request).await?;
+    Ok(response.number("amount_paid").unwrap().value)
+}
+```
 
 ## Provider options
 

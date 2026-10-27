@@ -11,6 +11,7 @@ categories = ["api-bindings", "artificial-intelligence", "wasm"]
 
 [dependencies]
 allama = { workspace = true }
+allama-cloudflare = { workspace = true }
 allama-http = { workspace = true }
 allama-openai-compat = { workspace = true }
 allama-systemone = { workspace = true }

@@ -68,6 +68,7 @@ name = "allama-cloudflare-worker"
 version = "0.2.0"
 dependencies = [
  "allama",
+ "allama-cloudflare",
  "allama-conformance",
  "allama-http",
  "allama-openai-compat",
