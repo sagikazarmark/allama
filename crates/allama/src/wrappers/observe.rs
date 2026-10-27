@@ -144,6 +144,8 @@ pub enum CallKind {
     Embedding,
     /// `decide`.
     Decision,
+    /// `extract_values`.
+    Extraction,
 }
 
 impl<'a> CallOutcome<'a> {
@@ -432,6 +434,28 @@ impl<S: Stream<Item = Result<StreamEvent>>> Stream for ObserveStream<S> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.inner.size_hint()
     }
+}
+
+impl<P: crate::ExtractionProvider> crate::ExtractionProvider for ObserveProvider<P> {
+    async fn extract_values(
+        &self,
+        request: &crate::ExtractionRequest,
+    ) -> Result<crate::ExtractionResponse> {
+        let started = Instant::now();
+        let result = self.inner.extract_values(request).await;
+        self.outcome(&CallOutcome::unary(
+            CallKind::Extraction,
+            &request.model,
+            started,
+            &result,
+            |response| (response.provider.as_deref(), response.usage.as_ref()),
+        ));
+        let response = result?;
+        self.observe(&request.model, &response.warnings);
+        Ok(response)
+    }
+
+    super::forward_extraction_questions!(inner);
 }
 
 #[cfg(test)]

@@ -369,6 +369,21 @@ fn recorded_response(mut response: ChatResponse) -> ChatResponse {
     response
 }
 
+impl<P, F> crate::ExtractionProvider for RecordingProvider<P, F>
+where
+    P: crate::ExtractionProvider,
+    F: Fn(ChatExchange) + Send + Sync,
+{
+    async fn extract_values(
+        &self,
+        request: &crate::ExtractionRequest,
+    ) -> Result<crate::ExtractionResponse> {
+        self.inner.extract_values(request).await
+    }
+
+    super::forward_extraction_questions!(inner);
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;

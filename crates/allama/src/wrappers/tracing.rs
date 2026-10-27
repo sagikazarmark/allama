@@ -132,6 +132,11 @@ use crate::{
 /// `allama.response.request_id`, `allama.response.warnings`,
 /// `allama.response.cancelled`.
 ///
+/// **Extraction** (`gen_ai.operation.name = "extraction"`, not a well-known
+/// value either; the operation is unstable, ADR 0018): the decision
+/// attributes, with `allama.extraction.field_count` (int) in place of the
+/// question count.
+///
 /// **Server**, on every span: `server.address` and `server.port`, the
 /// endpoint the last request of the call was sent to, so the serving host
 /// after a failover between two hosts of one provider. The HTTP transport
@@ -324,6 +329,8 @@ pub enum TracedRequest<'a> {
     Embedding(&'a EmbeddingRequest),
     /// A `decide` call.
     Decision(&'a DecisionRequest),
+    /// An `extract_values` call.
+    Extraction(&'a crate::ExtractionRequest),
 }
 
 impl<T> fmt::Debug for TracingProvider<T> {
@@ -1563,6 +1570,84 @@ fn otel_millis(duration: std::time::Duration) -> i64 {
 fn record_finish_reason(span: &Span, reason: &FinishReason) {
     let reasons = serde_json::to_string(&[reason.as_str()]).unwrap_or_default();
     span.record("gen_ai.response.finish_reasons", reasons.as_str());
+}
+
+impl<T> crate::ExtractionProvider for TracingProvider<T>
+where
+    T: crate::ExtractionProvider,
+{
+    async fn extract_values(
+        &self,
+        request: &crate::ExtractionRequest,
+    ) -> Result<crate::ExtractionResponse> {
+        let addressed = self.inner.provider_name();
+        let span = tracing::info_span!(
+            "extraction",
+            "otel.name" = %format_args!("extraction {}", request.model),
+            "otel.kind" = "client",
+            "otel.status_code" = tracing::field::Empty,
+            "otel.status_description" = tracing::field::Empty,
+            "gen_ai.operation.name" = "extraction",
+            "gen_ai.provider.name" = otel_genai_provider_name(addressed),
+            "gen_ai.request.model" = %request.model,
+            "allama.request.provider" = otel_genai_provider_name(addressed),
+            "server.address" = tracing::field::Empty,
+            "server.port" = tracing::field::Empty,
+            "gen_ai.conversation.id" = tracing::field::Empty,
+            "allama.extraction.field_count" = otel_count(request.fields.len()),
+            "allama.response.provider" = tracing::field::Empty,
+            "allama.response.request_id" = tracing::field::Empty,
+            "gen_ai.response.id" = tracing::field::Empty,
+            "gen_ai.usage.input_tokens" = tracing::field::Empty,
+            "gen_ai.usage.output_tokens" = tracing::field::Empty,
+            "gen_ai.response.model" = tracing::field::Empty,
+            "allama.response.warnings" = tracing::field::Empty,
+            "allama.attempts" = tracing::field::Empty,
+            "allama.retry.total_delay_ms" = tracing::field::Empty,
+            "allama.retry.last_delay_ms" = tracing::field::Empty,
+            "allama.retry.server_directive" = tracing::field::Empty,
+            "allama.retry.budget_denied" = tracing::field::Empty,
+            "allama.retry.give_up_reason" = tracing::field::Empty,
+            "allama.fallback.used" = tracing::field::Empty,
+            "allama.fallback.attempts" = tracing::field::Empty,
+            "allama.fallback.error_type" = tracing::field::Empty,
+            "allama.response.cancelled" = tracing::field::Empty,
+            "error.type" = tracing::field::Empty,
+        );
+        self.run_span_hook(&span, TracedRequest::Extraction(request));
+        let scope = Scope::new();
+        let call = CallRecord::new(span.clone(), Arc::clone(&scope), addressed);
+        let result = call_scope::within(&scope, self.inner.extract_values(request))
+            .instrument(span.clone())
+            .await;
+        match &result {
+            Ok(response) => {
+                if let Some(usage) = &response.usage {
+                    if let Some(input) = usage.input_tokens {
+                        record_int(&span, "gen_ai.usage.input_tokens", input);
+                    }
+                    if let Some(output) = usage.output_tokens {
+                        record_int(&span, "gen_ai.usage.output_tokens", output);
+                    }
+                }
+                if let Some(request_id) = &response.request_id {
+                    span.record("allama.response.request_id", request_id.as_str());
+                }
+                if let Some(id) = &response.id {
+                    span.record("gen_ai.response.id", id.as_str());
+                }
+                if let Some(model) = &response.model {
+                    span.record("gen_ai.response.model", model.as_str());
+                }
+                record_warnings(&span, &response.warnings);
+                call.complete(response.provider.as_deref());
+            }
+            Err(err) => call.fail(err),
+        }
+        result
+    }
+
+    super::forward_extraction_questions!(inner);
 }
 
 #[cfg(test)]

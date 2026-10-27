@@ -160,6 +160,17 @@ impl<P> fmt::Debug for UnsupportedPolicyProvider<P> {
     }
 }
 
+impl<P: crate::ExtractionProvider> crate::ExtractionProvider for UnsupportedPolicyProvider<P> {
+    async fn extract_values(
+        &self,
+        request: &crate::ExtractionRequest,
+    ) -> Result<crate::ExtractionResponse> {
+        self.inner.extract_values(request).await
+    }
+
+    super::forward_extraction_questions!(inner);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

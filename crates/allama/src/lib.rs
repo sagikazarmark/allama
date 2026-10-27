@@ -97,6 +97,8 @@
 //! - [`EmbeddingProvider`]: batch text embedding.
 //! - [`DecisionProvider`]: typed questions answered with probabilities
 //!   (decision models; see [`decision`]).
+//! - [`ExtractionProvider`]: typed fields answered with values (extraction
+//!   models; see [`extraction`]). Unstable, see [Stability](#stability).
 //!
 //! # Portability model
 //!
@@ -120,6 +122,7 @@
 //!   recording, and tracing wrappers.
 //! - [`decision`]: decision-model questions and answers, and typed decisions
 //!   (derives with feature `derive`).
+//! - [`extraction`]: extraction-model fields and answers (unstable).
 //! - [`chat`] and [`embedding`]: an overview of the chat and embedding
 //!   types, which are exported at the crate root (see [Paths](#paths));
 //!   [`chat::stream`] holds stream collection and commit-point helpers.
@@ -162,7 +165,7 @@
 //! | `schema` | `allama::schemars`, `ToolDefinition::from_schema`, `ResponseFormat::from_schema`, field paths in `ToolArgumentsError` | `schemars`, `serde_path_to_error` |
 //! | `chat-extract` | `allama::chat::extract` (`ChatExtractExt::extract`, `ChatExtractor`), also in the prelude; implies `schema`; `extract` is an alias | `schemars`, `serde_path_to_error` |
 //! | `derive` | `#[derive(Decision, ChoiceSet, Scale)]` in [`decision`] | `allama-derive` (`syn`, `quote`, `proc-macro2`, `heck`) |
-//! | `mock` | `allama::mock`: `MockProvider`, `MockStreamingProvider`, `MockEmbeddingProvider`, `MockDecisionProvider`, and other test doubles | nothing |
+//! | `mock` | `allama::mock`: `MockProvider`, `MockStreamingProvider`, `MockEmbeddingProvider`, `MockDecisionProvider`, `MockExtractionProvider`, and other test doubles | nothing |
 //! | `tracing` | `wrappers::TracingProvider` (OpenTelemetry GenAI spans), with the resilience summary wrappers report through `wrappers::call_scope`, and retry and fallback attempt events | `tracing` |
 //!
 //! Deriving tool parameters from a Rust type (`ToolDefinition::from_schema`)
@@ -415,6 +418,15 @@
 //! persisted but never sent (see
 //! [Application data](history#application-data)).
 //!
+//! # Stability
+//!
+//! A minor release (`0.x` to `0.(x+1)`) may break the API; a patch release
+//! does not. Beyond that, one module is **unstable** (ADR 0018):
+//! [`extraction`] and the [`ExtractionProvider`] trait, grounded in one
+//! provider, may change in any minor release with a release note but no
+//! migration path, and none of their names are persisted names. They
+//! become stable when a second provider implements the trait.
+//!
 //! # Serialization and stability
 //!
 //! Most public types serialize with serde. How long their JSON stays
@@ -516,6 +528,7 @@ pub mod adapter;
 pub mod chat;
 pub mod decision;
 pub mod embedding;
+pub mod extraction;
 pub mod history;
 #[cfg(any(test, feature = "mock"))]
 pub mod mock;
@@ -563,13 +576,18 @@ pub use error::{
     Error, ErrorContext, ErrorLog, MessageOrigin, ParseEnumError, Result, SerializationError,
     StreamErrorKind, UnsupportedStage,
 };
+#[doc(inline)]
+pub use extraction::{
+    DynExtractionProvider, ExtractionCapability, ExtractionLimits, ExtractionProvider,
+    ExtractionRequest, ExtractionResponse,
+};
 pub use identity::{ProviderIdentity, ProviderIdentityExt, expose};
 pub use options::{ProviderOptions, RequestOptions};
 pub use provider_data::{ProviderData, ProviderDataEntry};
 pub use usage::Usage;
 pub use validation::{
-    ChatValidation, DecisionValidation, EmbeddingValidation, FallbackValidation, Validation,
-    ValidationCoverage,
+    ChatValidation, DecisionValidation, EmbeddingValidation, ExtractionValidation,
+    FallbackValidation, Validation, ValidationCoverage,
 };
 pub(crate) use warning::Degradations;
 pub use warning::{
@@ -705,8 +723,9 @@ pub mod prelude {
         CapabilitySupport, ChatCapability, ChatProvider, ChatProviderExt, ChatRequest,
         ChatResponse, ChatStream, ChatStreamExt, CollectedEvent, ContentBlock, ContentPart,
         DecisionProvider, DecisionProviderExt, DecisionRequest, DecisionResponse, DynChatProvider,
-        DynEmbeddingProvider, EmbeddingInputType, EmbeddingProvider, EmbeddingProviderExt,
-        EmbeddingRequest, EmbeddingResponse, Error, FinishReason, Message, ProviderIdentity,
+        DynEmbeddingProvider, DynExtractionProvider, EmbeddingInputType, EmbeddingProvider,
+        EmbeddingProviderExt, EmbeddingRequest, EmbeddingResponse, Error, ExtractionProvider,
+        ExtractionRequest, ExtractionResponse, FinishReason, Message, ProviderIdentity,
         ProviderIdentityExt, ReasoningConfig, ReasoningEffort, ReasoningOutput, RequestField,
         ResponseFormat, Result, StreamBlockType, StreamEvent, SystemPrompt, ToolCall, ToolChoice,
         ToolDefinition, UnsupportedPolicy, Usage,

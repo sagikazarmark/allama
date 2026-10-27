@@ -162,6 +162,21 @@ impl<P, F> fmt::Debug for MapRequestProvider<P, F> {
     }
 }
 
+impl<P, F> crate::ExtractionProvider for MapRequestProvider<P, F>
+where
+    P: crate::ExtractionProvider,
+    F: Fn(&mut ChatRequest) + Send + Sync,
+{
+    async fn extract_values(
+        &self,
+        request: &crate::ExtractionRequest,
+    ) -> Result<crate::ExtractionResponse> {
+        self.inner.extract_values(request).await
+    }
+
+    super::forward_extraction_questions!(inner);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

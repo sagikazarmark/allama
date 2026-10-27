@@ -65,7 +65,7 @@
 
 mod input;
 mod json;
-mod named;
+pub(crate) mod named;
 pub(crate) mod prepared;
 mod provider;
 mod question;

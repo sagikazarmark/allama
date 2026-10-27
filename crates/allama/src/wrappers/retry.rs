@@ -726,6 +726,17 @@ fn random_unit() -> f64 {
     (hasher.finish() >> 11) as f64 / (1u64 << 53) as f64
 }
 
+impl<T: crate::ExtractionProvider> crate::ExtractionProvider for RetryingProvider<T> {
+    async fn extract_values(
+        &self,
+        request: &crate::ExtractionRequest,
+    ) -> Result<crate::ExtractionResponse> {
+        self.retry(|| self.inner.extract_values(request)).await
+    }
+
+    super::forward_extraction_questions!(inner);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

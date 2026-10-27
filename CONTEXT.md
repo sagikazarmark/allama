@@ -368,11 +368,11 @@ _Avoid_: Refused field (for the stage), local refusal, upstream refusal (as a ty
 ### Chat extraction
 
 **Chat extraction**:
-Driving a chat model to produce a typed value (`ChatExtractExt::extract::<T>`, `ChatExtractor`), through a response format or a forced tool, with passes, repair and retries around it. "Chat" qualifies it because it extends `ChatProvider`: ADR 0018 gives "extraction model" to a model class that does the same job without generating tokens, another operation. Its types carry the `Chat` prefix, its feature is `chat-extract`, its namespace `allama.chat.extraction`.
+Driving a chat model to produce a typed value (`ChatExtractExt::extract::<T>`, `ChatExtractor`), through a response format or a forced tool, with passes, repair and retries around it. "Chat" qualifies it because it extends `ChatProvider`: an extraction model (see Extraction models) does the same job without generating tokens, and is another operation. Its types carry the `Chat` prefix, its feature is `chat-extract`, its namespace `allama.chat.extraction`.
 _Avoid_: Extraction model (for this operation; within this section, "extraction" alone means chat extraction), structured output (for the operation; that is the request field it may use)
 
 **Extraction request**:
-The chat request an extraction derives its passes from (`ChatExtractor::extract(&provider, &request)`, `ChatExtractExt::extract`). Every field is kept except the extraction mode option, which extraction consumes, and the fields the selected mode replaces: the response format in native mode, the tools and tool choice in forced-tool mode. A request with tools of its own fails with `ToolConflict` in every mode, before sending, so the same request behaves the same on every provider. To extract from a conversation alone, the caller starts a fresh chat request from its messages, or clears the tools on a copy; chat extraction has no request type of its own.
+The chat request an extraction derives its passes from (`ChatExtractor::extract(&provider, &request)`, `ChatExtractExt::extract`). Every field is kept except the extraction mode option, which extraction consumes, and the fields the selected mode replaces: the response format in native mode, the tools and tool choice in forced-tool mode. A request with tools of its own fails with `ToolConflict` in every mode, before sending, so the same request behaves the same on every provider. To extract from a conversation alone, the caller starts a fresh chat request from its messages, or clears the tools on a copy; chat extraction has no request type of its own (`ExtractionRequest` is an extraction model's, see Extraction models).
 _Avoid_: Direct extraction, dedicated extraction, extraction orchestration
 
 **Extraction pass**:
@@ -418,7 +418,7 @@ _Avoid_: State
 
 **Question**:
 A named request for one answer about the decision input: a yes/no question, a choice among options, or a score on an ordered scale of levels. Questions are answered independently; answers are not passed to later questions.
-_Avoid_: Primitive, field
+_Avoid_: Primitive, field (an extraction model's request for a value)
 
 **Option**:
 One candidate answer of a choice question: a key the model can pick, with an optional description. The model reads both, so a key is prompt text.
@@ -446,6 +446,44 @@ _Avoid_: Rubric, criteria
 **Level**:
 One step of a score question's ordered scale, with a short label and an optional description. Levels are numbered from 0, lowest first, and a score answer is the probability-weighted average of their numbers, so the level nearest a score can be one the model gave probability 0 (a split between the ends of the scale averages to the middle); the most likely level is the one the model favoured.
 _Avoid_: Criterion, rubric entry
+
+### Extraction models
+
+**Extraction model**:
+A model that answers named, typed fields about an input with values instead of generating text: a text span, a number, a date, a time, a datetime, a duration, a list, an estimate inside declared bounds, or a forecast of a series, each scalar one a value or null with the probability that the input does not determine it. Every field is answered in one pass. A chat model asked for JSON is chat extraction, not an extraction model. In `allama` it is an `ExtractionProvider`, a sibling of chat, embeddings and decisions, and unstable (ADR 0018).
+_Avoid_: System One extraction model, regression model, extractor (the chat-side type)
+
+**Field (extraction)**:
+A named request for one value about the input, of one kind (`Field`): text, number, date, time, datetime, duration, list, estimate or forecast, with optional instructions and the parameters that define its answer (a unit, decimals, bounds, a grid, a horizon). Every parameter is semantic: a provider sends it as given or refuses the field. Distinct from a request field (`RequestField`, a field of a chat request a warning names) and from a Rust struct field of a typed decision (`DecisionField`); the decision glossary avoids "field" for a question for this reason.
+_Avoid_: Question (that is a decision's), slot, schema property
+
+**Answer (extraction)**:
+The value a field was answered with, of the field's kind (`Answer`): the value or null, the null probability, a span for text, items for a list, and a value, median and interval for an estimate. Provider statistics about an answer (a confidence, the guess a model would have made for a null) are provider data keyed by field name, as a decision's confidence is.
+_Avoid_: Prediction (for every kind), result
+
+**Null probability**:
+The probability a model reports that the input does not determine a scalar field's value (`null_probability`), `None` when the provider reports none. The value itself is the provider's determination: where its threshold falls is the provider's business (Clairic's is a per-field provider option), so an application that wants another threshold reads the probability, and the relation between the two is not checked.
+_Avoid_: `p_null` (the wire name), confidence, abstention (a decision's threshold)
+
+**Text span**:
+Where a text answer or a text list item was copied from: a byte range into the request's input, end exclusive, on `char` boundaries (`TextSpan`), so `span.text(&request.input)` is the value. Adapters place the provider's offsets, whatever their unit and whatever copy of the input the provider indexed, by conversion or by finding the value, and drop a span they cannot place with a warning: a wrong span is worse than none. The same word names a tracing span elsewhere; the type says which.
+_Avoid_: Offsets (the wire form), character range, citation (that is a chat annotation)
+
+**Estimate**:
+A field whose value the input gives evidence for without stating it, answered with a distribution summarised as a point value, a median and a prediction interval, inside the bounds the field declares, on a linear or logarithmic grid (`EstimateScale`). A value outside the bounds is an unexpected response; values are never clamped.
+_Avoid_: Guess (the provider's statistic for a null), regression output
+
+**Prediction interval**:
+A central interval of an estimate's distribution with the probability mass it holds (`PredictionInterval { low, high, probability }`): 0.8 for the 80% interval Clairic reports as `p10`–`p90`. The level is part of the interval, not assumed, so another provider's 90% interval reads the same way.
+_Avoid_: Confidence interval (a frequentist term for another thing), range, p10/p90 (the wire names)
+
+**Forecast**:
+A field that asks for future values of a series the input holds, one estimate per step ahead for a horizon of steps, each step a period long (`ForecastPeriod`: a minute, a day, a month, …, or one entry of the series). The answer has exactly `horizon` steps, nearest first.
+_Avoid_: Projection, time series (the input, not the field)
+
+**Reference date**:
+The calendar date that anchors dates the input writes without a year (`ExtractionRequest::reference_date`, a `Date`). Anchoring times and datetimes (a reference time, a time zone) is a known gap, not a choice.
+_Avoid_: Today, now, current date (as a field name)
 
 ### Embeddings
 

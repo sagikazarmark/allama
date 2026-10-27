@@ -144,6 +144,13 @@ where
     fn decision_request<'r>(&self, request: &'r DecisionRequest) -> Cow<'r, DecisionRequest> {
         self.mapped(request, &request.model, |r, model| r.model = model)
     }
+
+    fn extraction_request<'r>(
+        &self,
+        request: &'r crate::ExtractionRequest,
+    ) -> Cow<'r, crate::ExtractionRequest> {
+        self.mapped(request, &request.model, |r, model| r.model = model)
+    }
 }
 
 impl<P, F> ChatProvider for MapModelProvider<P, F>
@@ -257,6 +264,42 @@ where
 impl<P, F> fmt::Debug for MapModelProvider<P, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MapModelProvider").finish_non_exhaustive()
+    }
+}
+
+impl<P, F> crate::ExtractionProvider for MapModelProvider<P, F>
+where
+    P: crate::ExtractionProvider,
+    F: Fn(&str) -> Cow<'_, str> + Send + Sync,
+{
+    async fn extract_values(
+        &self,
+        request: &crate::ExtractionRequest,
+    ) -> Result<crate::ExtractionResponse> {
+        self.inner
+            .extract_values(&self.extraction_request(request))
+            .await
+    }
+
+    fn extraction_capability(
+        &self,
+        model: &str,
+        capability: crate::ExtractionCapability,
+    ) -> CapabilitySupport {
+        self.inner
+            .extraction_capability(&self.map_model(model), capability)
+    }
+
+    fn extraction_limits(&self, model: &str) -> crate::ExtractionLimits {
+        self.inner.extraction_limits(&self.map_model(model))
+    }
+
+    fn validate_extraction_request(
+        &self,
+        request: &crate::ExtractionRequest,
+    ) -> Result<crate::ExtractionValidation> {
+        self.inner
+            .validate_extraction_request(&self.extraction_request(request))
     }
 }
 
