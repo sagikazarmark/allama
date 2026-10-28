@@ -7,6 +7,11 @@
 //! The examples in `examples/` build their providers themselves, from a
 //! model address, the way an application reads its model from
 //! configuration; this library holds no setup for them.
+//!
+//! [`workspace`] lists the crates of the workspace for the tests that read
+//! every crate.
+
+pub mod workspace;
 
 /// The applications guide (`docs/guides/applications.md`), whose
 /// self-contained code blocks run as doc tests of this crate. Its

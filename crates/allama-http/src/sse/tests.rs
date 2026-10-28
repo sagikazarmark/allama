@@ -360,6 +360,40 @@ fn a_transport_error_ends_the_stream_after_the_buffered_events() {
     );
 }
 
+/// The root directory of every crate in the workspace, from `cargo
+/// metadata`, so the fixtures are found wherever the crates live; or `None`
+/// when this crate has no sibling crates (a packaged `allama-http` is tested
+/// on its own).
+#[cfg(not(target_arch = "wasm32"))]
+fn workspace_crates() -> Option<Vec<std::path::PathBuf>> {
+    let output = std::process::Command::new(env!("CARGO"))
+        .args([
+            "metadata",
+            "--no-deps",
+            "--offline",
+            "--format-version",
+            "1",
+        ])
+        .args([
+            "--manifest-path",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"),
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let metadata: Value = serde_json::from_slice(&output.stdout).ok()?;
+    let roots: Vec<std::path::PathBuf> = metadata["packages"]
+        .as_array()?
+        .iter()
+        .filter_map(|package| package["manifest_path"].as_str())
+        .filter_map(|manifest| std::path::Path::new(manifest).parent())
+        .map(std::path::Path::to_path_buf)
+        .collect();
+    (roots.len() > 1).then_some(roots)
+}
+
 /// The SSE fixtures of every provider crate, as `(path, contents)`, or
 /// `None` outside the workspace (a packaged `allama-http` has no sibling
 /// crates).
@@ -379,16 +413,13 @@ fn sse_fixtures() -> Option<Vec<(std::path::PathBuf, String)>> {
             }
         }
     }
-    let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let workspace = std::fs::read_to_string(crates.join("../Cargo.toml"))
-        .is_ok_and(|manifest| manifest.contains("[workspace]"));
-    if !workspace {
+    let Some(crates) = workspace_crates() else {
         eprintln!("skipped: the workspace SSE fixtures are not available");
         return None;
-    }
+    };
     let mut fixtures = Vec::new();
-    for entry in std::fs::read_dir(crates).unwrap().flatten() {
-        walk(&entry.path().join("fixtures"), &mut fixtures);
+    for root in &crates {
+        walk(&root.join("fixtures"), &mut fixtures);
     }
     fixtures.sort();
     Some(fixtures)

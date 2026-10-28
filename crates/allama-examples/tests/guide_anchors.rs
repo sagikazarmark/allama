@@ -1,14 +1,17 @@
 //! Links into the applications guide name one of its headings.
 //!
 //! Every link to a section of `docs/guides/applications.md`, from the
-//! Markdown files at the repository root, the Markdown and Rust files under
-//! `crates/` and `docs/`, and inside the guide itself, must match the anchor GitHub gives one of the guide's headings.
-//! Renaming or removing a heading then fails here instead of leaving a
-//! link that lands at the top of the page.
+//! Markdown files at the repository root, the Markdown and Rust files of
+//! every crate and under `docs/`, and inside the guide itself, must match
+//! the anchor GitHub gives one of the guide's headings. Renaming or removing
+//! a heading then fails here instead of leaving a link that lands at the top
+//! of the page.
 
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use allama_examples::workspace::Workspace;
 
 const GUIDE: &str = include_str!("../../../docs/guides/applications.md");
 
@@ -21,16 +24,18 @@ const LOCAL_LINK: &str = "](#";
 #[test]
 fn links_into_the_applications_guide_name_its_headings() {
     let headings = anchors(GUIDE);
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = Workspace::get();
+    let root = &workspace.root;
     let mut files = Vec::new();
-    for entry in fs::read_dir(&root).unwrap() {
+    for entry in fs::read_dir(root).unwrap() {
         let path = entry.unwrap().path();
         if path.extension().is_some_and(|extension| extension == "md") {
             files.push(path);
         }
     }
-    for dir in ["crates", "docs"] {
-        collect(&root.join(dir), &mut files);
+    collect(&root.join("docs"), &mut files);
+    for package in &workspace.packages {
+        collect(&package.root, &mut files);
     }
     assert!(
         files.iter().any(|file| file.ends_with("README.md")),
@@ -42,7 +47,7 @@ fn links_into_the_applications_guide_name_its_headings() {
         let text = fs::read_to_string(file).unwrap();
         for anchor in links(&text, GUIDE_LINK) {
             if !headings.contains(anchor) {
-                let file = file.strip_prefix(&root).unwrap_or(file);
+                let file = file.strip_prefix(root).unwrap_or(file);
                 broken.push(format!("{}: {GUIDE_LINK}{anchor}", file.display()));
             }
         }

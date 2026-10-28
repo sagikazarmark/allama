@@ -3103,6 +3103,39 @@ mod tests {
         assert_eq!(collected.response.usage.unwrap().output_tokens, Some(5));
     }
 
+    /// The root directory of every crate in the workspace, from `cargo
+    /// metadata`, so the fixtures are found wherever the crates live; or
+    /// `None` when this crate has no sibling crates (a packaged `allama`
+    /// is tested on its own).
+    fn workspace_crates() -> Option<Vec<std::path::PathBuf>> {
+        let output = std::process::Command::new(env!("CARGO"))
+            .args([
+                "metadata",
+                "--no-deps",
+                "--offline",
+                "--format-version",
+                "1",
+            ])
+            .args([
+                "--manifest-path",
+                concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"),
+            ])
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let metadata: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+        let roots: Vec<std::path::PathBuf> = metadata["packages"]
+            .as_array()?
+            .iter()
+            .filter_map(|package| package["manifest_path"].as_str())
+            .filter_map(|manifest| std::path::Path::new(manifest).parent())
+            .map(std::path::Path::to_path_buf)
+            .collect();
+        (roots.len() > 1).then_some(roots)
+    }
+
     /// Every recorded `*_events.json` stream fixture in the workspace, or
     /// `None` outside the workspace (a packaged `allama` has no sibling
     /// crates). In the workspace there are at least ten.
@@ -3119,16 +3152,13 @@ mod tests {
                 }
             }
         }
-        let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let workspace = std::fs::read_to_string(crates.join("../Cargo.toml"))
-            .is_ok_and(|manifest| manifest.contains("[workspace]"));
-        if !workspace {
+        let Some(crates) = workspace_crates() else {
             eprintln!("skipped: the workspace stream fixtures are not available");
             return None;
-        }
+        };
         let mut paths = Vec::new();
-        for entry in std::fs::read_dir(&crates).unwrap() {
-            visit(&entry.unwrap().path().join("fixtures"), &mut paths);
+        for root in &crates {
+            visit(&root.join("fixtures"), &mut paths);
         }
         paths.sort();
         assert!(paths.len() >= 10, "found {} fixtures", paths.len());

@@ -16,10 +16,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use allama_examples::workspace::Workspace;
 use serde_json::Value;
 
-fn workspace() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+/// The root directory of the `allama` crate.
+fn core() -> &'static Path {
+    &Workspace::get().package("allama").root
 }
 
 fn read(path: &Path) -> String {
@@ -28,7 +30,7 @@ fn read(path: &Path) -> String {
 
 /// `allama`'s golden: the kinds, and the codes core derives.
 fn core_golden() -> Value {
-    let path = workspace().join("crates/allama/tests/fixtures/warning_codes.json");
+    let path = core().join("tests/fixtures/warning_codes.json");
     serde_json::from_str(&read(&path)).unwrap()
 }
 
@@ -106,13 +108,13 @@ fn current() -> BTreeMap<String, Vec<String>> {
     let kinds = strings(&golden["kinds"]);
     let derived: BTreeSet<String> = strings(&golden["derived"]).into_iter().collect();
     let mut crates = BTreeMap::new();
-    for entry in std::fs::read_dir(workspace().join("crates")).unwrap() {
-        let dir = entry.unwrap().path();
-        if read(&dir.join("Cargo.toml")).contains("publish = false") {
-            continue;
-        }
+    for package in Workspace::get()
+        .packages
+        .iter()
+        .filter(|package| package.published)
+    {
         let mut files = Vec::new();
-        sources(&dir.join("src"), &mut files);
+        sources(&package.root.join("src"), &mut files);
         let mut found = BTreeSet::new();
         for file in files {
             for line in code_lines(&read(&file)) {
@@ -121,8 +123,7 @@ fn current() -> BTreeMap<String, Vec<String>> {
         }
         let codes: Vec<String> = found.difference(&derived).cloned().collect();
         if !codes.is_empty() {
-            let name = dir.file_name().unwrap().to_string_lossy().into_owned();
-            crates.insert(name, codes);
+            crates.insert(package.name.clone(), codes);
         }
     }
     crates
@@ -130,7 +131,7 @@ fn current() -> BTreeMap<String, Vec<String>> {
 
 #[test]
 fn every_crate_writes_the_codes_the_fixture_lists() {
-    let path = workspace().join("crates/allama-examples/tests/fixtures/warning_codes.json");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/warning_codes.json");
     let current = serde_json::to_value(current()).unwrap();
     let fixture: Value = serde_json::from_str(&read(&path)).unwrap();
     if current == fixture {
@@ -153,7 +154,7 @@ fn every_crate_writes_the_codes_the_fixture_lists() {
 /// code core names as a constant, and the `<kind>.<field>` rule.
 #[test]
 fn the_warning_docs_list_every_code() {
-    let docs = read(&workspace().join("crates/allama/src/warning.rs"));
+    let docs = read(&core().join("src/warning.rs"));
     let start = docs
         .find("//! # Warning codes")
         .expect("the warning docs have a codes section");
