@@ -8,7 +8,8 @@ use std::marker::PhantomData;
 
 use allama::adapter::Degradations;
 use allama::decision::{
-    Answer, ChoiceAnswer, DecisionInput, Question, ScoreAnswer, ScoreLevel, YesNoAnswer,
+    Answer, ChoiceAnswer, DecisionInput, LocateAnswer, Question, ScoreAnswer, ScoreLevel,
+    YesNoAnswer,
 };
 use allama::{
     DecisionRequest, DecisionResponse, Error, ExtraMap, MediaSource, Result, Subject, Usage,
@@ -23,7 +24,14 @@ use crate::options::{DecisionRequestOptions, KeepAlive};
 
 /// Request body fields that [`DecisionRequestOptions::extra`] must not
 /// replace.
-const RESERVED: &[&str] = &["model", "state", "questions", "keep_alive", "images"];
+const RESERVED: &[&str] = &[
+    "model",
+    "state",
+    "questions",
+    "keep_alive",
+    "images",
+    "assets",
+];
 
 /// The System One dialect an endpoint speaks: the protocol is the same, but
 /// some servers extend it.
@@ -31,6 +39,8 @@ const RESERVED: &[&str] = &["model", "state", "questions", "keep_alive", "images
 pub(crate) enum Dialect {
     /// TypeSafe's protocol, as its gateways forward it: no images.
     SystemOne,
+    /// TypeSafe's own API: images as `assets`, placed by reference.
+    TypeSafe,
     /// Ollama's: `keep_alive`, and images as bare base64.
     Ollama,
     /// Cloudflare Workers AI's (Clef models): the model's own URL, a model
@@ -46,13 +56,18 @@ pub(crate) enum Dialect {
 #[derive(Debug, Serialize)]
 pub(crate) struct WireRequest<'a> {
     model: &'a str,
-    state: &'a DecisionInput,
+    state: Cow<'a, DecisionInput>,
     #[serde(serialize_with = "serialize_entries")]
     questions: Vec<(&'a str, WireQuestion<'a>)>,
     #[serde(skip_serializing_if = "Option::is_none")]
     keep_alive: Option<&'a KeepAlive>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     images: Vec<WireImage<'a>>,
+    #[serde(
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "serialize_entries"
+    )]
+    assets: Assets<'a>,
     #[serde(flatten)]
     extra: &'a ExtraMap,
 }
@@ -74,6 +89,8 @@ enum WireQuestion<'a> {
         instructions: &'a str,
         criteria: Vec<Cow<'a, str>>,
     },
+    /// A locate question (TypeSafe's name).
+    Box { instructions: &'a str },
 }
 
 #[derive(Debug, Serialize)]
@@ -101,6 +118,25 @@ enum WireImage<'a> {
         content_type: &'a str,
         base64: &'a str,
     },
+}
+
+/// TypeSafe's `assets`: each under the reference string the request uses
+/// for it.
+type Assets<'a> = Vec<(String, WireAsset<'a>)>;
+
+/// A TypeSafe asset: an image the request refers to by its key.
+#[derive(Debug, Serialize)]
+struct WireAsset<'a> {
+    #[serde(rename = "type")]
+    kind: &'static str,
+    format: &'static str,
+    data_base64: &'a str,
+}
+
+/// An image's inline data, checked for every dialect.
+struct InlineImage<'a> {
+    media_type: &'a str,
+    data: &'a str,
 }
 
 /// Encode a portable request for `dialect`, reporting through `d`. The
@@ -143,15 +179,28 @@ pub(crate) fn encode_parts<'a>(
         .iter()
         .map(|(name, question)| Ok((name.as_str(), encode_question(name, question)?)))
         .collect::<Result<_>>()?;
+    let inline = inline_images(request, dialect, d)?;
+    let (state, images, assets) = match dialect {
+        Dialect::TypeSafe => {
+            let (state, assets) = typesafe_assets(request, extra, &inline, d)?;
+            (state, Vec::new(), assets)
+        }
+        Dialect::SystemOne | Dialect::Ollama | Dialect::WorkersAi => (
+            Cow::Borrowed(&request.input),
+            encode_images(&inline, dialect),
+            Vec::new(),
+        ),
+    };
     Ok(WireRequest {
         model: match dialect {
             Dialect::WorkersAi => workers_ai_selector(&request.model),
-            Dialect::SystemOne | Dialect::Ollama => &request.model,
+            Dialect::SystemOne | Dialect::TypeSafe | Dialect::Ollama => &request.model,
         },
-        state: &request.input,
+        state,
         questions,
         keep_alive,
-        images: encode_images(request, dialect, d)?,
+        images,
+        assets,
         extra,
     })
 }
@@ -163,14 +212,13 @@ pub(crate) fn workers_ai_selector(model: &str) -> &str {
     model.rsplit('/').next().unwrap_or(model)
 }
 
-/// The request's images as `dialect` takes them: inline data only, since
-/// no System One server downloads a URL. An image detail is a hint none of
-/// them reads.
-fn encode_images<'a>(
+/// The request's images as inline data: no System One server downloads a
+/// URL. An image detail is a hint none of them reads.
+fn inline_images<'a>(
     request: &'a DecisionRequest,
     dialect: Dialect,
     d: &mut Degradations,
-) -> Result<Vec<WireImage<'a>>> {
+) -> Result<Vec<InlineImage<'a>>> {
     if dialect == Dialect::SystemOne && !request.images.is_empty() {
         return Err(d.reject(
             Subject::Other {
@@ -199,15 +247,148 @@ fn encode_images<'a>(
                 "System One has no image detail setting; the image was sent without it",
             )?;
         }
-        images.push(match dialect {
-            Dialect::SystemOne | Dialect::Ollama => WireImage::Bare(data),
-            Dialect::WorkersAi => WireImage::Typed {
-                content_type: image.resolved_media_type()?.unwrap_or(media_type),
-                base64: data,
-            },
+        images.push(InlineImage {
+            media_type: image.resolved_media_type()?.unwrap_or(media_type),
+            data,
         });
     }
     Ok(images)
+}
+
+/// The images as Ollama (bare base64) or Workers AI (with the media type)
+/// takes them.
+fn encode_images<'a>(images: &[InlineImage<'a>], dialect: Dialect) -> Vec<WireImage<'a>> {
+    images
+        .iter()
+        .map(|image| match dialect {
+            Dialect::WorkersAi => WireImage::Typed {
+                content_type: image.media_type,
+                base64: image.data,
+            },
+            Dialect::SystemOne | Dialect::TypeSafe | Dialect::Ollama => WireImage::Bare(image.data),
+        })
+        .collect()
+}
+
+/// The images as TypeSafe takes them: each an asset under a reference
+/// string, and the references appended to the state, so the model reads
+/// them with the input and every question is about both. The state keeps
+/// its shape, so the paths questions refer to stay valid: text gains the
+/// references after a blank line, a JSON array gains them as elements, and
+/// a JSON object gains an `images` array.
+fn typesafe_assets<'a>(
+    request: &'a DecisionRequest,
+    extra: &ExtraMap,
+    images: &[InlineImage<'a>],
+    d: &mut Degradations,
+) -> Result<(Cow<'a, DecisionInput>, Assets<'a>)> {
+    if images.is_empty() {
+        return Ok((Cow::Borrowed(&request.input), Vec::new()));
+    }
+    let mut assets = Vec::with_capacity(images.len());
+    for (index, (image, reference)) in images
+        .iter()
+        .zip(image_references(request, extra, images.len())?)
+        .enumerate()
+    {
+        let format = typesafe_format(image.media_type).ok_or_else(|| {
+            d.reject(
+                Subject::Other {
+                    name: format!("image {index}"),
+                },
+                format!(
+                    "TypeSafe takes PNG and JPEG images only, not `{}`; convert the image first",
+                    image.media_type
+                ),
+            )
+        })?;
+        assets.push((
+            reference,
+            WireAsset {
+                kind: "image",
+                format,
+                data_base64: image.data,
+            },
+        ));
+    }
+    let references: Vec<&str> = assets.iter().map(|(key, _)| key.as_str()).collect();
+    let state = if let Some(text) = request.input.as_text() {
+        DecisionInput::text(format!("{text}\n\n{}", references.join("\n")))
+    } else {
+        let json = request.input.to_json_string().unwrap_or_default();
+        let listed = serde_json::to_string(&references)?;
+        let listed = &listed[1..listed.len() - 1];
+        let appended = if let Some(elements) = json.strip_suffix(']') {
+            let separator = if elements == "[" { "" } else { "," };
+            format!("{elements}{separator}{listed}]")
+        } else {
+            let fields: BTreeMap<String, serde::de::IgnoredAny> = serde_json::from_str(&json)?;
+            if fields.contains_key(IMAGES_FIELD) {
+                return Err(d.reject(
+                    Subject::Other {
+                        name: "images".into(),
+                    },
+                    format!(
+                        "TypeSafe reads the request's images from the input's `{IMAGES_FIELD}` field, which this input already has; rename it"
+                    ),
+                ));
+            }
+            let fields = json.strip_suffix('}').unwrap_or(&json);
+            let separator = if fields == "{" { "" } else { "," };
+            format!("{fields}{separator}\"{IMAGES_FIELD}\":[{listed}]}}")
+        };
+        serde_json::from_str(&appended)?
+    };
+    Ok((Cow::Owned(state), assets))
+}
+
+/// The JSON object field the TypeSafe dialect lists image references in.
+const IMAGES_FIELD: &str = "images";
+
+/// TypeSafe's `format` for a media type: PNG or JPEG.
+fn typesafe_format(media_type: &str) -> Option<&'static str> {
+    match media_type.to_ascii_lowercase().as_str() {
+        "image/png" => Some("png"),
+        "image/jpeg" | "image/jpg" => Some("jpg"),
+        _ => None,
+    }
+}
+
+/// `count` references, `[image-0]`, `[image-1]`, and so on: TypeSafe
+/// replaces a reference wherever it occurs in the request's strings, so
+/// none may already occur in them. The closing bracket keeps `[image-1]`
+/// out of `[image-10]`. A salt (`[image-0-1]`) is added until no reference
+/// occurs in the input, the questions or `extra`.
+fn image_references(
+    request: &DecisionRequest,
+    extra: &ExtraMap,
+    count: usize,
+) -> Result<Vec<String>> {
+    let haystack = [
+        request.input.as_text().map_or_else(
+            || request.input.to_json_string().unwrap_or_default(),
+            str::to_owned,
+        ),
+        serde_json::to_string(&request.questions)?,
+        serde_json::to_string(extra)?,
+    ]
+    .concat();
+    let references = |salt: usize| -> Vec<String> {
+        (0..count)
+            .map(|index| match salt {
+                0 => format!("[image-{index}]"),
+                salt => format!("[image-{index}-{salt}]"),
+            })
+            .collect()
+    };
+    Ok((0..)
+        .map(references)
+        .find(|references| {
+            references
+                .iter()
+                .all(|reference| !haystack.contains(reference.as_str()))
+        })
+        .expect("a finite request cannot hold every salted reference"))
 }
 
 fn encode_question<'a>(name: &str, question: &'a Question) -> Result<WireQuestion<'a>> {
@@ -244,6 +425,9 @@ fn encode_question<'a>(name: &str, question: &'a Question) -> Result<WireQuestio
                 criteria,
             }
         }
+        Question::Locate(question) => WireQuestion::Box {
+            instructions: &question.instructions,
+        },
         other => {
             return Err(Error::unsupported(format!(
                 "System One has no {} questions (question {name:?})",
@@ -320,6 +504,21 @@ enum WireAnswer {
         #[serde(default)]
         confidence: Option<f64>,
     },
+    /// A locate answer: the box's edges as fractions of the image.
+    Box {
+        #[serde(rename = "box")]
+        edges: WireBox,
+        #[serde(default)]
+        confidence: Option<f64>,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+struct WireBox {
+    left: f64,
+    top: f64,
+    right: f64,
+    bottom: f64,
 }
 
 /// The decoded answers, each question's confidence statistic when the
@@ -355,6 +554,13 @@ pub(crate) fn decode(body: WireResponse) -> Result<Decoded> {
             } => {
                 confidence.extend(reported.map(|c| (name.clone(), c)));
                 ScoreAnswer::new(score, levels(&name, probabilities)?).into()
+            }
+            WireAnswer::Box {
+                edges,
+                confidence: reported,
+            } => {
+                confidence.extend(reported.map(|c| (name.clone(), c)));
+                LocateAnswer::new(edges.left, edges.top, edges.right, edges.bottom).into()
             }
         };
         answers.push((name, answer));
@@ -582,6 +788,64 @@ mod tests {
         );
         let err = encode_as(&request, &options, Dialect::SystemOne).unwrap_err();
         assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
+        let (typesafe, _) = encode_as(&request, &options, Dialect::TypeSafe).unwrap();
+        assert!(typesafe.get("images").is_none());
+        assert_eq!(
+            typesafe["assets"]["[image-1]"],
+            json!({"type": "image", "format": "jpg", "data_base64": "aG8="})
+        );
+    }
+
+    /// The references join the state in its own shape, so the paths
+    /// questions refer to stay valid.
+    #[test]
+    fn typesafe_appends_references_to_the_state_in_its_shape() {
+        let options = DecisionRequestOptions::default();
+        let state = |input: serde_json::Value| {
+            let request = DecisionRequest::new("jev-latest", input)
+                .question("q", Question::yes_no("?"))
+                .image(Image::base64("image/png", "aGk="));
+            encode_as(&request, &options, Dialect::TypeSafe).map(|(body, _)| body["state"].clone())
+        };
+        assert_eq!(
+            state(json!({"subject": "Refund", "body": "Charged twice"})).unwrap(),
+            json!({"subject": "Refund", "body": "Charged twice", "images": ["[image-0]"]})
+        );
+        assert_eq!(state(json!({})).unwrap(), json!({"images": ["[image-0]"]}));
+        assert_eq!(
+            state(json!(["first", "second"])).unwrap(),
+            json!(["first", "second", "[image-0]"])
+        );
+        assert_eq!(state(json!([])).unwrap(), json!(["[image-0]"]));
+        assert_eq!(state(json!("Look.")).unwrap(), json!("Look.\n\n[image-0]"));
+        // The input's own `images` field is not replaced.
+        let err = state(json!({"images": 2})).unwrap_err();
+        assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
+    }
+
+    /// TypeSafe replaces a reference wherever it occurs, so the references
+    /// avoid the request's own text.
+    #[test]
+    fn typesafe_references_avoid_the_requests_text() {
+        let request = DecisionRequest::new("jev-latest", "Compare [image-0] with [image-1-1].")
+            .question("q", Question::yes_no("Does [image-1] match?"))
+            .image(Image::base64("image/png", "aGk="))
+            .image(Image::base64("image/png", "aG8="));
+        let (body, _) = encode_as(
+            &request,
+            &DecisionRequestOptions::default(),
+            Dialect::TypeSafe,
+        )
+        .unwrap();
+        assert_eq!(
+            body["state"],
+            "Compare [image-0] with [image-1-1].\n\n[image-0-2]\n[image-1-2]"
+        );
+        let assets = body["assets"].as_object().unwrap();
+        assert_eq!(
+            assets.keys().collect::<Vec<_>>(),
+            ["[image-0-2]", "[image-1-2]"]
+        );
     }
 
     #[test]

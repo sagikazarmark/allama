@@ -23,7 +23,8 @@
 //! Images ([`DecisionRequest::images`](allama::DecisionRequest::images))
 //! go to Ollama and Cloudflare, whose models read them: which models do is
 //! model data, so [`DecisionCapability::ImageInput`] is `Unknown` there.
-//! TypeSafe's protocol, which the gateways forward, has none.
+//! TypeSafe's API takes them as a preview, opted into for each request that
+//! carries one; the gateways forward its protocol without them.
 
 use allama::{CapabilitySupport, DecisionCapability, DecisionLimits, Error, Result};
 
@@ -45,8 +46,8 @@ fn all_kinds(builder: ProviderBuilder) -> ProviderBuilder {
     })
 }
 
-/// [`all_kinds`] for an endpoint of TypeSafe's protocol, which takes no
-/// images.
+/// [`all_kinds`] for a gateway to TypeSafe, which forwards its protocol
+/// without images.
 fn typesafe_protocol(builder: ProviderBuilder) -> ProviderBuilder {
     all_kinds(builder).decision_capability(
         DecisionCapability::ImageInput,
@@ -155,7 +156,16 @@ fn typesafe_limits() -> DecisionLimits {
         .max_score_levels(10)
 }
 
-/// TypeSafe's hosted System One API (model `jev-latest`).
+/// TypeSafe's hosted System One API (models `jev-latest`, `jev-preview`).
+///
+/// Jev reads images, which TypeSafe calls a preview ("danger zone"): a
+/// request with images is sent the `TypeSafe-Danger-Zone-Images: true`
+/// header that opts into them. Each image goes in the body's `assets` under
+/// a reference, `[image-0]` and so on, and the references are appended to
+/// the state: after a blank line for text, as elements of a JSON array,
+/// and as an `images` array field of a JSON object (an input object with
+/// its own `images` field is refused). TypeSafe takes PNG and JPEG only;
+/// other media types are refused before sending.
 #[derive(Debug, Clone, Copy)]
 pub struct TypeSafe;
 
@@ -189,14 +199,16 @@ impl TypeSafe {
     ///
     /// Fails when the key is empty.
     pub fn builder(api_key: &str) -> Result<ProviderBuilder> {
-        Ok(typesafe_protocol(
+        Ok(all_kinds(
             Provider::builder()
                 .base_url(Self::BASE_URL)
                 .bearer_token(required("api_key", api_key)?)
                 .provider_name(Self::PROVIDER_NAME)
                 .request_id_header_name("x-typesafe-request-id")
-                .limits(typesafe_limits()),
-        ))
+                .limits(typesafe_limits())
+                .dialect(Dialect::TypeSafe),
+        )
+        .decision_capability(DecisionCapability::ImageInput, CapabilitySupport::Supported))
     }
 
     /// Create a provider from `TYPESAFE_API_KEY` and, when set,
@@ -816,6 +828,15 @@ mod tests {
             .unwrap();
         assert_eq!(
             typesafe.decision_capability("jev-latest", DecisionCapability::ImageInput),
+            CapabilitySupport::Supported
+        );
+        let gateway = OpenRouter::builder("k")
+            .unwrap()
+            .http_transport(allama_http::ReplayTransport::default())
+            .build()
+            .unwrap();
+        assert_eq!(
+            gateway.decision_capability("typesafe/jev-1.13", DecisionCapability::ImageInput),
             CapabilitySupport::Unsupported
         );
     }

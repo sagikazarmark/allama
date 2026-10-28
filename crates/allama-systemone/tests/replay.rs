@@ -653,8 +653,8 @@ async fn success_status_errors_keep_their_headers() {
 }
 
 /// `keep_alive` is Ollama's; another endpoint is not sent it, and
-/// the hint is dropped with a warning. TypeSafe's protocol takes no images,
-/// so they are refused before sending.
+/// the hint is dropped with a warning. The gateways forward TypeSafe's
+/// protocol without images, so they are refused before sending.
 #[tokio::test]
 async fn ollama_options_go_to_ollama_only() {
     let request = || DecisionRequest::new("nimble", "x").question("q", Question::yes_no("?"));
@@ -688,11 +688,151 @@ async fn ollama_options_go_to_ollama_only() {
         .unwrap();
     assert!(sent_body(&transport).get("keep_alive").is_none());
     assert_eq!(response.warnings.len(), 1, "{:?}", response.warnings);
-    let err = provider
+    let gateway = OpenRouter::builder("or-key")
+        .unwrap()
+        .http_transport(ReplayTransport::default())
+        .build()
+        .unwrap();
+    let err = gateway
         .validate_decision_request(&with_image())
         .unwrap_err();
     assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
     assert!(err.message().contains("does not take images"), "{err}");
+}
+
+/// TypeSafe takes images as `assets` the state refers to, behind its
+/// opt-in header, which only a request with images is sent.
+#[tokio::test]
+async fn typesafe_images_are_assets_the_state_refers_to() {
+    let answer = r#"{"model":"jev-1.13.0","answers":{"q":{"type":"noul","noul":0.9}}}"#;
+    let transport = ReplayTransport::new([
+        ReplayResponse::json(200, answer),
+        ReplayResponse::json(200, answer),
+    ]);
+    let provider = typesafe(&transport);
+    let request = DecisionRequest::new("jev-latest", "Checkout fails with this error.")
+        .question("q", Question::yes_no("Is this an outage?"));
+    provider.decide(&request).await.unwrap();
+    provider
+        .decide(
+            &request
+                .clone()
+                .image(Image::base64("image/png", "aGk="))
+                .image(Image::base64("image/jpeg", "aG8=")),
+        )
+        .await
+        .unwrap();
+
+    let requests = transport.requests();
+    assert_eq!(requests[0].headers.get("typesafe-danger-zone-images"), None);
+    let plain: Value = serde_json::from_str(requests[0].body_text().unwrap()).unwrap();
+    assert_eq!(plain["state"], "Checkout fails with this error.");
+    assert!(plain.get("assets").is_none());
+
+    assert_eq!(
+        requests[1].headers.get("typesafe-danger-zone-images"),
+        Some("true")
+    );
+    let body: Value = serde_json::from_str(requests[1].body_text().unwrap()).unwrap();
+    assert_eq!(
+        body["state"],
+        "Checkout fails with this error.\n\n[image-0]\n[image-1]"
+    );
+    assert_eq!(
+        body["assets"],
+        json!({
+            "[image-0]": {"type": "image", "format": "png", "data_base64": "aGk="},
+            "[image-1]": {"type": "image", "format": "jpg", "data_base64": "aG8="}
+        })
+    );
+    assert!(body.get("images").is_none());
+
+    // TypeSafe reads PNG and JPEG only.
+    let err = provider
+        .validate_decision_request(&request.image(Image::base64("image/webp", "aGk=")))
+        .unwrap_err();
+    assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
+    assert!(err.message().contains("PNG and JPEG"), "{err}");
+}
+
+/// A locate question is TypeSafe's `box`, sent with the image behind the
+/// images header; its answer is the box's edges, and its confidence
+/// provider data.
+#[tokio::test]
+async fn typesafe_locate_round_trip() {
+    let transport = ReplayTransport::new([ReplayResponse::json(200, fixture("typesafe/box.json"))]);
+    let request = DecisionRequest::new("jev-preview", json!({"caption": "A kitchen."}))
+        .image(Image::base64("image/jpeg", "/9j/"))
+        .question("mug", Question::locate("the coffee mug in `images`"));
+    let response = typesafe(&transport).decide(&request).await.unwrap();
+
+    let sent = &transport.requests()[0];
+    assert_eq!(
+        sent.headers.get("typesafe-danger-zone-images"),
+        Some("true")
+    );
+    assert_eq!(
+        sent_body(&transport),
+        json!({
+            "model": "jev-preview",
+            "state": {"caption": "A kitchen.", "images": ["[image-0]"]},
+            "questions": {
+                "mug": {"type": "box", "instructions": "the coffee mug in `images`"}
+            },
+            "assets": {
+                "[image-0]": {"type": "image", "format": "jpg", "data_base64": "/9j/"}
+            }
+        })
+    );
+
+    let mug = response.locate("mug").unwrap();
+    assert_eq!(
+        (mug.left, mug.top, mug.right, mug.bottom),
+        (0.44, 0.25, 0.84, 0.82)
+    );
+    assert_eq!(response.model.as_deref(), Some("jev-1.14.0"));
+    let confidence = response.provider_data.get::<Confidence>().unwrap().unwrap();
+    assert_eq!(confidence.0["mug"], 0.92);
+
+    // Without an image the request is refused before sending.
+    let err = typesafe(&ReplayTransport::default())
+        .validate_decision_request(
+            &DecisionRequest::new("jev-preview", "A kitchen.")
+                .question("mug", Question::locate("the coffee mug")),
+        )
+        .unwrap_err();
+    assert!(matches!(err, Error::InvalidRequest { .. }), "{err:?}");
+}
+
+/// `long_context` is TypeSafe's opt-in header; another endpoint drops it
+/// with a warning.
+#[tokio::test]
+async fn long_context_goes_to_typesafe_only() {
+    let request = || {
+        DecisionRequest::new("jev-latest", "x")
+            .question("q", Question::yes_no("?"))
+            .with_option(DecisionRequestOptions::new().long_context(true))
+    };
+    let answer = r#"{"model":"jev-1.13.0","answers":{"q":{"type":"noul","noul":0.1}}}"#;
+    let transport = ReplayTransport::new([ReplayResponse::json(200, answer)]);
+    let response = typesafe(&transport).decide(&request()).await.unwrap();
+    let sent = &transport.requests()[0];
+    assert_eq!(
+        sent.headers.get("typesafe-danger-zone-long-context"),
+        Some("true")
+    );
+    assert!(sent_body(&transport).get("long_context").is_none());
+    assert!(response.warnings.is_empty(), "{:?}", response.warnings);
+
+    let transport = ReplayTransport::new([ReplayResponse::json(200, answer)]);
+    let response = ollama(&transport).decide(&request()).await.unwrap();
+    assert_eq!(
+        transport.requests()[0]
+            .headers
+            .get("typesafe-danger-zone-long-context"),
+        None
+    );
+    assert_eq!(response.warnings.len(), 1, "{:?}", response.warnings);
 }
 
 /// Builder headers go with every request
