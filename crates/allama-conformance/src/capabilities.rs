@@ -460,9 +460,11 @@ mod tests {
     use super::*;
     use allama::mock::{MockEmbeddingProvider, MockProvider};
 
-    // The crate root doubles as the "fixture directory" here; its parent
-    // (`crates/`) has no sources, so test names resolve against nothing
-    // unless a test points at this crate explicitly.
+    // The crate root doubles as the "fixture directory" here, so the "crate
+    // root" `assert_backed` derives from it is the directory holding the
+    // workspace's crates, which has no `src`, `tests` or `examples`; test
+    // names then resolve against nothing unless a test points at this crate
+    // explicitly (`src_fixtures`).
     fn fixtures() -> FixtureDir {
         FixtureDir::new(env!("CARGO_MANIFEST_DIR"))
     }

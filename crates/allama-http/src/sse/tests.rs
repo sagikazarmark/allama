@@ -1,4 +1,6 @@
 use futures_util::{FutureExt, StreamExt, stream};
+// Only the fixture tests below read JSON, and they do not run on `wasm32`.
+#[cfg(not(target_arch = "wasm32"))]
 use serde_json::Value;
 
 use super::*;
@@ -362,8 +364,8 @@ fn a_transport_error_ends_the_stream_after_the_buffered_events() {
 
 /// The root directory of every crate in the workspace, from `cargo
 /// metadata`, so the fixtures are found wherever the crates live; or `None`
-/// when this crate has no sibling crates (a packaged `allama-http` is tested
-/// on its own).
+/// when this crate has no sibling crates: a packaged `allama-http`, whose
+/// tests build without `reqwest` (see the note on the `reqwest` tests).
 #[cfg(not(target_arch = "wasm32"))]
 fn workspace_crates() -> Option<Vec<std::path::PathBuf>> {
     let output = std::process::Command::new(env!("CARGO"))
@@ -396,7 +398,7 @@ fn workspace_crates() -> Option<Vec<std::path::PathBuf>> {
 
 /// The SSE fixtures of every provider crate, as `(path, contents)`, or
 /// `None` outside the workspace (a packaged `allama-http` has no sibling
-/// crates).
+/// crates; see [`workspace_crates`]).
 #[cfg(not(target_arch = "wasm32"))]
 fn sse_fixtures() -> Option<Vec<(std::path::PathBuf, String)>> {
     fn walk(dir: &std::path::Path, out: &mut Vec<(std::path::PathBuf, String)>) {

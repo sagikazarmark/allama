@@ -305,6 +305,9 @@ fn classify(
     TransportError::new(kind, message)
 }
 
+// These tests need `allama-conformance`, a path-only dev-dependency that
+// publishing strips (it depends on this crate), so a packaged `allama-http`
+// builds its tests only without `reqwest`.
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use std::time::Duration;
