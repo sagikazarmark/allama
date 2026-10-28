@@ -12,8 +12,9 @@
 //! - **Aggregates** ([`adapter`]): [`assert_chat_adapter`] runs every
 //!   probe-based chat contract below against an adapter from one
 //!   [`AdapterUnderTest`], and grows with the crate;
-//!   [`assert_embedding_adapter`] and [`assert_decision_adapter`] do the
-//!   same for embeddings and decisions. A contract whose input is missing
+//!   [`assert_embedding_adapter`], [`assert_decision_adapter`] and
+//!   [`assert_extraction_adapter`] do the same for embeddings, decisions
+//!   and extractions. A contract whose input is missing
 //!   fails the aggregate unless it is listed in `skip`, so nothing is skipped
 //!   silently. For wrappers, [`assert_chat_wrapper`] (and
 //!   [`assert_wrapper`], [`assert_embedding_wrapper`],
@@ -159,11 +160,13 @@
 //! - the capability answers
 //!   ([`chat_capability`](allama::ChatProvider::chat_capability),
 //!   [`embedding_capability`](allama::EmbeddingProvider::embedding_capability),
-//!   [`decision_capability`](allama::DecisionProvider::decision_capability)),
-//!   which drive validation and extraction's `Auto` mode;
+//!   [`decision_capability`](allama::DecisionProvider::decision_capability),
+//!   [`extraction_capability`](allama::ExtractionProvider::extraction_capability)),
+//!   which drive validation and chat extraction's `Auto` mode;
 //! - the limits
 //!   ([`embedding_limits`](allama::EmbeddingProvider::embedding_limits),
-//!   [`decision_limits`](allama::DecisionProvider::decision_limits));
+//!   [`decision_limits`](allama::DecisionProvider::decision_limits),
+//!   [`extraction_limits`](allama::ExtractionProvider::extraction_limits));
 //! - request validation
 //!   ([`validate_chat_request`](allama::ChatProvider::validate_chat_request),
 //!   [`validate_chat_stream_request`](allama::ChatProvider::validate_chat_stream_request),
@@ -197,6 +200,7 @@
 //! | [`ChatProvider`](allama::ChatProvider) | [`assert_chat_wrapper`] |
 //! | [`EmbeddingProvider`](allama::EmbeddingProvider) | [`assert_embedding_wrapper`] |
 //! | [`DecisionProvider`](allama::DecisionProvider) | [`assert_decision_wrapper`] |
+//! | [`ExtractionProvider`](allama::ExtractionProvider) (unstable, ADR 0018; not part of `assert_wrapper`) | [`assert_extraction_wrapper`] |
 //! | [`ProviderIdentity`](allama::ProviderIdentity) only | [`assert_transparent_identity`] |
 //! | a model mapping, every trait | [`assert_transparent_model_mapping`] |
 //! | a model mapping, [`ChatProvider`](allama::ChatProvider) | [`assert_transparent_chat_model_mapping`] |
@@ -210,7 +214,10 @@
 //! [`assert_transparent_embedding_data_path`] and
 //! [`assert_transparent_decision_data_path`]) are provisional: the
 //! aggregates run them, and on their own they may change or go in any
-//! minor release (ADR 0017).
+//! minor release (ADR 0017). The extraction parts
+//! ([`assert_transparent_extraction_wrapper`],
+//! [`assert_transparent_extraction_data_path`]) follow the trait's
+//! unstable status (ADR 0018).
 //!
 //! Wrappers that combine several providers or change requests on purpose
 //! pass when every inner provider is the probe: `FallbackProvider` reports
@@ -243,8 +250,9 @@
 //!   test reaches the server over `allama-http`'s `reqwest` transport, so a
 //!   crate whose own `reqwest` feature is off in the test build adds
 //!   `allama-http` with that feature as a dev-dependency.
-//! - `extract` (default): the extraction scenarios in [`e2e`] (requires
-//!   `allama/extract`).
+//! - `chat-extract` (default): the chat extraction scenarios in [`e2e`]
+//!   (requires `allama/chat-extract`); `extract` is its former name, kept
+//!   as an alias.
 //!
 //! The contracts that wait ([`assert_retry_respects_hint`]) need a Tokio
 //! runtime with timers, such as `#[tokio::test]`.
@@ -292,8 +300,9 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 pub use adapter::{
-    AdapterUnderTest, Contract, DecisionAdapterUnderTest, EmbeddingAdapterUnderTest, KnownGap,
-    assert_chat_adapter, assert_decision_adapter, assert_embedding_adapter,
+    AdapterUnderTest, Contract, DecisionAdapterUnderTest, EmbeddingAdapterUnderTest,
+    ExtractionAdapterUnderTest, KnownGap, assert_chat_adapter, assert_decision_adapter,
+    assert_embedding_adapter, assert_extraction_adapter,
 };
 pub use decoding::ResponseCapture;
 pub use error_kinds::assert_error_kinds_mapped;
@@ -308,16 +317,19 @@ pub use stream_end::assert_stream_ends_classified;
 pub use stream_errors::assert_stream_errors_classified;
 pub use transparency::{
     TransparencyProbe, assert_chat_wrapper, assert_decision_wrapper, assert_embedding_wrapper,
-    assert_transparent_chat_data_path, assert_transparent_chat_model_mapping,
-    assert_transparent_chat_wrapper, assert_transparent_decision_data_path,
-    assert_transparent_decision_wrapper, assert_transparent_embedding_data_path,
-    assert_transparent_embedding_wrapper, assert_transparent_identity,
-    assert_transparent_model_mapping, assert_transparent_wrapper, assert_wrapper,
+    assert_extraction_wrapper, assert_transparent_chat_data_path,
+    assert_transparent_chat_model_mapping, assert_transparent_chat_wrapper,
+    assert_transparent_decision_data_path, assert_transparent_decision_wrapper,
+    assert_transparent_embedding_data_path, assert_transparent_embedding_wrapper,
+    assert_transparent_extraction_data_path, assert_transparent_extraction_wrapper,
+    assert_transparent_identity, assert_transparent_model_mapping, assert_transparent_wrapper,
+    assert_wrapper,
 };
 pub use transport_options::{TransportOutcome, assert_transport_options_applied};
 pub use validation::{
     assert_decision_validation_agrees, assert_embedding_validation_agrees,
-    assert_validation_agrees, decision_drift_requests, drift_requests, embedding_drift_requests,
+    assert_extraction_validation_agrees, assert_validation_agrees, decision_drift_requests,
+    drift_requests, embedding_drift_requests, extraction_drift_requests,
 };
 
 /// A directory of fixture files, usually `<crate>/fixtures/`.

@@ -11,6 +11,11 @@
   "allama-anthropic": [
     "approximated.tool_call_arguments"
   ],
+  "allama-cloudflare": [
+    "approximated.input_truncated",
+    "dropped.provider_name_options",
+    "dropped.span"
+  ],
   "allama-cloudflare-worker": [
     "approximated.tool_result_error",
     "dropped.provider_name_options"

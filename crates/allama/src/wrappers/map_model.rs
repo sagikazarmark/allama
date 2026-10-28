@@ -6,7 +6,9 @@ use crate::{
     CapabilitySupport, ChatCapability, ChatProvider, ChatRequest, ChatResponse, ChatValidation,
     DecisionCapability, DecisionLimits, DecisionProvider, DecisionRequest, DecisionResponse,
     DecisionValidation, EmbeddingCapability, EmbeddingLimits, EmbeddingProvider, EmbeddingRequest,
-    EmbeddingResponse, EmbeddingValidation, ProviderIdentity, Result,
+    EmbeddingResponse, EmbeddingValidation, ExtractionCapability, ExtractionLimits,
+    ExtractionProvider, ExtractionRequest, ExtractionResponse, ExtractionValidation,
+    ProviderIdentity, Result,
 };
 
 /// Rewrites model ids before requests reach the wrapped provider.
@@ -144,6 +146,10 @@ where
     fn decision_request<'r>(&self, request: &'r DecisionRequest) -> Cow<'r, DecisionRequest> {
         self.mapped(request, &request.model, |r, model| r.model = model)
     }
+
+    fn extraction_request<'r>(&self, request: &'r ExtractionRequest) -> Cow<'r, ExtractionRequest> {
+        self.mapped(request, &request.model, |r, model| r.model = model)
+    }
 }
 
 impl<P, F> ChatProvider for MapModelProvider<P, F>
@@ -233,6 +239,39 @@ where
     fn validate_decision_request(&self, request: &DecisionRequest) -> Result<DecisionValidation> {
         self.inner
             .validate_decision_request(&self.decision_request(request))
+    }
+}
+
+impl<P, F> ExtractionProvider for MapModelProvider<P, F>
+where
+    P: ExtractionProvider,
+    F: Fn(&str) -> Cow<'_, str> + Send + Sync,
+{
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        self.inner
+            .extract_values(&self.extraction_request(request))
+            .await
+    }
+
+    fn extraction_capability(
+        &self,
+        model: &str,
+        capability: ExtractionCapability,
+    ) -> CapabilitySupport {
+        self.inner
+            .extraction_capability(&self.map_model(model), capability)
+    }
+
+    fn extraction_limits(&self, model: &str) -> ExtractionLimits {
+        self.inner.extraction_limits(&self.map_model(model))
+    }
+
+    fn validate_extraction_request(
+        &self,
+        request: &ExtractionRequest,
+    ) -> Result<ExtractionValidation> {
+        self.inner
+            .validate_extraction_request(&self.extraction_request(request))
     }
 }
 

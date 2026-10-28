@@ -451,11 +451,13 @@ async fn the_adapter_passes_every_contract() {
 
 /// Extraction refusals: a `content_filter` finish fails extraction
 /// before parsing, unary and streamed. The binding cannot run here, so the
-/// decoded responses go through `Extractor::parse`, the step a call ends
+/// decoded responses go through `ChatExtractor::parse`, the step a call ends
 /// with.
 #[tokio::test]
 async fn content_filter_finishes_fail_extraction() {
-    use allama::extract::{ExtractError, ExtractionMode, Extractor, RefusalSource};
+    use allama::chat::extract::{
+        ChatExtractError, ChatExtractionMode, ChatExtractor, RefusalSource,
+    };
     use allama::{ChatStreamExt, FinishReason};
 
     #[derive(Debug, serde::Deserialize, allama::schemars::JsonSchema)]
@@ -466,8 +468,8 @@ async fn content_filter_finishes_fail_extraction() {
     }
 
     fn assert_refused(response: allama::ChatResponse) {
-        let error = Extractor::new()
-            .parse::<Invoice>(response, ExtractionMode::Native)
+        let error = ChatExtractor::new()
+            .parse::<Invoice>(response, ChatExtractionMode::Native)
             .unwrap_err();
         let allama::Error::Extract { failure, .. } = error else {
             panic!("an extraction failure expected: {error:?}");
@@ -475,7 +477,7 @@ async fn content_filter_finishes_fail_extraction() {
         assert!(
             matches!(
                 failure.error(),
-                ExtractError::Refused {
+                ChatExtractError::Refused {
                     finish_reason: Some(FinishReason::ContentFilter),
                     source: RefusalSource::None,
                     ..

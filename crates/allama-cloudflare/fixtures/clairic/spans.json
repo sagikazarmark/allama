@@ -1,0 +1,70 @@
+{
+  "result": {
+    "model": "clairic",
+    "answers": {
+      "new_ref": {
+        "type": "text",
+        "p_null": 1.2e-05,
+        "span": [
+          63,
+          66
+        ],
+        "guess": "B-2",
+        "confidence": 0.998,
+        "value": "B-2"
+      },
+      "old_ref": {
+        "type": "text",
+        "p_null": 0.0003,
+        "span": [
+          35,
+          38
+        ],
+        "guess": "A-1",
+        "confidence": 0.91,
+        "value": "A-1"
+      },
+      "refs": {
+        "type": "list",
+        "value": [
+          "A-1",
+          "A-1",
+          "B-2"
+        ],
+        "spans": [
+          [
+            16,
+            19
+          ],
+          [
+            35,
+            38
+          ],
+          [
+            63,
+            66
+          ]
+        ]
+      },
+      "delivered_on": {
+        "type": "date",
+        "p_null": 0.02,
+        "guess": "2026-03-03",
+        "confidence": 0.9,
+        "value": "2026-03-03"
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 40,
+      "image_tokens": 0,
+      "schema_tokens": 120,
+      "input_tokens": 160,
+      "output_tokens": 0,
+      "passes": 1
+    }
+  },
+  "success": true,
+  "errors": [],
+  "messages": []
+}

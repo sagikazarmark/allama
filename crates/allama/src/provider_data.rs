@@ -47,13 +47,13 @@
 //! field, an adapter also stores the explanation's text, verbatim, under
 //! its namespace and the [`DECLINE_EXPLANATION_KEY`] key, so code that
 //! reports a decline (extraction's
-//! [`ExtractError::Refused`][crate::extract::ExtractError::Refused]) can
+//! [`ChatExtractError::Refused`][crate::chat::extract::ChatExtractError::Refused]) can
 //! quote it without knowing the provider. A refusal the model writes
 //! itself is content, not provider data.
 //!
 #![cfg_attr(
-    not(feature = "extract"),
-    doc = "[crate::extract::ExtractError::Refused]: crate#cargo-features"
+    not(feature = "chat-extract"),
+    doc = "[crate::chat::extract::ChatExtractError::Refused]: crate#cargo-features"
 )]
 
 use std::collections::BTreeMap;

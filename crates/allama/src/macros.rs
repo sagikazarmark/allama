@@ -186,12 +186,50 @@ mod tests {
         assert_eq!(DecisionCapability::VARIANTS, DecisionCapability::ALL);
     }
 
-    #[cfg(feature = "extract")]
+    /// The extraction enums round-trip the same way; their names are not
+    /// persisted names (the module is unstable, ADR 0018).
+    #[test]
+    fn every_extraction_model_enum_round_trips_through_its_name() {
+        use crate::ExtractionCapability;
+        use crate::extraction::{
+            DurationUnit, EstimateScale, FieldKind, ForecastPeriod, ListItemKind,
+        };
+
+        let kinds = [
+            "text", "number", "date", "time", "datetime", "duration", "list", "estimate",
+            "forecast",
+        ];
+        names_agree(FieldKind::VARIANTS, &kinds);
+        let mut capabilities = kinds.to_vec();
+        capabilities.push("image_input");
+        names_agree(ExtractionCapability::VARIANTS, &capabilities);
+        names_agree(
+            DurationUnit::VARIANTS,
+            &[
+                "seconds", "minutes", "hours", "days", "weeks", "months", "years",
+            ],
+        );
+        names_agree(ListItemKind::VARIANTS, &["text", "number", "date"]);
+        names_agree(EstimateScale::VARIANTS, &["linear", "log"]);
+        names_agree(
+            ForecastPeriod::VARIANTS,
+            &[
+                "step", "minute", "hour", "day", "week", "month", "quarter", "year",
+            ],
+        );
+        assert_eq!(FieldKind::VARIANTS, FieldKind::ALL);
+        assert_eq!(ExtractionCapability::VARIANTS, ExtractionCapability::ALL);
+    }
+
+    #[cfg(feature = "chat-extract")]
     #[test]
     fn every_extraction_enum_round_trips_through_its_name() {
-        use crate::extract::{ExtractionMode, SchemaEnforcement};
+        use crate::chat::extract::{ChatExtractionMode, SchemaEnforcement};
 
-        names_agree(ExtractionMode::VARIANTS, &["auto", "native", "forced_tool"]);
+        names_agree(
+            ChatExtractionMode::VARIANTS,
+            &["auto", "native", "forced_tool"],
+        );
         names_agree(
             SchemaEnforcement::VARIANTS,
             &["exact", "approximate", "not_enforced"],

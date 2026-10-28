@@ -6,6 +6,10 @@ Provider-agnostic language for low-level LLM operations and their normalized beh
 
 ### Chat, messages, streaming and tools
 
+**Chat**:
+The operation of a `ChatProvider`: one assistant turn produced from messages, with tools, whether or not a conversation follows (a one-shot summary is chat too). It names the operation, not the model class; "completion" names the legacy prompt-continuation API and an OpenAI endpoint.
+_Avoid_: Completion, generation, text generation (for the operation)
+
 **Content block**:
 One piece of a model's output in an assistant message or response (`ContentBlock`): text, an image, a tool call, reasoning, a refusal, a provider tool call or result, or other content. Blocks keep the order the model produced them in, and a stream builds each one between its `BlockStart` and `BlockStop`.
 _Avoid_: Content part (for output), message part, chunk
@@ -233,7 +237,7 @@ The key under which a provider's provider data lives, such as `anthropic`, `goog
 _Avoid_: Origin (as a separate concept), provider id
 
 **Options namespace**:
-The key a request options type is read under (`ProviderOptions::NAMESPACE`), and the key of its JSON form in `with_options_json`. It usually equals the provider's namespace, but need not: every OpenAI-compatible preset reads options under `openai-compat` and stores state under `openai-compat:groq`, `openai-compat:ollama`, and so on. Some options namespaces belong to no provider: `allama.extraction` is read by extraction, and `allama-http` holds transport options, which the transport code of every HTTP adapter reads. No provider mints state under an options-only namespace. One options bag holds one options type per namespace: `RequestOptions::resolve` fails with `Error::InvalidRequest` when a typed value of another type was attached under the namespace it reads, instead of ignoring it.
+The key a request options type is read under (`ProviderOptions::NAMESPACE`), and the key of its JSON form in `with_options_json`. It usually equals the provider's namespace, but need not: every OpenAI-compatible preset reads options under `openai-compat` and stores state under `openai-compat:groq`, `openai-compat:ollama`, and so on. Some options namespaces belong to no provider: `allama.chat.extraction` is read by extraction, and `allama-http` holds transport options, which the transport code of every HTTP adapter reads. No provider mints state under an options-only namespace. One options bag holds one options type per namespace: `RequestOptions::resolve` fails with `Error::InvalidRequest` when a typed value of another type was attached under the namespace it reads, instead of ignoring it.
 _Avoid_: Provider namespace (for options), option key
 
 **Extra fields**:
@@ -241,7 +245,7 @@ The `extra` map of a provider options type: request body fields the crate does n
 _Avoid_: Passthrough, raw body, unknown fields (those are refused)
 
 **Reserved key**:
-A key allama itself uses in a map it shares with providers or applications, in one of three styles. `allama` is the provider-data namespace allama writes under (`ALLAMA_NAMESPACE`, holding `FallbackAttempts`), spelled like a provider's namespace because it is one. `allama.<area>` names a core record by the area that owns it: application data (`allama.turn`), error metadata (`allama.extraction`, `allama.embedding`), the extraction options namespace (`allama.extraction`), and span attributes (`allama.retry.*`); every key starting with `allama.` is reserved. `allama-http` is the options namespace of the transport options the `allama-http` crate defines, named after that crate as a provider's options namespace is named after its provider. A new core record takes `allama.<area>`; options defined by another allama crate take the crate's name.
+A key allama itself uses in a map it shares with providers or applications, in one of three styles. `allama` is the provider-data namespace allama writes under (`ALLAMA_NAMESPACE`, holding `FallbackAttempts`), spelled like a provider's namespace because it is one. `allama.<area>` names a core record by the area that owns it: application data (`allama.turn`), error metadata (`allama.chat.extraction`, `allama.embedding`), the extraction options namespace (`allama.chat.extraction`), and span attributes (`allama.retry.*`); every key starting with `allama.` is reserved. `allama-http` is the options namespace of the transport options the `allama-http` crate defines, named after that crate as a provider's options namespace is named after its provider. A new core record takes `allama.<area>`; options defined by another allama crate take the crate's name.
 _Avoid_: allama namespace (for the dotted keys), internal key
 
 **Decline explanation**:
@@ -354,17 +358,21 @@ Context a wrapper or application puts in front of an error's constructor message
 _Avoid_: Error wrapping, error chaining (the error stays the same error)
 
 **Redacted error view**:
-`Error::as_log()`, the form of an error that is safe to log, persist (`FallbackAttempt`), and export: the kind, provider, status, provider code and type and the rejected field (`param`) when each is a bounded token (otherwise `<redacted>`; the filter keeps out prose, not values shaped like codes), the request id, the retry hint, the server retry directive, the body's length, the constructor message only when it is authored, an extraction's pass record (`allama.extraction`), a chunked embedding's progress (`allama.embedding`), both usage rather than input, and the errors a failed failover tried first, each as a nested view (`fallback_from`). It never includes the response body, other metadata, or the upstream message, except that `as_log().with_message(n)` opts in to the upstream message, truncated. `Display` is not redacted; `Debug` is compact (the variant, its message, and the context fields that are set) and shows the upstream message's length, not its text (`<withheld N bytes; print with {err}>`), the body's length, and neither a serialization failure's text nor an extraction's model output; it filters code, type and `param` the same way.
+`Error::as_log()`, the form of an error that is safe to log, persist (`FallbackAttempt`), and export: the kind, provider, status, provider code and type and the rejected field (`param`) when each is a bounded token (otherwise `<redacted>`; the filter keeps out prose, not values shaped like codes), the request id, the retry hint, the server retry directive, the body's length, the constructor message only when it is authored, an extraction's pass record (`allama.chat.extraction`), a chunked embedding's progress (`allama.embedding`), both usage rather than input, and the errors a failed failover tried first, each as a nested view (`fallback_from`). It never includes the response body, other metadata, or the upstream message, except that `as_log().with_message(n)` opts in to the upstream message, truncated. `Display` is not redacted; `Debug` is compact (the variant, its message, and the context fields that are set) and shows the upstream message's length, not its text (`<withheld N bytes; print with {err}>`), the body's length, and neither a serialization failure's text nor an extraction's model output; it filters code, type and `param` the same way.
 _Avoid_: Sanitized error, safe display
 
 **Unsupported stage**:
 Where a refusal (`Error::Unsupported`) happened (`UnsupportedStage`, read with `Error::unsupported_stage`): `BeforeSending` (the adapter refused through `Degradations`, so nothing reached the provider and nothing was billed), `Provider` (the provider refused the request it received, and the adapter mapped the reply with `Error::unsupported_by_provider`, only through its own table of wire paths, for replies a fixture pins), or `Unspecified` (`Error::unsupported`, which promises neither: the request may have been sent). The refusal also names what it refused (`Error::unsupported_subject`: a request field, or a content block or part with the caller's indices). Extraction's `Auto` mode falls back on a `BeforeSending` refusal, and on a `Provider` one only when native output was a guess; `FallbackProvider` fails over at every stage.
 _Avoid_: Refused field (for the stage), local refusal, upstream refusal (as a type)
 
-### Extraction
+### Chat extraction
+
+**Chat extraction**:
+Driving a chat model to produce a typed value (`ChatExtractExt::extract::<T>`, `ChatExtractor`), through a response format or a forced tool, with passes, repair and retries around it. "Chat" qualifies it because it extends `ChatProvider`: an extraction model (see Extraction models) does the same job without generating tokens, and is another operation. Its types carry the `Chat` prefix, its feature is `chat-extract`, its namespace `allama.chat.extraction`.
+_Avoid_: Extraction model (for this operation; within this section, "extraction" alone means chat extraction), structured output (for the operation; that is the request field it may use)
 
 **Extraction request**:
-The chat request an extraction derives its passes from (`Extractor::extract(&provider, &request)`, `ExtractExt::extract`). Every field is kept except the extraction mode option, which extraction consumes, and the fields the selected mode replaces: the response format in native mode, the tools and tool choice in forced-tool mode. A request with tools of its own fails with `ToolConflict` in every mode, before sending, so the same request behaves the same on every provider. To extract from a conversation alone, the caller starts a fresh chat request from its messages, or clears the tools on a copy; there is no separate extraction-only request type.
+The chat request an extraction derives its passes from (`ChatExtractor::extract(&provider, &request)`, `ChatExtractExt::extract`). Every field is kept except the extraction mode option, which extraction consumes, and the fields the selected mode replaces: the response format in native mode, the tools and tool choice in forced-tool mode. A request with tools of its own fails with `ToolConflict` in every mode, before sending, so the same request behaves the same on every provider. To extract from a conversation alone, the caller starts a fresh chat request from its messages, or clears the tools on a copy; chat extraction has no request type of its own (`ExtractionRequest` is an extraction model's, see Extraction models).
 _Avoid_: Direct extraction, dedicated extraction, extraction orchestration
 
 **Extraction pass**:
@@ -372,14 +380,14 @@ One provider chat dispatch made by an extraction operation. It counts dispatches
 _Avoid_: LLM call
 
 **Extraction failure**:
-An extraction operation that produced no value: why (no usable mode, a conflicting request, truncated or unusable output), the last provider response, and the record of its passes. Provider errors during an extraction are not extraction failures: they are returned unchanged, so retry and fallback policies keep their classification, and carry the extraction's pass record (mode, passes made before the error, summed usage) in their error context under `allama.extraction` (`ExtractionMetadata::from_error`). A stream that fails mid-way adds the usage and degradations it reported before failing to that record, without counting as a pass.
+An extraction operation that produced no value: why (no usable mode, a conflicting request, truncated or unusable output), the last provider response, and the record of its passes. Provider errors during an extraction are not extraction failures: they are returned unchanged, so retry and fallback policies keep their classification, and carry the extraction's pass record (mode, passes made before the error, summed usage) in their error context under `allama.chat.extraction` (`ChatExtractionMetadata::from_error`). A stream that fails mid-way adds the usage and degradations it reported before failing to that record, without counting as a pass.
 
 **Schema enforcement**:
-How far the provider reported constraining an extraction's output to the target schema (`ExtractionMetadata::enforcement`, a `SchemaEnforcement`). Extraction always requests strict mode, and reads the warnings the adapter reported on the field its mode relies on: **exact** (no warning; constrained decoding ran over the schema with only rewrites that change nothing the target type can deserialize), **approximate** (an `Approximated` warning; constrained decoding ran over a widened schema, or one sent unchecked to an engine that does not report what it enforces), or **not enforced** (an `Unsupported` warning; strict mode was not honoured, or no call was made). It is the adapter's own report, not a verified grammar guarantee, and even exact does not guarantee every value (refusals, token-limit cut-offs, the capitalisation of string `enum` values on some engines). Under the strict unsupported-feature policy a strict drop fails the call instead, so the policy means "constrained, possibly approximately, or fail"; a pipeline that needs exact sets an enforcement floor. Below exact, the enforcement is reported in terms of the caller's type and is a warning event once per provider, model and type.
+How far the provider reported constraining an extraction's output to the target schema (`ChatExtractionMetadata::enforcement`, a `SchemaEnforcement`). Extraction always requests strict mode, and reads the warnings the adapter reported on the field its mode relies on: **exact** (no warning; constrained decoding ran over the schema with only rewrites that change nothing the target type can deserialize), **approximate** (an `Approximated` warning; constrained decoding ran over a widened schema, or one sent unchecked to an engine that does not report what it enforces), or **not enforced** (an `Unsupported` warning; strict mode was not honoured, or no call was made). It is the adapter's own report, not a verified grammar guarantee, and even exact does not guarantee every value (refusals, token-limit cut-offs, the capitalisation of string `enum` values on some engines). Under the strict unsupported-feature policy a strict drop fails the call instead, so the policy means "constrained, possibly approximately, or fail"; a pipeline that needs exact sets an enforcement floor. Below exact, the enforcement is reported in terms of the caller's type and is a warning event once per provider, model and type.
 _Avoid_: Validated, guaranteed schema, schema enforced (as a yes/no)
 
 **Extraction refusal**:
-An extraction failure because the model or the provider declined to produce the output (`ExtractError::Refused`): a refusal the model wrote in place of the output, or a `Refusal` or `ContentFilter` finish. It is checked before parsing, next to truncation, and never retried, since asking again pays for the same refusal. Its text is the model's refusal or the provider's decline explanation, and `RefusalSource` (`Model`, `Provider`, `None`) says which, or that nothing explains it. Other abnormal finishes are parsed as usual; a parse failure then names the finish reason. Empty or whitespace-only native output is missing structured text, not a parse failure.
+An extraction failure because the model or the provider declined to produce the output (`ChatExtractError::Refused`): a refusal the model wrote in place of the output, or a `Refusal` or `ContentFilter` finish. It is checked before parsing, next to truncation, and never retried, since asking again pays for the same refusal. Its text is the model's refusal or the provider's decline explanation, and `RefusalSource` (`Model`, `Provider`, `None`) says which, or that nothing explains it. Other abnormal finishes are parsed as usual; a parse failure then names the finish reason. Empty or whitespace-only native output is missing structured text, not a parse failure.
 _Avoid_: Parse failure (for a refusal), filtered extraction
 
 **Undeclared key**:
@@ -387,15 +395,15 @@ An object key in extraction output that no schema of the target type that may ap
 _Avoid_: Extra field, unknown field (serde's term for the same thing under `deny_unknown_fields`)
 
 **Enforcement floor**:
-The least schema enforcement an extraction accepts (`Extractor::min_enforcement`), off by default. Below it, extraction fails with `EnforcementBelow`: before sending when the provider's validation is a dry run of the call, after the pass (a paid call) otherwise. Approximate is the practical portable floor, since some providers never enforce common types exactly. An **extraction plan** (`Extractor::plan`) is what the floor is checked against: the mode, enforcement, degradations and validation coverage of an extraction, found by validating a schema-only copy of the request.
+The least schema enforcement an extraction accepts (`ChatExtractor::min_enforcement`), off by default. Below it, extraction fails with `EnforcementBelow`: before sending when the provider's validation is a dry run of the call, after the pass (a paid call) otherwise. Approximate is the practical portable floor, since some providers never enforce common types exactly. An **extraction plan** (`ChatExtractor::plan`) is what the floor is checked against: the mode, enforcement, degradations and validation coverage of an extraction, found by validating a schema-only copy of the request.
 _Avoid_: Minimum strictness, guarantee level
 
 **Automatic fallback (extraction)**:
-An `Auto` extraction that picked native output and switched to forced-tool mode because the adapter refused the response format before sending (`Error::unsupported_field` is the response format and `Error::unsupported_stage` is `BeforeSending`), such as a schema with a map on a provider whose native output has no unconstrained form. When native output was only a guess from an `Unknown` answer, the provider's own refusal of the response format (stage `Provider`, a 4xx with no output to bill) falls back too. The refused attempt produced nothing and is not a pass; the metadata reports forced-tool mode and the refusal with its stage (`ExtractionMetadata::auto_fallback`). An explicitly chosen mode never falls back.
+An `Auto` extraction that picked native output and switched to forced-tool mode because the adapter refused the response format before sending (`Error::unsupported_field` is the response format and `Error::unsupported_stage` is `BeforeSending`), such as a schema with a map on a provider whose native output has no unconstrained form. When native output was only a guess from an `Unknown` answer, the provider's own refusal of the response format (stage `Provider`, a 4xx with no output to bill) falls back too. The refused attempt produced nothing and is not a pass; the metadata reports forced-tool mode and the refusal with its stage (`ChatExtractionMetadata::auto_fallback`). An explicitly chosen mode never falls back.
 _Avoid_: Retry (nothing was sent), mode downgrade
 
 **Degradation (extraction)**:
-A warning an adapter reported on an extraction pass about the field the extraction mode relies on: the response format in native mode, the tools in forced-tool mode (`ExtractionMetadata::degradations`). The degradations decide the schema enforcement; warnings about other fields are not degradations.
+A warning an adapter reported on an extraction pass about the field the extraction mode relies on: the response format in native mode, the tools in forced-tool mode (`ChatExtractionMetadata::degradations`). The degradations decide the schema enforcement; warnings about other fields are not degradations.
 _Avoid_: Extraction warning (the response keeps every warning)
 
 ### Decisions
@@ -410,7 +418,7 @@ _Avoid_: State
 
 **Question**:
 A named request for one answer about the decision input: a yes/no question, a choice among options, or a score on an ordered scale of levels. Questions are answered independently; answers are not passed to later questions.
-_Avoid_: Primitive, field
+_Avoid_: Primitive, field (an extraction model's request for a value)
 
 **Option**:
 One candidate answer of a choice question: a key the model can pick, with an optional description. The model reads both, so a key is prompt text.
@@ -438,6 +446,44 @@ _Avoid_: Rubric, criteria
 **Level**:
 One step of a score question's ordered scale, with a short label and an optional description. Levels are numbered from 0, lowest first, and a score answer is the probability-weighted average of their numbers, so the level nearest a score can be one the model gave probability 0 (a split between the ends of the scale averages to the middle); the most likely level is the one the model favoured.
 _Avoid_: Criterion, rubric entry
+
+### Extraction models
+
+**Extraction model**:
+A model that answers named, typed fields about an input with values instead of generating text: a text span, a number, a date, a time, a datetime, a duration, a list, an estimate inside declared bounds, or a forecast of a series, each scalar one a value or null with the probability that the input does not determine it. Every field is answered in one pass. A chat model asked for JSON is chat extraction, not an extraction model. In `allama` it is an `ExtractionProvider`, a sibling of chat, embeddings and decisions, and unstable (ADR 0018).
+_Avoid_: System One extraction model, regression model, extractor (the chat-side type)
+
+**Field (extraction)**:
+A named request for one value about the input, of one kind (`Field`): text, number, date, time, datetime, duration, list, estimate or forecast, with optional instructions and the parameters that define its answer (a unit, decimals, bounds, a grid, a horizon). Every parameter is semantic: a provider sends it as given or refuses the field. Distinct from a request field (`RequestField`, a field of a chat request a warning names) and from a Rust struct field of a typed decision (`DecisionField`); the decision glossary avoids "field" for a question for this reason.
+_Avoid_: Question (that is a decision's), slot, schema property
+
+**Answer (extraction)**:
+The value a field was answered with, of the field's kind (`Answer`): the value or null, the null probability, a span for text, items for a list, and a value, median and interval for an estimate. Provider statistics about an answer (a confidence, the guess a model would have made for a null) are provider data keyed by field name, as a decision's confidence is.
+_Avoid_: Prediction (for every kind), result
+
+**Null probability**:
+The probability a model reports that the input does not determine a scalar field's value (`null_probability`), `None` when the provider reports none. The value itself is the provider's determination: where its threshold falls is the provider's business (Clairic's is a per-field provider option), so an application that wants another threshold reads the probability, and the relation between the two is not checked.
+_Avoid_: `p_null` (the wire name), confidence, abstention (a decision's threshold)
+
+**Text span**:
+Where a text answer or a text list item was copied from: a byte range into the request's input, end exclusive, on `char` boundaries (`TextSpan`), so `span.text(&request.input)` is the value. Adapters place the provider's offsets, whatever their unit and whatever copy of the input the provider indexed, by conversion or by finding the value, and drop a span they cannot place with a warning: a wrong span is worse than none. The same word names a tracing span elsewhere; the type says which.
+_Avoid_: Offsets (the wire form), character range, citation (that is a chat annotation)
+
+**Estimate**:
+A field whose value the input gives evidence for without stating it, answered with a distribution summarised as a point value, a median and a prediction interval, inside the bounds the field declares, on a linear or logarithmic grid (`EstimateScale`). A value outside the bounds is an unexpected response; values are never clamped.
+_Avoid_: Guess (the provider's statistic for a null), regression output
+
+**Prediction interval**:
+A central interval of an estimate's distribution with the probability mass it holds (`PredictionInterval { low, high, probability }`): 0.8 for the 80% interval Clairic reports as `p10`–`p90`. The level is part of the interval, not assumed, so another provider's 90% interval reads the same way.
+_Avoid_: Confidence interval (a frequentist term for another thing), range, p10/p90 (the wire names)
+
+**Forecast**:
+A field that asks for future values of a series the input holds, one estimate per step ahead for a horizon of steps, each step a period long (`ForecastPeriod`: a minute, a day, a month, …, or one entry of the series). The answer has exactly `horizon` steps, nearest first.
+_Avoid_: Projection, time series (the input, not the field)
+
+**Reference date**:
+The calendar date that anchors dates the input writes without a year (`ExtractionRequest::reference_date`, a `Date`). Anchoring times and datetimes (a reference time, a time zone) is a known gap, not a choice.
+_Avoid_: Today, now, current date (as a field name)
 
 ### Embeddings
 

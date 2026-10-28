@@ -3,10 +3,10 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::macros::enum_names;
-use crate::{ChatCapability, DecisionCapability, EmbeddingCapability};
+use crate::{ChatCapability, DecisionCapability, EmbeddingCapability, ExtractionCapability};
 
-/// A portable capability enum: [`ChatCapability`], [`EmbeddingCapability`]
-/// or [`DecisionCapability`].
+/// A portable capability enum: [`ChatCapability`], [`EmbeddingCapability`],
+/// [`DecisionCapability`] or [`ExtractionCapability`].
 ///
 /// It names the capabilities a [`Validation`](crate::Validation) reports as
 /// [`relied_on_unknown`](crate::Validation::relied_on_unknown). It is
@@ -16,9 +16,10 @@ pub trait Capability: Copy + Eq + fmt::Debug + Send + Sync + 'static + sealed::S
 impl Capability for ChatCapability {}
 impl Capability for EmbeddingCapability {}
 impl Capability for DecisionCapability {}
+impl Capability for ExtractionCapability {}
 
 pub(crate) mod sealed {
-    use crate::{ChatCapability, DecisionCapability, EmbeddingCapability};
+    use crate::{ChatCapability, DecisionCapability, EmbeddingCapability, ExtractionCapability};
 
     /// A capability of any operation, so one record holds them all.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +27,7 @@ pub(crate) mod sealed {
         Chat(ChatCapability),
         Embedding(EmbeddingCapability),
         Decision(DecisionCapability),
+        Extraction(ExtractionCapability),
     }
 
     pub trait Sealed: Sized {
@@ -67,6 +69,19 @@ pub(crate) mod sealed {
         fn from_any(any: AnyCapability) -> Option<Self> {
             match any {
                 AnyCapability::Decision(capability) => Some(capability),
+                _ => None,
+            }
+        }
+    }
+
+    impl Sealed for ExtractionCapability {
+        fn into_any(self) -> AnyCapability {
+            AnyCapability::Extraction(self)
+        }
+
+        fn from_any(any: AnyCapability) -> Option<Self> {
+            match any {
+                AnyCapability::Extraction(capability) => Some(capability),
                 _ => None,
             }
         }

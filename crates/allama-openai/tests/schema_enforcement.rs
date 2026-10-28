@@ -6,7 +6,9 @@
 // The fixture types are only deserialized into, never read.
 #![allow(dead_code)]
 
-use allama::extract::{ExtractExt, ExtractionMetadata, ExtractionMode, SchemaEnforcement};
+use allama::chat::extract::{
+    ChatExtractExt, ChatExtractionMetadata, ChatExtractionMode, SchemaEnforcement,
+};
 use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama::{DynChatProvider, RequestField, Subject, WarningKind};
@@ -25,7 +27,7 @@ enum Target {
 }
 
 const TARGETS: [Target; 2] = [Target::ChatCompletions, Target::Responses];
-const MODES: [ExtractionMode; 2] = [ExtractionMode::Native, ExtractionMode::ForcedTool];
+const MODES: [ChatExtractionMode; 2] = [ChatExtractionMode::Native, ChatExtractionMode::ForcedTool];
 
 impl Target {
     fn model(self) -> &'static str {
@@ -238,10 +240,10 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
 /// the body sent.
 async fn run_shape(
     target: Target,
-    mode: ExtractionMode,
+    mode: ChatExtractionMode,
     name: &str,
     answer: Value,
-) -> (ExtractionMetadata, Value) {
+) -> (ChatExtractionMetadata, Value) {
     match name {
         "documented unit enum" => target.extract::<Wrapped<Documented>>(mode, answer).await,
         "externally tagged" => target.extract::<Wrapped<External>>(mode, answer).await,
@@ -254,12 +256,16 @@ async fn run_shape(
 }
 
 impl Target {
-    async fn extract<T>(self, mode: ExtractionMode, answer: Value) -> (ExtractionMetadata, Value)
+    async fn extract<T>(
+        self,
+        mode: ChatExtractionMode,
+        answer: Value,
+    ) -> (ChatExtractionMetadata, Value)
     where
         T: JsonSchema + DeserializeOwned + Send + std::fmt::Debug,
     {
         let response = match mode {
-            ExtractionMode::Native => self.text(&answer.to_string()),
+            ChatExtractionMode::Native => self.text(&answer.to_string()),
             _ => self.tool_call(&answer.to_string()),
         };
         let transport = ReplayTransport::new([response]);
@@ -322,7 +328,7 @@ async fn an_overlapping_one_of_is_approximate_in_both_modes() {
                 "{target:?} {mode:?}"
             );
             let field = match mode {
-                ExtractionMode::Native => RequestField::ResponseFormat,
+                ChatExtractionMode::Native => RequestField::ResponseFormat,
                 _ => RequestField::Tools,
             };
             let [warning] = metadata.degradations.as_slice() else {

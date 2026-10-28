@@ -14,6 +14,9 @@ repository = "https://github.com/sagikazarmark/allama"
 # application; members that want the events opt in.
 allama = { version = "0.2.0", path = "crates/allama", default-features = false }
 allama-anthropic = { version = "0.2.0", path = "crates/allama-anthropic", default-features = false }
+# Exact pin: allama-cloudflare-worker builds on allama-cloudflare's
+# `#[doc(hidden)]` codec (`binding`), which carries no semver promise.
+allama-cloudflare = { version = "=0.2.0", path = "crates/allama-cloudflare", default-features = false }
 allama-cloudflare-worker = { version = "0.2.0", path = "crates/allama-cloudflare-worker" }
 allama-conformance = { version = "0.2.0", path = "crates/allama-conformance", default-features = false }
 # Exact pin: allama-derive emits code against allama internals, so the two

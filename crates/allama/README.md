@@ -6,7 +6,7 @@
 **Low-level, provider-agnostic LLM abstractions for Rust.**
 
 `allama` is a low-level crate for code that wants one interface for LLM APIs
-(chat, embeddings, and decision models) while leaving HTTP transport, request translation,
+(chat, embeddings, decision models, and extraction models) while leaving HTTP transport, request translation,
 and response parsing to provider implementations.
 
 Use it when you want to:
@@ -18,6 +18,9 @@ Use it when you want to:
 - produce embedding vectors from multiple providers with a single trait
 - ask decision models typed questions (yes/no, choice, score) and read
   probabilities, untyped or through `#[derive(Decision)]`
+- ask extraction models for typed fields (text spans, numbers, dates,
+  durations, lists, estimates, forecasts) and read values with null
+  probabilities (unstable, ADR 0018)
 
 `allama` is intentionally not a provider client and not an agent framework.
 
@@ -27,6 +30,7 @@ Use it when you want to:
 - `ChatProvider`: <https://docs.rs/allama/latest/allama/trait.ChatProvider.html>
 - `EmbeddingProvider`: <https://docs.rs/allama/latest/allama/trait.EmbeddingProvider.html>
 - `DecisionProvider`: <https://docs.rs/allama/latest/allama/trait.DecisionProvider.html>
+- `ExtractionProvider`: <https://docs.rs/allama/latest/allama/trait.ExtractionProvider.html>
 - chat example: [`chat.rs`](examples/chat.rs)
 - embedding example: [`embedding.rs`](examples/embedding.rs)
 - decision example: [`decision.rs`](examples/decision.rs)
@@ -115,12 +119,13 @@ which mock to pick and when scripted errors surface.
 | Requests | `ChatRequest`, `Message`, `ContentPart` (`Text`, `Image`, `File`), `MediaSource` (`Url`, `Base64`, `ProviderFile`), `SystemPrompt`, `ToolDefinition`, `ToolChoice`, `ResponseFormat`, `ReasoningConfig`, `PromptCache` |
 | Responses | `ChatResponse`, `ContentBlock` (`Text`, `Image`, `ToolCall`, `Reasoning`, `Refusal`, `ProviderToolCall`, `ProviderToolResult`, `Other`), `FinishReason`, `Usage`, `Warning` |
 | Decisions | `DecisionRequest`, `DecisionResponse`, `DecisionLimits`; in `decision`: `DecisionInput`, `Question` (`yes_no`, `choice`, `score`), `Answer`; typed: `Decision`, `ChoiceSet`, `Scale`, `Choice`, `Score`, `DecisionProviderExt::decide_as` |
+| Extraction (unstable) | `ExtractionRequest`, `ExtractionResponse`, `ExtractionLimits`; in `extraction`: `Field` (`text`, `number`, `date`, `time`, `datetime`, `duration`, `list`, `estimate`, `forecast`), `Answer`, `TextSpan`, `PredictionInterval`, `Date`, `Time`, `DateTime` |
 | Streaming | `StreamEvent`, `ChatStreamExt::{next_event, collect_response, with_collector}`, `CollectedEvent`; in `chat::stream`: `StreamCollector`, `StreamTranscript`, `until_committed` |
 | Provider escape hatches | `ProviderOptions` / `RequestOptions` (typed or JSON request options), `ProviderData` (namespaced provider state on blocks, messages, responses) |
 | Policy | `UnsupportedPolicy` (warn or fail on unsupported hints) |
-| Provider authoring | `adapter::{chat, embedding, decision, schema}` (`prepare`, `preflight`, `WireSupport`, the JSON Schema passes), `adapter::Degradations` |
+| Provider authoring | `adapter::{chat, embedding, decision, extraction, schema}` (`prepare`, `preflight`, `WireSupport`, the JSON Schema passes), `adapter::Degradations` |
 | Errors | `Error` (`RateLimited`, `QuotaExhausted`, `ContextLengthExceeded`, `Stream { kind }`, …) with `retry_after`, `request_id`, `is_retryable` |
-| Composition | `wrappers::{RetryingProvider, FallbackProvider, TimeoutProvider, MapModelProvider, MapRequestProvider, RecordingProvider, TracingProvider}`, `extract::ExtractExt`, typed lookup through wrappers (`ProviderIdentityExt::downcast_ref`) |
+| Composition | `wrappers::{RetryingProvider, FallbackProvider, TimeoutProvider, MapModelProvider, MapRequestProvider, RecordingProvider, TracingProvider}`, `extract::ChatExtractExt`, typed lookup through wrappers (`ProviderIdentityExt::downcast_ref`) |
 | Persistence | `history::History` (versioned envelope), `history::retain_portable_content` for client-held history; requests and responses are `Serialize`/`Deserialize` |
 
 ## Features
@@ -133,8 +138,8 @@ The only default feature is `warning-events`. A library that depends on
 | `warning-events` (default) | every warning a call reports is also a `tracing` event (targets `allama::warning::<kind>`, deduplicated by code), and retries and failovers are `allama::retry` and `allama::fallback` events |
 | `schema` | `ToolDefinition::from_schema::<T>()`, `ResponseFormat::from_schema::<T>()` and `allama::adapter::schema::schema_for` via `schemars`, re-exported as `allama::schemars`; field paths in `ToolArgumentsError` via `serde_path_to_error` |
 | `derive` | `#[derive(Decision, ChoiceSet, Scale)]` for typed decisions (`allama-derive`) |
-| `extract` | structured extraction (`ExtractExt`, `Extractor`); implies `schema` |
-| `mock` | test doubles: `MockProvider`, `MockStreamingProvider`, `MockEmbeddingProvider`, `MockDecisionProvider`, `FunctionProvider`, `TestProvider` |
+| `extract` | structured extraction (`ChatExtractExt`, `ChatExtractor`); implies `schema` |
+| `mock` | test doubles: `MockProvider`, `MockStreamingProvider`, `MockEmbeddingProvider`, `MockDecisionProvider`, `MockExtractionProvider`, `FunctionProvider`, `TestProvider` |
 | `tracing` | OpenTelemetry GenAI spans via `wrappers::TracingProvider` |
 
 ## Implementing A Provider

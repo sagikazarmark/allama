@@ -107,6 +107,15 @@ Decision example (decision models over System One; it does not use `ALLAMA_MODEL
   default `jev-latest`), otherwise a local Ollama 0.35+ (`OLLAMA_HOST`,
   `OLLAMA_DECISION_MODEL`, default `nimble`).
 
+Extraction example (an extraction model, unstable in allama; it does not use
+`ALLAMA_MODEL`):
+
+- `provider_extraction`: turn a damaged-product claim into typed values
+  (a span, a computed total, a duration, a list, an estimate with its
+  interval, a null with its probability) with Cloudflare Workers AI's
+  Clairic (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`;
+  `CLOUDFLARE_EXTRACTION_MODEL`, default `@cf/cloudflare/clairic`).
+
 Multi-provider and provider-specific:
 
 - `cross_provider_fallback`: `FallbackProvider` failing over from an unreachable OpenAI endpoint to Anthropic; shows the served provider, recorded attempts, and non-retryable errors

@@ -487,7 +487,7 @@ async fn streamed_custom_tool_calls_wait_for_the_client() {
 /// paths and is never retried.
 #[tokio::test]
 async fn refusals_fail_extraction_once() {
-    use allama::extract::{ExtractError, ExtractExt, Extractor};
+    use allama::chat::extract::{ChatExtractError, ChatExtractExt, ChatExtractor};
     use allama::schemars::{self, JsonSchema};
     use allama_http::{ReplayResponse, ReplayTransport};
 
@@ -506,9 +506,9 @@ async fn refusals_fail_extraction_once() {
         assert!(
             matches!(
                 failure.error(),
-                ExtractError::Refused {
+                ChatExtractError::Refused {
                     finish_reason: Some(FinishReason::Refusal),
-                    source: allama::extract::RefusalSource::Model,
+                    source: allama::chat::extract::RefusalSource::Model,
                     text: Some(text),
                     ..
                 } if text == refusal
@@ -539,7 +539,7 @@ async fn refusals_fail_extraction_once() {
         .build()
         .unwrap();
     let request = ChatRequest::new("gpt-5-mini").user("total?");
-    let error = Extractor::new()
+    let error = ChatExtractor::new()
         .retries(2)
         .extract::<_, Invoice>(&provider, &request)
         .await

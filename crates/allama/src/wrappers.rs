@@ -80,7 +80,8 @@
 //! Write the operations (`chat`, `chat_stream`, `embed`, `decide`) and
 //! forward every question about the provider with
 //! [`forward_provider_identity!`], [`forward_chat_questions!`],
-//! [`forward_embedding_questions!`] and [`forward_decision_questions!`],
+//! [`forward_embedding_questions!`], [`forward_decision_questions!`] and
+//! [`forward_extraction_questions!`],
 //! naming the field that holds the wrapped provider. A question added to a
 //! provider trait later is added to its macro in the same release, so a
 //! wrapper that uses them forwards it by being recompiled. They forward:
@@ -187,6 +188,7 @@ pub use crate::{
     __forward_chat_questions as forward_chat_questions,
     __forward_decision_questions as forward_decision_questions,
     __forward_embedding_questions as forward_embedding_questions,
+    __forward_extraction_questions as forward_extraction_questions,
     __forward_provider_identity as forward_provider_identity,
 };
 pub use capability_override::CapabilityOverrideProvider;

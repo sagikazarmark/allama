@@ -46,8 +46,9 @@ async fn main() -> anyhow::Result<()> {
 ```
 
 `chat::from_provider("anthropic")` returns the provider alone, for choosing
-the model per request. The `embedding` and `decision` modules have the same
-pair for embeddings and decision models.
+the model per request. The `embedding`, `decision` and `extraction`
+modules have the same pair for embeddings, decision models and extraction
+models (the last unstable, ADR 0018).
 
 ## Retries by default
 
@@ -133,22 +134,25 @@ an allowlist of addresses you configured, and never pass their string to
 
 ## Built-in providers
 
-| Key | Chat | Embeddings | Decisions | Feature |
-|---|---|---|---|---|
-| `anthropic` | Messages API | no | no | `anthropic` |
-| `gemini` | Gemini API | yes | no | `gemini` |
-| `openai` | Responses API | yes | no | `openai` |
-| `openai-chat` | Chat Completions | no | no | `openai` |
-| `openai-responses` | Responses API, as `openai` | no | no | `openai` |
-| `azure-responses` | Azure OpenAI Responses API | no | no | `openai-compat` |
-| `github-copilot` | GitHub Copilot, Chat Completions | no | no | `openai-compat` |
-| `azure`, `cloudflare`, `deepinfra`, `deepseek`, `fireworks`, `groq`, `mistral`, `together`, `vllm`, `xai` | `allama-openai-compat` presets | yes | no | `openai-compat` |
-| `ollama`, `openrouter` | `allama-openai-compat` presets | yes | `allama-systemone` presets | `openai-compat`, `systemone` |
-| `digitalocean`, `litellm`, `typesafe` | no | no | `allama-systemone` presets | `systemone` |
+| Key | Chat | Embeddings | Decisions | Extraction | Feature |
+|---|---|---|---|---|---|
+| `anthropic` | Messages API | no | no | no | `anthropic` |
+| `gemini` | Gemini API | yes | no | no | `gemini` |
+| `openai` | Responses API | yes | no | no | `openai` |
+| `openai-chat` | Chat Completions | no | no | no | `openai` |
+| `openai-responses` | Responses API, as `openai` | no | no | no | `openai` |
+| `azure-responses` | Azure OpenAI Responses API | no | no | no | `openai-compat` |
+| `github-copilot` | GitHub Copilot, Chat Completions | no | no | no | `openai-compat` |
+| `azure`, `deepinfra`, `deepseek`, `fireworks`, `groq`, `mistral`, `together`, `vllm`, `xai` | `allama-openai-compat` presets | yes | no | no | `openai-compat` |
+| `cloudflare` | `allama-openai-compat` preset | yes | `allama-systemone` preset | `allama-cloudflare` (Clairic) | `openai-compat`, `systemone`, `cloudflare` |
+| `ollama`, `openrouter` | `allama-openai-compat` presets | yes | `allama-systemone` presets | no | `openai-compat`, `systemone` |
+| `digitalocean`, `litellm`, `typesafe` | no | no | `allama-systemone` presets | no | `systemone` |
 
 A key names one provider configuration, and its operations may come from
 different crates: `ollama` reaches the same server (`OLLAMA_HOST`) for chat,
-embeddings, and decisions.
+embeddings, and decisions, and `cloudflare` the same account
+(`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`) for chat, embeddings,
+decisions and extraction.
 
 **`openai` is the Responses API.** OpenAI has two chat APIs: `openai`
 builds `allama_openai::ResponsesProvider` (Responses) and `openai-chat`
@@ -177,7 +181,7 @@ key reserved for it.
 
 All features are on by default; disable default features to pick some.
 The provider crates come without their own default features: `extract` is
-not forced on (enable `allama/extract` yourself), and the TLS backend is
+not forced on (enable `allama/chat-extract` yourself), and the TLS backend is
 one of this crate's `default-tls` (default), `rustls`, `native-tls` or
 `rustls-ring` (`ring` instead of `aws-lc-rs`, for static musl builds
 without cmake) features, forwarded to every enabled provider. Every
@@ -276,7 +280,7 @@ when the constructor leaves one untaken, so a tenant's scope is never
 dropped silently.
 
 A provider you build yourself gets the same stack from `chat::wrap`,
-`embedding::wrap` or `decision::wrap`. Do not wrap the result in another
+`embedding::wrap`, `decision::wrap` or `extraction::wrap`. Do not wrap the result in another
 `RetryingProvider`: it already retries.
 
 ```rust,ignore

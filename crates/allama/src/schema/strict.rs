@@ -39,7 +39,7 @@ use crate::{Degradations, Error, RequestField, Result};
 /// `"the response schema"`.
 ///
 /// This is where extraction's
-/// [`NotEnforced`][crate::extract::SchemaEnforcement::NotEnforced] comes
+/// [`NotEnforced`][crate::chat::extract::SchemaEnforcement::NotEnforced] comes
 /// from: the `Unsupported` warning it records is what extraction counts,
 /// and the error it returns under `UnsupportedPolicy::Error` is the
 /// pre-send failure.
@@ -107,8 +107,8 @@ use crate::{Degradations, Error, RequestField, Result};
 /// - [`Error::InvalidRequest`] when the schema is malformed.
 ///
 #[cfg_attr(
-    not(feature = "extract"),
-    doc = "[crate::extract::SchemaEnforcement::NotEnforced]: crate#cargo-features"
+    not(feature = "chat-extract"),
+    doc = "[crate::chat::extract::SchemaEnforcement::NotEnforced]: crate#cargo-features"
 )]
 pub fn apply_strict_policy(
     schema: &Value,

@@ -5,8 +5,9 @@
 //! agreement, request fields and what never reaches the wire, strict mode,
 //! error kinds and redaction, retry signals, in-band stream errors and
 //! stream ends, transport options, and a malformed response.
-//! [`assert_embedding_adapter`] and [`assert_decision_adapter`] are the same
-//! for embeddings and decisions. The set grows with the crate: a contract
+//! [`assert_embedding_adapter`], [`assert_decision_adapter`] and
+//! [`assert_extraction_adapter`] are the same for embeddings, decisions and
+//! extractions. The set grows with the crate: a contract
 //! added later runs in every adapter's suite without a change to it.
 //!
 //! What a contract needs from the adapter is an input of the
@@ -107,6 +108,7 @@ use futures_util::FutureExt;
 
 pub use decision::{DecisionAdapterUnderTest, assert_decision_adapter};
 pub use embedding::{AnsweredVector, EmbeddingAdapterUnderTest, assert_embedding_adapter};
+pub use extraction::{ExtractionAdapterUnderTest, assert_extraction_adapter};
 
 use crate::TransportOutcome;
 use crate::capabilities::{
@@ -126,6 +128,7 @@ use crate::stream_frames::StreamFraming;
 
 mod decision;
 mod embedding;
+mod extraction;
 
 /// Assert that a chat adapter passes every probe-based chat contract.
 ///

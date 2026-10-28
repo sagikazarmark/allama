@@ -33,7 +33,7 @@
 //! application as is:
 //!
 //! ```toml
-//! allama = { version = "0.1", features = ["extract"] }
+//! allama = { version = "0.1", features = ["chat-extract"] }
 //! allama-providers = "0.1"
 //! serde = { version = "1", features = ["derive"] }
 //! tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

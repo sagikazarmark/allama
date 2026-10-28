@@ -5,7 +5,7 @@
 // The target type is only deserialized into, never read.
 #![allow(dead_code)]
 
-use allama::extract::{ExtractError, ExtractExt, Extractor, RefusalSource};
+use allama::chat::extract::{ChatExtractError, ChatExtractExt, ChatExtractor, RefusalSource};
 use allama::prelude::*;
 use allama::schemars::{self, JsonSchema};
 use allama::{Error, FinishReason};
@@ -38,7 +38,7 @@ fn assert_refused(error: Error, explanation: &str) {
     assert!(
         matches!(
             failure.error(),
-            ExtractError::Refused {
+            ChatExtractError::Refused {
                 finish_reason: Some(FinishReason::ContentFilter),
                 text: Some(text),
                 source: RefusalSource::Provider,
@@ -62,7 +62,7 @@ async fn a_safety_finish_fails_extraction_once() {
         })
         .to_string(),
     ));
-    let error = Extractor::new()
+    let error = ChatExtractor::new()
         .retries(2)
         .extract::<_, Invoice>(&provider, &ChatRequest::new(MODEL).user("total?"))
         .await

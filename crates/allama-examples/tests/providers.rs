@@ -1,5 +1,5 @@
+use allama::chat::extract::ChatExtracted;
 use allama::chat::stream::StreamCollector;
-use allama::extract::Extracted;
 use allama::prelude::*;
 use allama::{DynChatProvider, DynEmbeddingProvider};
 use allama::{Error, Result, ToolChoice, ToolDefinition};
@@ -163,7 +163,7 @@ async fn run_live_extract(target: &ChatTarget) -> Result<()> {
         )
         .user("Confirm that this structured extraction smoke test is working.");
 
-    let extracted: Extracted<LiveExtract> = target.provider.extract(&request).await?;
+    let extracted: ChatExtracted<LiveExtract> = target.provider.extract(&request).await?;
     assert_eq!(extracted.value.token, "live-extract-ok");
     assert!(
         !extracted.value.summary.trim().is_empty(),

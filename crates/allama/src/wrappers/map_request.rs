@@ -3,7 +3,8 @@ use std::fmt;
 use crate::{
     CapabilitySupport, ChatCapability, ChatProvider, ChatRequest, ChatResponse, ChatValidation,
     DecisionProvider, DecisionRequest, DecisionResponse, EmbeddingProvider, EmbeddingRequest,
-    EmbeddingResponse, Error, ProviderIdentity, Result,
+    EmbeddingResponse, Error, ExtractionProvider, ExtractionRequest, ExtractionResponse,
+    ProviderIdentity, Result,
 };
 
 /// Rewrites chat requests before they reach the wrapped provider.
@@ -146,6 +147,18 @@ where
     }
 
     super::forward_decision_questions!(inner);
+}
+
+impl<P, F> ExtractionProvider for MapRequestProvider<P, F>
+where
+    P: ExtractionProvider,
+    F: Fn(&mut ChatRequest) + Send + Sync,
+{
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        self.inner.extract_values(request).await
+    }
+
+    super::forward_extraction_questions!(inner);
 }
 
 impl<P, F> ProviderIdentity for MapRequestProvider<P, F>

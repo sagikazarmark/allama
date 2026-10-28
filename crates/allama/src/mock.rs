@@ -143,3 +143,4 @@ pub use crate::chat::mock::{
 };
 pub use crate::decision::mock::MockDecisionProvider;
 pub use crate::embedding::mock::MockEmbeddingProvider;
+pub use crate::extraction::mock::MockExtractionProvider;

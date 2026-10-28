@@ -97,6 +97,8 @@
 //! - [`EmbeddingProvider`]: batch text embedding.
 //! - [`DecisionProvider`]: typed questions answered with probabilities
 //!   (decision models; see [`decision`]).
+//! - [`ExtractionProvider`]: typed fields answered with values (extraction
+//!   models; see [`extraction`]). Unstable, see [Stability](#stability).
 //!
 //! # Portability model
 //!
@@ -120,6 +122,7 @@
 //!   recording, and tracing wrappers.
 //! - [`decision`]: decision-model questions and answers, and typed decisions
 //!   (derives with feature `derive`).
+//! - [`extraction`]: extraction-model fields and answers (unstable).
 //! - [`chat`] and [`embedding`]: an overview of the chat and embedding
 //!   types, which are exported at the crate root (see [Paths](#paths));
 //!   [`chat::stream`] holds stream collection and commit-point helpers.
@@ -129,7 +132,7 @@
 //!   call, and the JSON Schema passes.
 //! - [`warning`]: warnings, the unsupported-feature policy, and warning
 //!   events.
-//! - [`extract`] (feature `extract`): typed structured extraction.
+//! - [`chat::extract`] (feature `chat-extract`): chat extraction, typed structured output from a chat model.
 //! - [`provider_data`]: provider-scoped data and replay rules.
 //! - [`history`]: versioned conversation history for persistence, and
 //!   tool-call validation before sending.
@@ -160,9 +163,9 @@
 //! | --- | --- | --- |
 //! | `warning-events` (default) | Every warning a call reports is also a `tracing` event ([`warning::emit`]), deduplicated by its code, with a target per kind; [`RetryingProvider`](wrappers::RetryingProvider) retries are `allama::retry` events and [`FallbackProvider`](wrappers::FallbackProvider) failovers `allama::fallback` events | `tracing` |
 //! | `schema` | `allama::schemars`, `ToolDefinition::from_schema`, `ResponseFormat::from_schema`, field paths in `ToolArgumentsError` | `schemars`, `serde_path_to_error` |
-//! | `extract` | `allama::extract` (`ExtractExt::extract`, `Extractor`), also in the prelude; implies `schema` | `schemars`, `serde_path_to_error` |
+//! | `chat-extract` | `allama::chat::extract` (`ChatExtractExt::extract`, `ChatExtractor`), also in the prelude; implies `schema`; `extract` is an alias | `schemars`, `serde_path_to_error` |
 //! | `derive` | `#[derive(Decision, ChoiceSet, Scale)]` in [`decision`] | `allama-derive` (`syn`, `quote`, `proc-macro2`, `heck`) |
-//! | `mock` | `allama::mock`: `MockProvider`, `MockStreamingProvider`, `MockEmbeddingProvider`, `MockDecisionProvider`, and other test doubles | nothing |
+//! | `mock` | `allama::mock`: `MockProvider`, `MockStreamingProvider`, `MockEmbeddingProvider`, `MockDecisionProvider`, `MockExtractionProvider`, and other test doubles | nothing |
 //! | `tracing` | `wrappers::TracingProvider` (OpenTelemetry GenAI spans), with the resilience summary wrappers report through `wrappers::call_scope`, and retry and fallback attempt events | `tracing` |
 //!
 //! Deriving tool parameters from a Rust type (`ToolDefinition::from_schema`)
@@ -295,12 +298,12 @@
 //!
 //! An extraction may take several provider calls (retries are opt-in), and a
 //! failed one was still billed. Both outcomes carry the same
-//! [`ExtractionMetadata`][extract::ExtractionMetadata], with the usage of
+//! [`ChatExtractionMetadata`][chat::extract::ChatExtractionMetadata], with the usage of
 //! every pass summed; a failure also keeps the last response:
 //!
 //! ```
-//! # #[cfg(feature = "extract")] {
-//! use allama::extract::Extractor;
+//! # #[cfg(feature = "chat-extract")] {
+//! use allama::chat::extract::ChatExtractor;
 //! use allama::schemars::{self, JsonSchema};
 //! use allama::{ChatProvider, ChatRequest, Error, Usage};
 //!
@@ -314,7 +317,7 @@
 //!     request: &ChatRequest,
 //!     bill: impl Fn(&Usage),
 //! ) -> allama::Result<Invoice> {
-//!     let result = Extractor::new()
+//!     let result = ChatExtractor::new()
 //!         .retries(1)
 //!         .extract::<_, Invoice>(provider, request)
 //!         .await;
@@ -334,7 +337,7 @@
 //! ```
 //!
 //! For one call without recovery, `provider.extract::<T>(&request)`
-//! ([`ExtractExt`][extract::ExtractExt]) is enough.
+//! ([`ChatExtractExt`][chat::extract::ChatExtractExt]) is enough.
 //!
 //! ## Embeddings at scale
 //!
@@ -414,6 +417,15 @@
 //! message (ids, timestamps, UI state) goes in its `app_data`, which is
 //! persisted but never sent (see
 //! [Application data](history#application-data)).
+//!
+//! # Stability
+//!
+//! A minor release (`0.x` to `0.(x+1)`) may break the API; a patch release
+//! does not. Beyond that, one module is **unstable** (ADR 0018):
+//! [`extraction`] and the [`ExtractionProvider`] trait, grounded in one
+//! provider, may change in any minor release with a release note but no
+//! migration path, and none of their names are persisted names. They
+//! become stable when a second provider implements the trait.
 //!
 //! # Serialization and stability
 //!
@@ -495,10 +507,10 @@
     "/docs/guides/applications.md",
 )]
 #![cfg_attr(
-    not(feature = "extract"),
-    doc = "[`extract`]: crate#cargo-features\n\
-           [extract::ExtractionMetadata]: crate#cargo-features\n\
-           [extract::ExtractExt]: crate#cargo-features"
+    not(feature = "chat-extract"),
+    doc = "[`chat::extract`]: crate#cargo-features\n\
+           [chat::extract::ChatExtractionMetadata]: crate#cargo-features\n\
+           [chat::extract::ChatExtractExt]: crate#cargo-features"
 )]
 
 mod capability;
@@ -516,8 +528,7 @@ pub mod adapter;
 pub mod chat;
 pub mod decision;
 pub mod embedding;
-#[cfg(feature = "extract")]
-pub mod extract;
+pub mod extraction;
 pub mod history;
 #[cfg(any(test, feature = "mock"))]
 pub mod mock;
@@ -565,13 +576,18 @@ pub use error::{
     Error, ErrorContext, ErrorLog, MessageOrigin, ParseEnumError, Result, SerializationError,
     StreamErrorKind, UnsupportedStage,
 };
+#[doc(inline)]
+pub use extraction::{
+    DynExtractionProvider, ExtractionCapability, ExtractionLimits, ExtractionProvider,
+    ExtractionRequest, ExtractionResponse,
+};
 pub use identity::{ProviderIdentity, ProviderIdentityExt, expose};
 pub use options::{ProviderOptions, RequestOptions};
 pub use provider_data::{ProviderData, ProviderDataEntry};
 pub use usage::Usage;
 pub use validation::{
-    ChatValidation, DecisionValidation, EmbeddingValidation, FallbackValidation, Validation,
-    ValidationCoverage,
+    ChatValidation, DecisionValidation, EmbeddingValidation, ExtractionValidation,
+    FallbackValidation, Validation, ValidationCoverage,
 };
 pub(crate) use warning::Degradations;
 pub use warning::{
@@ -707,13 +723,14 @@ pub mod prelude {
         CapabilitySupport, ChatCapability, ChatProvider, ChatProviderExt, ChatRequest,
         ChatResponse, ChatStream, ChatStreamExt, CollectedEvent, ContentBlock, ContentPart,
         DecisionProvider, DecisionProviderExt, DecisionRequest, DecisionResponse, DynChatProvider,
-        DynEmbeddingProvider, EmbeddingInputType, EmbeddingProvider, EmbeddingProviderExt,
-        EmbeddingRequest, EmbeddingResponse, Error, FinishReason, Message, ProviderIdentity,
+        DynEmbeddingProvider, DynExtractionProvider, EmbeddingInputType, EmbeddingProvider,
+        EmbeddingProviderExt, EmbeddingRequest, EmbeddingResponse, Error, ExtractionProvider,
+        ExtractionRequest, ExtractionResponse, FinishReason, Message, ProviderIdentity,
         ProviderIdentityExt, ReasoningConfig, ReasoningEffort, ReasoningOutput, RequestField,
         ResponseFormat, Result, StreamBlockType, StreamEvent, SystemPrompt, ToolCall, ToolChoice,
         ToolDefinition, UnsupportedPolicy, Usage,
     };
 
-    #[cfg(feature = "extract")]
-    pub use crate::extract::ExtractExt;
+    #[cfg(feature = "chat-extract")]
+    pub use crate::chat::extract::ChatExtractExt;
 }

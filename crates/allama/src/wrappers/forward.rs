@@ -228,6 +228,61 @@ macro_rules! __forward_decision_questions {
     };
 }
 
+/// Forward every question about an extraction provider to the provider in
+/// a field: [`extraction_capability`](crate::ExtractionProvider::extraction_capability),
+/// [`extraction_limits`](crate::ExtractionProvider::extraction_limits) and
+/// [`validate_extraction_request`](crate::ExtractionProvider::validate_extraction_request).
+///
+/// The extraction counterpart of
+/// [`forward_chat_questions!`](crate::wrappers::forward_chat_questions): a
+/// wrapper writes `extract_values` and this macro.
+///
+/// ```
+/// use allama::wrappers::{forward_extraction_questions, forward_provider_identity};
+/// use allama::{ExtractionProvider, ExtractionRequest, ExtractionResponse, ProviderIdentity, Result};
+///
+/// struct Logged<P> {
+///     inner: P,
+/// }
+///
+/// impl<P: ExtractionProvider> ExtractionProvider for Logged<P> {
+///     async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+///         eprintln!("extracting {} fields", request.fields.len());
+///         self.inner.extract_values(request).await
+///     }
+///
+///     forward_extraction_questions!(inner);
+/// }
+///
+/// impl<P: ProviderIdentity> ProviderIdentity for Logged<P> {
+///     forward_provider_identity!(inner);
+/// }
+/// ```
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __forward_extraction_questions {
+    ($($field:tt).+) => {
+        fn extraction_capability(
+            &self,
+            model: &str,
+            capability: $crate::ExtractionCapability,
+        ) -> $crate::CapabilitySupport {
+            $crate::ExtractionProvider::extraction_capability(&self.$($field).+, model, capability)
+        }
+
+        fn extraction_limits(&self, model: &str) -> $crate::ExtractionLimits {
+            $crate::ExtractionProvider::extraction_limits(&self.$($field).+, model)
+        }
+
+        fn validate_extraction_request(
+            &self,
+            request: &$crate::ExtractionRequest,
+        ) -> $crate::Result<$crate::ExtractionValidation> {
+            $crate::ExtractionProvider::validate_extraction_request(&self.$($field).+, request)
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use crate::mock::{MockEmbeddingProvider, MockProvider};

@@ -45,6 +45,8 @@
 //! - [`embedding`]: [`embedding::from_provider`] and
 //!   [`embedding::from_model`].
 //! - [`decision`]: [`decision::from_provider`] and [`decision::from_model`].
+//! - [`extraction`]: [`extraction::from_provider`] and
+//!   [`extraction::from_model`] (unstable, ADR 0018).
 //!
 //! Each has a `_with` twin taking [`ProviderSettings`], such as a credential
 //! scope.
@@ -90,24 +92,26 @@
 //!
 //! # Built-in providers
 //!
-//! | Key | Chat | Embeddings | Decisions | Feature |
-//! |---|---|---|---|---|
-//! | `anthropic` | `allama_anthropic::Provider` | | | `anthropic` |
-//! | `gemini` | `allama_gemini::Provider` | `allama_gemini::Provider` | | `gemini` |
-//! | `openai` | `allama_openai::ResponsesProvider` | `allama_openai::Provider` | | `openai` |
-//! | `openai-chat` | `allama_openai::Provider` (Chat Completions) | | | `openai` |
-//! | `openai-responses` | `allama_openai::ResponsesProvider`, as `openai` | | | `openai` |
-//! | `azure-responses` | `allama_openai_compat::ResponsesProvider` (`Azure::responses_from_env`) | | | `openai-compat` |
-//! | `github-copilot` | `allama_openai_compat` preset (`GitHubCopilot`, Chat Completions) | | | `openai-compat` |
-//! | `azure`, `deepinfra`, `deepseek`, `fireworks`, `groq`, `mistral`, `together`, `vllm`, `xai` | `allama_openai_compat` preset | same preset | | `openai-compat` |
-//! | `cloudflare`, `ollama`, `openrouter` | `allama_openai_compat` preset | same preset | `allama_systemone` preset | `openai-compat`, `systemone` |
-//! | `digitalocean`, `litellm`, `typesafe` | | | `allama_systemone` preset | `systemone` |
+//! | Key | Chat | Embeddings | Decisions | Extraction | Feature |
+//! |---|---|---|---|---|---|
+//! | `anthropic` | `allama_anthropic::Provider` | | | | `anthropic` |
+//! | `gemini` | `allama_gemini::Provider` | `allama_gemini::Provider` | | | `gemini` |
+//! | `openai` | `allama_openai::ResponsesProvider` | `allama_openai::Provider` | | | `openai` |
+//! | `openai-chat` | `allama_openai::Provider` (Chat Completions) | | | | `openai` |
+//! | `openai-responses` | `allama_openai::ResponsesProvider`, as `openai` | | | | `openai` |
+//! | `azure-responses` | `allama_openai_compat::ResponsesProvider` (`Azure::responses_from_env`) | | | | `openai-compat` |
+//! | `github-copilot` | `allama_openai_compat` preset (`GitHubCopilot`, Chat Completions) | | | | `openai-compat` |
+//! | `azure`, `deepinfra`, `deepseek`, `fireworks`, `groq`, `mistral`, `together`, `vllm`, `xai` | `allama_openai_compat` preset | same preset | | | `openai-compat` |
+//! | `cloudflare` | `allama_openai_compat` preset | same preset | `allama_systemone` preset | `allama_cloudflare::Provider` | `openai-compat`, `systemone`, `cloudflare` |
+//! | `ollama`, `openrouter` | `allama_openai_compat` preset | same preset | `allama_systemone` preset | | `openai-compat`, `systemone` |
+//! | `digitalocean`, `litellm`, `typesafe` | | | `allama_systemone` preset | | `systemone` |
 //!
 //! A key names one provider configuration; its operations may come from
 //! different crates. `ollama` reaches the same server (`OLLAMA_HOST`) for
 //! chat, embeddings, and decisions, and `cloudflare` the same Workers AI
 //! account (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`), with Clef
-//! models (`cloudflare:@cf/cloudflare/clef`) for decisions.
+//! models (`cloudflare:@cf/cloudflare/clef`) for decisions and Clairic
+//! (`cloudflare:@cf/cloudflare/clairic`) for extraction.
 //!
 //! Azure, like OpenAI, has two chat APIs: `azure` is Chat Completions and
 //! `azure-responses` the Responses API, at the same resource with the same
@@ -190,8 +194,8 @@
 //! `chat::from_model` resolves to.
 //!
 //! A provider you build yourself, outside any registry, gets the same
-//! wrappers from [`chat::wrap`], [`embedding::wrap`] or
-//! [`decision::wrap`]. They refuse the settings only a constructor can
+//! wrappers from [`chat::wrap`], [`embedding::wrap`], [`decision::wrap`] or
+//! [`extraction::wrap`]. They refuse the settings only a constructor can
 //! apply, as a lookup of a constructor registered without settings does:
 //!
 //! ```no_run
@@ -215,6 +219,7 @@ mod stack;
 pub mod chat;
 pub mod decision;
 pub mod embedding;
+pub mod extraction;
 
 pub use address::ModelAddress;
 pub use registry::Registry;

@@ -64,6 +64,8 @@
 
 pub(crate) mod cache;
 pub(crate) mod content;
+#[cfg(feature = "chat-extract")]
+pub mod extract;
 pub(crate) mod message;
 pub(crate) mod preflight;
 pub(crate) mod prepared;

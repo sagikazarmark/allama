@@ -321,8 +321,8 @@ error; read an extraction failure's reason from `Error::Extract { failure }`:
   way every time: too long for the model, blocked by a content filter,
   content the model cannot read, declined by the model, or output that
   does not fit the type. Keep what a person needs to look at it: the
-  model's raw output (`ExtractError::raw_output()`) and the response
-  (`ExtractFailure::response()`).
+  model's raw output (`ChatExtractError::raw_output()`) and the response
+  (`ChatExtractFailure::response()`).
 - **Stop the worker**: a setup mistake fails every job the same way, so
   stop taking jobs and alert: a rejected key, a missing credential, a
   model the provider does not have, a feature the model lacks, an
@@ -332,7 +332,7 @@ error; read an extraction failure's reason from `Error::Extract { failure }`:
 ```rust
 use std::time::Duration;
 
-use allama::extract::{ExtractError, ExtractExt};
+use allama::chat::extract::{ChatExtractError, ChatExtractExt};
 use allama::mock::MockProvider;
 use allama::schemars::{self, JsonSchema};
 use allama::{ChatProvider, ChatRequest, Error, Subject};
@@ -381,9 +381,9 @@ fn classify(error: &Error) -> JobFailure {
     match error {
         Error::Extract { failure, .. } => match failure.error() {
             // Asking again pays for the same answer.
-            ExtractError::Refused { .. } => set_aside("the model declined"),
+            ChatExtractError::Refused { .. } => set_aside("the model declined"),
             // Every long enough invoice would be cut off.
-            ExtractError::Truncated { .. } => stop("max_output_tokens is too small"),
+            ChatExtractError::Truncated { .. } => stop("max_output_tokens is too small"),
             // Output that does not fit `Invoice`: keep it for review.
             other => JobFailure::SetAside {
                 reason: other.to_string(),
@@ -441,10 +441,10 @@ async fn main() {
 }
 ```
 
-`extract` makes one provider call; an `Extractor` sends a parse failure
+`extract` makes one provider call; an `ChatExtractor` sends a parse failure
 back to the model and asks again, which can save a job from being set
 aside (see
-[`allama::extract`, "Recovery is opt-in"](https://docs.rs/allama/latest/allama/extract/index.html#recovery-is-opt-in)).
+[`allama::chat::extract`, "Recovery is opt-in"](https://docs.rs/allama/latest/allama/chat-extract/index.html#recovery-is-opt-in)).
 Run the [smoke call](#a-smoke-call-for-credentials-and-the-model-id) when
 the worker starts, so a setup mistake stops it before it takes a job, and
 bound how many jobs call one provider at once, since every job past its
@@ -2681,8 +2681,8 @@ check can tell that apart from an answer.
 
 Extraction checks the same finishes before parsing: a refusal (written by
 the model, or a `Refusal` or `ContentFilter` finish) fails with
-`ExtractError::Refused`, whose `text` quotes the model's refusal or the
-provider's explanation, and `Length` with `ExtractError::Truncated`.
+`ChatExtractError::Refused`, whose `text` quotes the model's refusal or the
+provider's explanation, and `Length` with `ChatExtractError::Truncated`.
 Neither is retried, since asking again pays for the same answer.
 
 **Watching it in production.** With the default `warning-events` feature,
@@ -2724,7 +2724,7 @@ dev-dependency). Which one:
   `MockProvider::with_error` fails the call too.
 - **Extraction and parallel tool calls** script with
   `MockResponse::structured(json)` and `.tool_calls([..])`. A
-  structured response answers in whichever form the `Extractor` asked for
+  structured response answers in whichever form the `ChatExtractor` asked for
   (the forced tool call, or JSON text), so a test does not depend on the
   extraction strategy. `.tool_calls([..])` puts several calls in one
   reply, the way a model calls tools in parallel. Both are on

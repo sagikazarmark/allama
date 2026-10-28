@@ -19,7 +19,9 @@
 // The fixture type is only deserialized into.
 #![allow(dead_code)]
 
-use allama::extract::{ExtractError, ExtractExt, ExtractionMode, SchemaEnforcement};
+use allama::chat::extract::{
+    ChatExtractError, ChatExtractExt, ChatExtractionMode, SchemaEnforcement,
+};
 use allama::prelude::*;
 use allama::{
     CapabilitySupport, ChatCapability, RequestField, UnsupportedPolicy, UnsupportedStage,
@@ -240,8 +242,8 @@ async fn extraction_enforcement_per_preset() {
         ("vllm", "m", Some(Approximate), Some(Approximate)),
     ] {
         for (mode, expected, answer) in [
-            (ExtractionMode::Native, native, text()),
-            (ExtractionMode::ForcedTool, forced, tool_call()),
+            (ChatExtractionMode::Native, native, text()),
+            (ChatExtractionMode::ForcedTool, forced, tool_call()),
         ] {
             let request = ChatRequest::new(model).user("Ada").with_option(mode);
             let transport = ReplayTransport::new([answer]);
@@ -276,7 +278,11 @@ async fn auto_picks_native_output_where_it_is_constrained() {
             .extract::<Person>(&request)
             .await
             .unwrap();
-        assert_eq!(extracted.metadata.mode, ExtractionMode::Native, "{name}");
+        assert_eq!(
+            extracted.metadata.mode,
+            ChatExtractionMode::Native,
+            "{name}"
+        );
         assert_eq!(
             extracted.metadata.enforcement,
             SchemaEnforcement::Approximate,
@@ -292,7 +298,10 @@ async fn auto_picks_native_output_where_it_is_constrained() {
     let Error::Extract { failure, .. } = err else {
         panic!("expected an extraction failure: {err}");
     };
-    assert!(matches!(failure.error(), ExtractError::Unsupported { .. }));
+    assert!(matches!(
+        failure.error(),
+        ChatExtractError::Unsupported { .. }
+    ));
     assert!(transport.requests().is_empty());
 }
 
@@ -466,7 +475,7 @@ async fn cloudflare_auto_extraction_falls_back_on_a_refused_response_format() {
         .await
         .unwrap();
     assert_eq!(extracted.value.name, "Ada");
-    assert_eq!(extracted.metadata.mode, ExtractionMode::ForcedTool);
+    assert_eq!(extracted.metadata.mode, ChatExtractionMode::ForcedTool);
     assert!(extracted.metadata.auto_fallback.is_some());
     assert_eq!(transport.requests().len(), 2);
 }
@@ -505,7 +514,7 @@ async fn responses_auto_extraction_falls_back_on_a_codeless_refusal() {
         .await
         .unwrap();
     assert_eq!(extracted.value.name, "Ada");
-    assert_eq!(extracted.metadata.mode, ExtractionMode::ForcedTool);
+    assert_eq!(extracted.metadata.mode, ChatExtractionMode::ForcedTool);
     assert!(extracted.metadata.auto_fallback.is_some());
     let requests = transport.requests();
     assert_eq!(requests.len(), 2);

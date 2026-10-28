@@ -58,7 +58,7 @@ all of them without becoming generic over any one.
      treats it as foreign state.
    - `allama.<area>` names a core record by the area that owns it:
      application data (`allama.turn`), error metadata, the extraction
-     options namespace (`allama.extraction`), span attributes
+     options namespace (`allama.extraction`; `allama.chat.extraction` since ADR 0018), span attributes
      (`allama.retry.*`, following OpenTelemetry's dotted names). Every key
      starting with `allama.` is reserved.
    - `allama-http` is the options namespace of the `allama-http` crate's

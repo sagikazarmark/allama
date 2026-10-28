@@ -316,9 +316,9 @@ impl MockResponse {
     /// synthetic tool, native mode gets JSON text.
     ///
     /// ```
-    /// # #[cfg(feature = "extract")]
+    /// # #[cfg(feature = "chat-extract")]
     /// # tokio::runtime::Builder::new_current_thread().build().unwrap().block_on(async {
-    /// use allama::extract::{ExtractExt, ExtractionMode};
+    /// use allama::chat::extract::{ChatExtractExt, ChatExtractionMode};
     /// use allama::mock::{MockProvider, MockResponse};
     /// use allama::schemars::{self, JsonSchema};
     /// use allama::ChatRequest;
@@ -329,7 +329,7 @@ impl MockResponse {
     ///     name: String,
     /// }
     ///
-    /// for mode in [ExtractionMode::Native, ExtractionMode::ForcedTool] {
+    /// for mode in [ChatExtractionMode::Native, ChatExtractionMode::ForcedTool] {
     ///     let provider = MockProvider::new([MockResponse::structured(json!({"name": "Ada"}))]);
     ///     let request = ChatRequest::new("m").user("Ada wrote it.").with_option(mode);
     ///     let extracted = provider.extract::<Person>(&request).await?;
@@ -337,8 +337,11 @@ impl MockResponse {
     /// }
     /// # Ok::<(), allama::Error>(()) }).unwrap();
     /// ```
-    #[cfg_attr(feature = "extract", doc = "[extraction]: crate::extract")]
-    #[cfg_attr(not(feature = "extract"), doc = "[extraction]: crate#cargo-features")]
+    #[cfg_attr(feature = "chat-extract", doc = "[extraction]: crate::chat::extract")]
+    #[cfg_attr(
+        not(feature = "chat-extract"),
+        doc = "[extraction]: crate#cargo-features"
+    )]
     #[must_use]
     pub fn structured(value: serde_json::Value) -> Self {
         Self::Structured(value)
@@ -980,7 +983,7 @@ impl ChatProvider for FunctionProvider {
 /// arguments generated from the tool's JSON Schema. Otherwise, when the
 /// request asks for a [`ResponseFormat::JsonSchema`], it answers with a
 /// value generated from that schema, so `extract` (feature `extract`)
-/// works against it in every `ExtractionMode`; it reports
+/// works against it in every `ChatExtractionMode`; it reports
 /// [`StructuredOutput`](ChatCapability::StructuredOutput) as supported.
 /// Otherwise it answers with text describing the conversation.
 ///

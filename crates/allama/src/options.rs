@@ -83,7 +83,7 @@ type ErasedAny = dyn Any + Send + Sync;
 /// OpenAI-compatible preset reads its options under the shared
 /// `"openai-compat"` namespace while it stores its state under
 /// `"openai-compat:<name>"`, so one options value configures every preset.
-/// A few options namespaces belong to no provider: `"allama.extraction"` is
+/// A few options namespaces belong to no provider: `"allama.chat.extraction"` is
 /// read by extraction, and `"allama-http"` by the transport code of every
 /// HTTP adapter. Within one options bag, each namespace maps to a single
 /// options type: [`RequestOptions::resolve`] fails when a typed value of

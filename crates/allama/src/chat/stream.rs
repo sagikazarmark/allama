@@ -1335,7 +1335,7 @@ impl StreamCollector {
     /// The response-level metadata merged so far (usage, warnings, id,
     /// model, finish reason), without content: blocks are assembled when
     /// the collector finishes.
-    #[cfg_attr(not(feature = "extract"), allow(dead_code))]
+    #[cfg_attr(not(feature = "chat-extract"), allow(dead_code))]
     pub(crate) fn response_metadata(&self) -> &ChatResponse {
         &self.response
     }
@@ -2380,10 +2380,10 @@ mod tests {
         assert!(capabilities.contains(&(ChatCapability::ToolCalls, CapabilitySupport::Supported)));
         let _: HashSet<StreamErrorKind> = HashSet::new();
         let _: HashSet<UsageMetadataMode> = HashSet::new();
-        #[cfg(feature = "extract")]
+        #[cfg(feature = "chat-extract")]
         {
-            let _: HashSet<crate::extract::RefusalSource> = HashSet::new();
-            let _: HashSet<crate::extract::ExtractionMode> = HashSet::new();
+            let _: HashSet<crate::chat::extract::RefusalSource> = HashSet::new();
+            let _: HashSet<crate::chat::extract::ChatExtractionMode> = HashSet::new();
         }
     }
 

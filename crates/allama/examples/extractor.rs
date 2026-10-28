@@ -7,7 +7,7 @@
 //! a final user message. Every extraction reports the calls it made and
 //! their summed usage, on success and on failure.
 
-use allama::extract::{ExtractError, Extracted, ExtractionMode, Extractor};
+use allama::chat::extract::{ChatExtractError, ChatExtracted, ChatExtractionMode, ChatExtractor};
 use allama::mock::{ChatResponseBuilder, MockProvider, MockResponse};
 use allama::prelude::*;
 use allama::schemars::{self, JsonSchema};
@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     let request = chat.clone().user(instruction);
     match provider().extract::<Review>(&request).await {
         Err(Error::Extract { failure, .. })
-            if matches!(failure.error(), ExtractError::ToolConflict { .. }) =>
+            if matches!(failure.error(), ChatExtractError::ToolConflict { .. }) =>
         {
             println!("extraction refuses a request that carries its own tools");
         }
@@ -66,10 +66,12 @@ async fn main() -> anyhow::Result<()> {
     let conversation = ChatRequest::new(&chat.model)
         .extend_messages(chat.messages.clone())
         .user(instruction);
-    let extracted: Extracted<Review> = Extractor::new()
+    let extracted: ChatExtracted<Review> = ChatExtractor::new()
         .extract(
             &provider(),
-            &conversation.clone().with_option(ExtractionMode::ForcedTool),
+            &conversation
+                .clone()
+                .with_option(ChatExtractionMode::ForcedTool),
         )
         .await?;
     println!(
@@ -93,12 +95,12 @@ async fn main() -> anyhow::Result<()> {
                 .build(),
         )
     });
-    let recovered: Extracted<Review> = Extractor::new()
+    let recovered: ChatExtracted<Review> = ChatExtractor::new()
         .repair(true)
         .retries(1)
         .extract(
             &flaky,
-            &conversation.clone().with_option(ExtractionMode::Native),
+            &conversation.clone().with_option(ChatExtractionMode::Native),
         )
         .await?;
     println!(
@@ -119,11 +121,11 @@ async fn main() -> anyhow::Result<()> {
             .usage(120, 8)
             .build(),
     );
-    match Extractor::new()
+    match ChatExtractor::new()
         .retries(2)
         .extract::<_, Review>(
             &truncated,
-            &conversation.with_option(ExtractionMode::Native),
+            &conversation.with_option(ChatExtractionMode::Native),
         )
         .await
     {
@@ -140,7 +142,8 @@ async fn main() -> anyhow::Result<()> {
     let stored = ChatResponseBuilder::new()
         .text(r#"{"title": "Heat", "rating": 10}"#)
         .build();
-    let parsed: Extracted<Review> = Extractor::new().parse(stored, ExtractionMode::Native)?;
+    let parsed: ChatExtracted<Review> =
+        ChatExtractor::new().parse(stored, ChatExtractionMode::Native)?;
     println!("parsed stored response: {}", parsed.value.title);
     Ok(())
 }

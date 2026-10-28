@@ -9,7 +9,8 @@ and in the crate READMEs; the domain glossary is
 | --- | --- | --- |
 | Guides | [`guides/`](guides) | Current. How-to material for library users and provider authors. |
 | Decisions (ADRs) | [`decisions/`](decisions) | Current unless marked superseded. Each records one design choice and why. |
-| Model catalog evidence | [`catalog/`](catalog) | Current. Model-specific claims the adapters do not apply (ADR 0020), with their evidence. |
+| Model catalog evidence | [`catalog/`](catalog) | Current. Model-specific claims the adapters do not apply (ADR 0015), with their evidence. |
+| Research notes | [`research/`](research) | Dated. What was found about a question before a decision; a decision, if one follows, is an ADR. |
 
 ## Guides
 
@@ -59,4 +60,11 @@ Runnable examples are in [`crates/allama/examples`](../crates/allama/examples)
 | [0015](decisions/0015-provider-level-capabilities.md) | Capabilities belong to the provider; model knowledge is an opt-in catalog |
 | [0016](decisions/0016-model-addresses-and-the-builtin-registry.md) | Model addresses have a fixed grammar; the built-in registry is closed |
 | [0017](decisions/0017-conformance-contract-lifecycle.md) | Conformance contracts are added in minor releases, and required only when adapters pass them |
+| [0018](decisions/0018-extraction-models.md) | Extraction models are a sibling trait, unstable until a second provider; chat extraction takes its name |
+
+## Research notes
+
+| Date | Question |
+| --- | --- |
+| [2026-10-27](research/2026-10-27-extraction-models.md) | Extraction models (Cloudflare Clairic): how the ecosystem integrates the second System One class, and whether allama should |
 

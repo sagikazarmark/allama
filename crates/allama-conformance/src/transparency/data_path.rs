@@ -13,12 +13,13 @@ use std::time::Duration;
 use allama::adapter::Degradations;
 use allama::chat::stream::{MetadataBuilder, StreamBlockType};
 use allama::decision::{Answer, ChoiceAnswer, Question, ScoreAnswer, YesNoAnswer};
+use allama::extraction::{self, Field};
 use allama::{
     ChatProvider, ChatRequest, ChatResponse, ChatStream, ContentBlock, DecisionProvider,
     DecisionRequest, DecisionResponse, EmbeddingProvider, EmbeddingRequest, EmbeddingResponse,
-    Error, FinishReason, Message, MessageOrigin, ProviderData, RequestField, StreamErrorKind,
-    StreamEvent, Subject, UnsupportedPolicy, UnsupportedStage, Usage, Warning, WarningCause,
-    WarningKind,
+    Error, ExtractionProvider, ExtractionRequest, ExtractionResponse, FinishReason, Message,
+    MessageOrigin, ProviderData, RequestField, StreamErrorKind, StreamEvent, Subject,
+    UnsupportedPolicy, UnsupportedStage, Usage, Warning, WarningCause, WarningKind,
 };
 use futures_util::StreamExt;
 use serde_json::{Value, json};
@@ -80,6 +81,11 @@ impl Scenario {
     /// The scenario a decision request names.
     pub(super) fn of_decision(request: &DecisionRequest) -> Self {
         Self::parse(request.questions.first().map(|(name, _)| name.as_str()))
+    }
+
+    /// The scenario an extraction request names.
+    pub(super) fn of_extraction(request: &ExtractionRequest) -> Self {
+        Self::parse(request.fields.first().map(|(name, _)| name.as_str()))
     }
 }
 
@@ -278,6 +284,82 @@ fn decision_response(request: &DecisionRequest) -> DecisionResponse {
         (name.clone(), answer)
     });
     let mut response = DecisionResponse::new(answers)
+        .model(RESPONSE_MODEL)
+        .id(RESPONSE_ID)
+        .request_id(REQUEST_ID)
+        .provider(TransparencyProbe::PROVIDER_NAME)
+        .usage(usage())
+        .provider_data(provider_data());
+    response.warnings = warnings();
+    response
+}
+
+/// The probe's answer to an extraction call: a valid answer to every
+/// field.
+pub(super) fn extract_values(
+    scenario: Scenario,
+    request: &ExtractionRequest,
+) -> allama::Result<ExtractionResponse> {
+    match scenario {
+        Scenario::Ok => Ok(extraction_response(request)),
+        Scenario::Error(index) | Scenario::StreamError(index) => Err(error(index)),
+    }
+}
+
+fn extraction_response(request: &ExtractionRequest) -> ExtractionResponse {
+    let answers = request.fields.iter().map(|(name, field)| {
+        let answer: extraction::Answer = match field {
+            Field::Text(_) => extraction::TextAnswer::new(Some("probe"))
+                .span(extraction::TextSpan::new(0, 5))
+                .null_probability(0.01)
+                .into(),
+            Field::Number(_) => extraction::NumberAnswer::new(Some(7.0))
+                .null_probability(0.01)
+                .into(),
+            Field::Date(_) => extraction::DateAnswer::new(Some(
+                "2026-01-02".parse::<extraction::Date>().expect("a date"),
+            ))
+            .null_probability(0.01)
+            .into(),
+            Field::Time(_) => extraction::TimeAnswer::new(Some(
+                "13:34:00".parse::<extraction::Time>().expect("a time"),
+            ))
+            .into(),
+            Field::DateTime(_) => extraction::DateTimeAnswer::new(Some(
+                "2026-01-02T13:34:00"
+                    .parse::<extraction::DateTime>()
+                    .expect("a datetime"),
+            ))
+            .into(),
+            Field::Duration(duration) => {
+                extraction::DurationAnswer::new(Some(3.0), duration.unit).into()
+            }
+            Field::List(list) => extraction::ListAnswer::new([match list.items {
+                extraction::ListItemKind::Number => extraction::ListItem::number(1.0),
+                extraction::ListItemKind::Date => {
+                    extraction::ListItem::date("2026-01-02".parse().expect("a date"))
+                }
+                _ => extraction::ListItem::text("probe").span(extraction::TextSpan::new(0, 5)),
+            }])
+            .into(),
+            Field::Estimate(estimate) => {
+                let mid = f64::midpoint(estimate.min, estimate.max);
+                extraction::EstimateAnswer::new(mid)
+                    .median(mid)
+                    .interval(estimate.min, estimate.max, 0.8)
+                    .into()
+            }
+            Field::Forecast(forecast) => {
+                extraction::ForecastAnswer::new((0..forecast.horizon).map(|_| {
+                    extraction::EstimateAnswer::new(f64::midpoint(forecast.min, forecast.max))
+                }))
+                .into()
+            }
+            _ => unreachable!("every field kind is answered"),
+        };
+        (name.clone(), answer)
+    });
+    let mut response = ExtractionResponse::new(answers)
         .model(RESPONSE_MODEL)
         .id(RESPONSE_ID)
         .request_id(REQUEST_ID)
@@ -657,6 +739,41 @@ pub(super) async fn decision_problems<W: DecisionProvider + ?Sized>(wrapper: &W)
     problems
 }
 
+/// A field every probe model is asked about: the probe answers date
+/// fields `Supported` for [`TransparencyProbe::MODELS`]`[0]`.
+fn extraction_request(scenario: Scenario) -> ExtractionRequest {
+    ExtractionRequest::new(TransparencyProbe::MODELS[0], "probe").field(
+        scenario.text(),
+        Field::date().instructions("When was the data path checked?"),
+    )
+}
+
+/// The data path checks of an extraction wrapper, as problems.
+pub(super) async fn extraction_problems<W: ExtractionProvider + ?Sized>(
+    wrapper: &W,
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    let request = extraction_request(Scenario::Ok);
+    let expected = extraction_response(&request);
+    let problem = match wrapper.extract_values(&request).await {
+        Ok(response) => response_problem(&response, &expected, |r| &r.warnings),
+        Err(err) => Some(format!("the probe's response became an error: {err}")),
+    };
+    problems.extend(problem.map(|problem| format!("extract_values (Ok): {problem}")));
+    for (index, expected) in errors().iter().enumerate() {
+        let scenario = Scenario::Error(index);
+        let problem = match wrapper.extract_values(&extraction_request(scenario)).await {
+            Ok(_) => Some(format!(
+                "the probe's {} error became a response",
+                expected.kind_name()
+            )),
+            Err(err) => error_problem(&err, expected),
+        };
+        problems.extend(problem.map(|problem| format!("extract_values ({scenario:?}): {problem}")));
+    }
+    problems
+}
+
 /// Panic with `problems` of the wrapper `wrapper_name`, if there are any.
 pub(super) fn report(wrapper_name: &str, problems: &[String]) {
     assert!(
@@ -690,6 +807,31 @@ mod tests {
         );
         let request = decision_request(Scenario::Ok);
         decision_response(&request).validate(&request).unwrap();
+    }
+
+    #[test]
+    fn the_extraction_field_is_supported_and_every_kind_validates() {
+        use allama::ExtractionCapability;
+
+        assert_eq!(
+            TransparencyProbe
+                .extraction_capability(TransparencyProbe::MODELS[0], ExtractionCapability::Date),
+            CapabilitySupport::Supported
+        );
+        let request = extraction_request(Scenario::Ok);
+        extraction_response(&request).validate(&request).unwrap();
+        // The probe answers every kind with a valid answer.
+        let all = ExtractionRequest::new("m", "probe")
+            .field("t", Field::text())
+            .field("n", Field::number())
+            .field("d", Field::date())
+            .field("ti", Field::time())
+            .field("dt", Field::datetime())
+            .field("du", Field::duration(extraction::DurationUnit::Hours))
+            .field("l", Field::list(extraction::ListItemKind::Date))
+            .field("e", Field::estimate(1.0, 3.0))
+            .field("f", Field::forecast(0.0, 10.0).horizon(4));
+        extraction_response(&all).validate(&all).unwrap();
     }
 
     #[test]

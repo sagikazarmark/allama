@@ -307,6 +307,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
+      # Clairic, the extraction model, on the same account (allama-cloudflare).
+      - name: Run extraction e2e tests
+        run: cargo test --locked -p allama-cloudflare --test e2e -- --ignored --nocapture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
   # Azure OpenAI, on both of its chat APIs. Optional: skipped whenever its
   # secrets are missing, the scheduled run included. Model names are
   # deployment names on the configured resource.

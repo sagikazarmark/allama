@@ -1,7 +1,8 @@
 //! What a dry run of a request found: [`Validation`].
 
 use crate::{
-    Capability, ChatCapability, DecisionCapability, EmbeddingCapability, Result, Subject, Warning,
+    Capability, ChatCapability, DecisionCapability, EmbeddingCapability, ExtractionCapability,
+    Result, Subject, Warning,
 };
 
 /// What validating a request found, without sending it.
@@ -57,6 +58,9 @@ pub type EmbeddingValidation = Validation<EmbeddingCapability>;
 
 /// What validating a decision request found.
 pub type DecisionValidation = Validation<DecisionCapability>;
+
+/// What validating an extraction request found.
+pub type ExtractionValidation = Validation<ExtractionCapability>;
 
 /// How far a [`Validation`] went.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

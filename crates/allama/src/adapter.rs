@@ -3,8 +3,9 @@
 //!
 //! Applications do not need this module. It is for code that implements
 //! [`ChatProvider`](crate::ChatProvider),
-//! [`EmbeddingProvider`](crate::EmbeddingProvider) or
-//! [`DecisionProvider`](crate::DecisionProvider) against a wire API: a
+//! [`EmbeddingProvider`](crate::EmbeddingProvider),
+//! [`DecisionProvider`](crate::DecisionProvider) or
+//! [`ExtractionProvider`](crate::ExtractionProvider) against a wire API: a
 //! provider crate, or an application's own adapter for an in-house
 //! gateway. The [provider authors' guide] walks through it.
 //!
@@ -22,9 +23,9 @@
 //!   [`MISSING_FINISH_REASON`](chat::MISSING_FINISH_REASON); and
 //!   [`ToolCallIdFormat`](chat::ToolCallIdFormat), which maps the tool call
 //!   ids of a history from another provider to ones the wire accepts.
-//! - [`embedding`] and [`decision`]: the same `prepare` step for the other
-//!   operations, and [`check_response`](embedding::check_response) for
-//!   embedding vectors.
+//! - [`embedding`], [`decision`] and [`extraction`]: the same `prepare`
+//!   step for the other operations, and
+//!   [`check_response`](embedding::check_response) for embedding vectors.
 //! - [`schema`]: the JSON Schema passes adapters compose into a provider's
 //!   dialect, and the strict-schema policy.
 //! - [`Degradations`]: the warnings and refusals a request collects while
@@ -136,6 +137,12 @@ pub mod decision {
     //! The decision steps adapters share around encoding a request.
 
     pub use crate::decision::prepared::{Prepared, prepare, prepare_dry_run};
+}
+
+pub mod extraction {
+    //! The extraction steps adapters share around encoding a request.
+
+    pub use crate::extraction::prepared::{Prepared, prepare, prepare_dry_run};
 }
 
 pub mod schema {

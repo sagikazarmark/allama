@@ -4,7 +4,7 @@
 //! `#[serde(default)]` fields with a default stay non-nullable. Covers both
 //! extraction modes and strict tool arguments (`parse_arguments_with`).
 
-use allama::extract::{ExtractExt, ExtractionMode};
+use allama::chat::extract::{ChatExtractExt, ChatExtractionMode};
 use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama_http::{ReplayResponse, ReplayTransport};
@@ -195,7 +195,7 @@ async fn native_extraction_round_trips_strict_nulls() {
         let transport = ReplayTransport::new([api.text(&strict_output().to_string())]);
         let request = ChatRequest::new(MODEL)
             .user("I was charged twice.")
-            .with_option(ExtractionMode::Native);
+            .with_option(ChatExtractionMode::Native);
         let extracted = api
             .provider(&transport)
             .extract::<Ticket>(&request)
@@ -214,7 +214,7 @@ async fn forced_tool_extraction_round_trips_strict_nulls() {
             ReplayTransport::new([api.tool_call("submit_structured_output", &strict_output())]);
         let request = ChatRequest::new(MODEL)
             .user("I was charged twice.")
-            .with_option(ExtractionMode::ForcedTool);
+            .with_option(ChatExtractionMode::ForcedTool);
         let extracted = api
             .provider(&transport)
             .extract::<Ticket>(&request)

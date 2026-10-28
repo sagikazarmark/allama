@@ -9,8 +9,9 @@ repository = { workspace = true }
 publish = false
 
 [dependencies]
-allama = { workspace = true, features = ["derive", "extract", "warning-events"] }
+allama = { workspace = true, features = ["derive", "chat-extract", "warning-events"] }
 allama-anthropic = { workspace = true, features = ["default"] }
+allama-cloudflare = { workspace = true, features = ["default"] }
 allama-gemini = { workspace = true, features = ["default"] }
 allama-openai = { workspace = true, features = ["default"] }
 allama-providers = { workspace = true, features = ["default"] }
@@ -24,7 +25,7 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 [dev-dependencies]
 allama = { workspace = true, features = ["mock", "tracing"] }
 allama-cloudflare-worker = { workspace = true }
-allama-conformance = { workspace = true, features = ["extract", "server"] }
+allama-conformance = { workspace = true, features = ["chat-extract", "server"] }
 allama-http = { workspace = true, features = ["reqwest"] }
 allama-openai-compat = { workspace = true }
 

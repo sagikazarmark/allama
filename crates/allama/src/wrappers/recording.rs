@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::chat::stream::{StreamCollector, StreamTranscript};
 use crate::{
     ChatProvider, ChatRequest, ChatResponse, DecisionProvider, DecisionRequest, DecisionResponse,
-    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, Error, ProviderIdentity, Result,
-    StreamEvent, Warning,
+    EmbeddingProvider, EmbeddingRequest, EmbeddingResponse, Error, ExtractionProvider,
+    ExtractionRequest, ExtractionResponse, ProviderIdentity, Result, StreamEvent, Warning,
 };
 
 /// The record of one chat call: what was asked, and what happened.
@@ -242,6 +242,18 @@ where
     }
 
     super::forward_decision_questions!(inner);
+}
+
+impl<P, F> ExtractionProvider for RecordingProvider<P, F>
+where
+    P: ExtractionProvider,
+    F: Fn(ChatExchange) + Send + Sync,
+{
+    async fn extract_values(&self, request: &ExtractionRequest) -> Result<ExtractionResponse> {
+        self.inner.extract_values(request).await
+    }
+
+    super::forward_extraction_questions!(inner);
 }
 
 impl<P, F> ProviderIdentity for RecordingProvider<P, F>

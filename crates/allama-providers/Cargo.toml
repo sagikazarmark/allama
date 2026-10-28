@@ -10,10 +10,12 @@ keywords = ["llm", "ai", "providers", "config", "registry"]
 categories = ["api-bindings", "artificial-intelligence", "config"]
 
 [features]
-default = ["anthropic", "default-tls", "gemini", "openai", "openai-compat", "systemone", "warning-events"]
+default = ["anthropic", "cloudflare", "default-tls", "gemini", "openai", "openai-compat", "systemone", "warning-events"]
 # Providers are built from configuration (`from_env`), so each one comes
 # with its default `reqwest` transport.
 anthropic = ["dep:allama-anthropic", "allama-anthropic/reqwest"]
+# Workers AI over REST: extraction models (unstable, ADR 0018).
+cloudflare = ["dep:allama-cloudflare", "allama-cloudflare/reqwest"]
 gemini = ["dep:allama-gemini", "allama-gemini/reqwest"]
 openai = ["dep:allama-openai", "allama-openai/reqwest"]
 openai-compat = ["dep:allama-openai-compat", "allama-openai-compat/reqwest"]
@@ -25,6 +27,7 @@ warning-events = ["allama/warning-events"]
 # disabling default features, or HTTPS endpoints cannot be reached.
 default-tls = [
     "allama-anthropic?/default-tls",
+    "allama-cloudflare?/default-tls",
     "allama-gemini?/default-tls",
     "allama-openai?/default-tls",
     "allama-openai-compat?/default-tls",
@@ -32,6 +35,7 @@ default-tls = [
 ]
 native-tls = [
     "allama-anthropic?/native-tls",
+    "allama-cloudflare?/native-tls",
     "allama-gemini?/native-tls",
     "allama-openai?/native-tls",
     "allama-openai-compat?/native-tls",
@@ -39,6 +43,7 @@ native-tls = [
 ]
 rustls = [
     "allama-anthropic?/rustls",
+    "allama-cloudflare?/rustls",
     "allama-gemini?/rustls",
     "allama-openai?/rustls",
     "allama-openai-compat?/rustls",
@@ -48,6 +53,7 @@ rustls = [
 # `aws-lc-sys`, so static musl builds need no cmake.
 rustls-ring = [
     "allama-anthropic?/rustls-ring",
+    "allama-cloudflare?/rustls-ring",
     "allama-gemini?/rustls-ring",
     "allama-openai?/rustls-ring",
     "allama-openai-compat?/rustls-ring",
@@ -58,8 +64,9 @@ rustls-ring = [
 allama = { workspace = true }
 
 # Provider crates without their default features: this crate forwards the
-# TLS backend choice and leaves `extract` to the application (`allama/extract`).
+# TLS backend choice and leaves chat extraction to the application (`allama/chat-extract`).
 allama-anthropic = { workspace = true, optional = true }
+allama-cloudflare = { workspace = true, optional = true }
 allama-gemini = { workspace = true, optional = true }
 allama-openai = { workspace = true, optional = true }
 allama-openai-compat = { workspace = true, optional = true }

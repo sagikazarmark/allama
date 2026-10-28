@@ -11,6 +11,7 @@ categories = ["api-bindings", "artificial-intelligence", "wasm"]
 
 [dependencies]
 allama = { workspace = true }
+allama-cloudflare = { workspace = true }
 allama-http = { workspace = true }
 allama-openai-compat = { workspace = true }
 allama-systemone = { workspace = true }
@@ -26,7 +27,7 @@ wasm-bindgen-futures = { workspace = true }
 worker = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-allama = { workspace = true, features = ["extract"] }
+allama = { workspace = true, features = ["chat-extract"] }
 allama-conformance = { workspace = true }
 
 tokio = { workspace = true, features = ["macros", "rt"] }

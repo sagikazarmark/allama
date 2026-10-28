@@ -42,7 +42,7 @@ use serde_json::{Map, Value};
 mod disjoint;
 mod merge;
 mod strict;
-#[cfg(feature = "extract")]
+#[cfg(feature = "chat-extract")]
 mod undeclared;
 
 pub use disjoint::{branches_disjoint, branches_disjoint_in};
@@ -381,7 +381,7 @@ pub(crate) fn from_str_normalized<T: serde::de::DeserializeOwned>(
 /// `reject_undeclared` is set. The rejection reads like serde's own
 /// (``unknown field `e_mail`, expected one of `email`, `name` ``), with the
 /// path to the key.
-#[cfg(feature = "extract")]
+#[cfg(feature = "chat-extract")]
 pub(crate) fn from_str_checked<T: serde::de::DeserializeOwned>(
     raw: &str,
     original_schema: Option<&Value>,
@@ -427,7 +427,7 @@ pub(crate) struct DeserializeFailure {
     pub(crate) path: Option<String>,
     /// The failure is a key the schema does not declare
     /// ([`from_str_checked`]).
-    #[cfg_attr(not(feature = "extract"), allow(dead_code))]
+    #[cfg_attr(not(feature = "chat-extract"), allow(dead_code))]
     pub(crate) undeclared: bool,
 }
 
@@ -1526,7 +1526,7 @@ mod tests {
         let mut value: Value = serde_json::from_str(&raw).unwrap();
         let started = std::time::Instant::now();
         normalize_strict_nulls(&schema, &mut value);
-        #[cfg(feature = "extract")]
+        #[cfg(feature = "chat-extract")]
         assert!(undeclared::find_undeclared_key(&schema, &value).is_none());
         assert!(
             started.elapsed() < std::time::Duration::from_secs(5),

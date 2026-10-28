@@ -10,8 +10,10 @@ keywords = ["llm", "allama", "conformance", "testing", "fixtures"]
 categories = ["development-tools::testing"]
 
 [features]
-default = ["extract", "server"]
-extract = ["dep:schemars", "allama/extract"]
+default = ["chat-extract", "server"]
+# `extract` is the former name of `chat-extract`, kept as an alias.
+chat-extract = ["dep:schemars", "allama/chat-extract"]
+extract = ["chat-extract"]
 server = ["dep:axum", "tokio/net", "tokio/rt", "tokio/sync"]
 
 [dependencies]

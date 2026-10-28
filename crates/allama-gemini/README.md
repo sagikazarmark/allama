@@ -161,7 +161,7 @@ placeholder signature and reports an `Approximated` warning. State from other pr
 
 ## Features
 
-Structured-output extraction (`allama::ExtractExt`) is `allama`'s
+Structured-output extraction (`allama::ChatExtractExt`) is `allama`'s
 `extract` feature: enable it on your `allama` dependency.
 
 - `reqwest` (default): the default transport. With default features off,

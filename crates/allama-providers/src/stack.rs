@@ -8,7 +8,7 @@
 use allama::wrappers::{RetryingProvider, TimeoutProvider, UnsupportedPolicyProvider};
 use allama::{
     ChatProvider, DecisionProvider, DynChatProvider, DynDecisionProvider, DynEmbeddingProvider,
-    EmbeddingProvider, Result,
+    DynExtractionProvider, EmbeddingProvider, ExtractionProvider, Result,
 };
 
 use crate::ProviderSettings;
@@ -69,6 +69,18 @@ where
     }
 }
 
+/// The extraction stack around `provider`: as [`decision`], extraction
+/// requests have no unsupported-feature policy.
+pub(crate) fn extraction<P>(provider: P, settings: &ProviderSettings) -> DynExtractionProvider
+where
+    P: ExtractionProvider + 'static,
+{
+    match settings.attempt_timeout {
+        Some(policy) => extraction_retry(TimeoutProvider::new(provider, policy), settings),
+        None => extraction_retry(provider, settings),
+    }
+}
+
 fn chat_attempt<P>(provider: P, settings: &ProviderSettings) -> DynChatProvider
 where
     P: ChatProvider + 'static,
@@ -119,12 +131,24 @@ where
     }
 }
 
+fn extraction_retry<P>(provider: P, settings: &ProviderSettings) -> DynExtractionProvider
+where
+    P: ExtractionProvider + 'static,
+{
+    match &settings.retry {
+        Some(policy) => DynExtractionProvider::new(RetryingProvider::new(provider, policy.clone())),
+        None => DynExtractionProvider::new(provider),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use allama::mock::{MockDecisionProvider, MockEmbeddingProvider, MockProvider};
+    use allama::mock::{
+        MockDecisionProvider, MockEmbeddingProvider, MockExtractionProvider, MockProvider,
+    };
     use allama::{CapabilitySupport, ChatCapability, ChatRequest, EmbeddingRequest, Error};
 
-    use crate::{ProviderSettings, Registry, chat, decision, embedding};
+    use crate::{ProviderSettings, Registry, chat, decision, embedding, extraction};
 
     fn quick_retries() -> ProviderSettings {
         ProviderSettings::new().retry(Some(
@@ -142,7 +166,8 @@ mod tests {
         registry
             .register_chat("mock", || Ok(MockProvider::empty()))
             .register_embedding("mock", || Ok(MockEmbeddingProvider::with_vectors(vec![])))
-            .register_decision("mock", || Ok(MockDecisionProvider::empty()));
+            .register_decision("mock", || Ok(MockDecisionProvider::empty()))
+            .register_extraction("mock", || Ok(MockExtractionProvider::empty()));
         let message = |error: Error| {
             assert!(matches!(error, Error::Configuration { .. }), "{error:?}");
             error.message().to_owned()
@@ -175,6 +200,15 @@ mod tests {
                     .err()
                     .map(message),
             ),
+            (
+                extraction::wrap(MockExtractionProvider::empty(), settings)
+                    .err()
+                    .map(message),
+                registry
+                    .extraction_from_provider_with("mock", settings)
+                    .err()
+                    .map(message),
+            ),
         ]
     }
 
@@ -200,7 +234,8 @@ mod tests {
 
         let capabilities = ProviderSettings::new()
             .chat_capabilities(|_: &str, _: ChatCapability| Some(CapabilitySupport::Supported));
-        let [chat, embedding, decision]: [_; 3] = refusals(&capabilities).try_into().unwrap();
+        let [chat, embedding, decision, extraction]: [_; 4] =
+            refusals(&capabilities).try_into().unwrap();
         let (wrapped, looked_up) = (chat.0.unwrap(), chat.1.unwrap());
         assert_eq!(
             reason(&wrapped),
@@ -216,6 +251,7 @@ mod tests {
         // Chat answers do not concern the other operations.
         assert_eq!(embedding, (None, None));
         assert_eq!(decision, (None, None));
+        assert_eq!(extraction, (None, None));
 
         // Nor do the wrapper settings.
         for refusal in refusals(&quick_retries()) {
@@ -251,6 +287,15 @@ mod tests {
         let provider = decision::wrap(mock.clone(), &quick_retries()).unwrap();
         let request = DecisionRequest::new("d", "x").question("q", Question::yes_no("?"));
         let err = provider.decide(&request).await.unwrap_err();
+        assert_eq!(err.message(), "final");
+        assert_eq!(mock.requests().len(), 2);
+
+        use allama::ExtractionProvider;
+        use allama::extraction::{ExtractionRequest, Field};
+        let mock = MockExtractionProvider::new([Err(Error::overloaded("busy")), Err(last_error())]);
+        let provider = extraction::wrap(mock.clone(), &quick_retries()).unwrap();
+        let request = ExtractionRequest::new("x", "text").field("f", Field::text());
+        let err = provider.extract_values(&request).await.unwrap_err();
         assert_eq!(err.message(), "final");
         assert_eq!(mock.requests().len(), 2);
     }
