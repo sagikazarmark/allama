@@ -3,8 +3,8 @@
 default:
     @just --list --unsorted
 
-# musl, collector, msrv and semver-checks need tools, a toolchain or a baseline
-# beyond the default shell; see their recipes.
+# musl, collector, msrv, semver-checks and worker-smoke need tools, a toolchain,
+# a baseline or a running Worker beyond the default shell; see their recipes.
 # Run the CI jobs that need no extra setup.
 ci: build test examples benchmarks docs features provider-features footprint package wasm fmt clippy unused-dependencies audit deny
 
@@ -119,12 +119,13 @@ collector:
 # workspace dependencies locally: catches an include_str! that leaves its
 # package, a path-only normal dependency, or a file missing from
 # `include`/`exclude` before release day. allama-examples is not published
-# (`cargo package` doesn't skip it by itself). A fresh target directory:
+# (`cargo package` doesn't skip it by itself), and neither is the example
+# Worker, allama-examples-worker. A fresh target directory:
 # Cargo would reuse an earlier build of a packaged crate of the same version,
 # whatever its source now.
 # Package the workspace.
 package:
-    CARGO_TARGET_DIR="$(mktemp -d)" cargo package --workspace --exclude allama-examples --locked
+    CARGO_TARGET_DIR="$(mktemp -d)" cargo package --workspace --exclude allama-examples --exclude allama-examples-worker --locked
 
 # Run in the msrv devenv profile: `devenv --profile msrv shell -- just msrv`.
 # Check with the minimum supported Rust version.
@@ -147,12 +148,43 @@ wasm:
     set -euo pipefail
     cargo hack build --target wasm32-unknown-unknown --workspace --ignore-private --exclude allama-conformance --exclude allama-derive --locked
     cargo hack clippy --target wasm32-unknown-unknown --workspace --ignore-private --exclude allama-conformance --exclude allama-derive --all-features --locked -- --deny warnings
+    # The example Worker, next to the Workers AI crate: tower-worker-fetch
+    # turns on `worker`'s `http` feature, which changes some `worker` types.
+    cargo clippy --target wasm32-unknown-unknown -p allama-examples-worker -p allama-cloudflare-worker --locked -- --deny warnings
     version=$(cargo metadata --format-version 1 --locked | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version')
     cargo install wasm-bindgen-cli --version "$version" --root target/tools --locked
     export PATH="$PWD/target/tools/bin:$PATH"
     cargo test --target wasm32-unknown-unknown -p allama-cloudflare-worker --lib --locked
     cargo test --target wasm32-unknown-unknown -p allama-http --lib --locked
     cargo test --target wasm32-unknown-unknown -p allama-http --lib --all-features --locked
+
+# Needs the example Worker running under `wrangler dev` (`devenv up`);
+# `devenv test` starts it and runs this. Each `/test-*` route checks the
+# Workers `fetch` transport against the Worker's stand-in API.
+# Check the example Worker.
+worker-smoke url="http://127.0.0.1:8787" timeout="300":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # wrangler builds the Worker before it listens.
+    for _ in $(seq 1 {{ timeout }}); do
+        curl --silent --output /dev/null "{{ url }}/" && break
+        sleep 1
+    done
+
+    failed=0
+    for route in test-chat test-stream test-binding test-timeout test-stream-idle test-redirect; do
+        body="$(curl --silent --show-error --write-out '\n%{http_code}' "{{ url }}/${route}" || true)"
+        status="${body##*$'\n'}"
+        body="${body%$'\n'*}"
+        if [[ "$status" == "200" ]] && grep -q '"ok":true' <<<"$body"; then
+            echo "PASS /${route}  ${body}"
+        else
+            echo "FAIL /${route}  HTTP ${status}  ${body}"
+            failed=1
+        fi
+    done
+    exit "$failed"
 
 # Check formatting.
 fmt:

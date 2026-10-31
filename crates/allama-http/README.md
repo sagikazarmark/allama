@@ -159,8 +159,11 @@ let provider = allama_openai_compat::Provider::builder()
 Or bring a client of your own: `tower-reqwest`'s `HttpClientService`
 behind `.map_request(|request: http::Request<RequestBody>| request.map(reqwest::Body::wrap))`,
 with a client that follows no redirects, or a `fetch` service on
-Cloudflare Workers with its `Redirect::Manual` extension. The
-`tower_transport` example in `allama-examples` runs both stacks.
+Cloudflare Workers (`tower-worker-fetch`'s `FetchService`) with its
+`Redirect::Manual` extension. The `tower_transport` example in
+`allama-examples` runs both `reqwest` stacks, and `allama-examples-worker`
+is a Worker over `FetchService` (see the applications guide,
+[From a Cloudflare Worker](../../docs/guides/applications.md#from-a-cloudflare-worker)).
 
 What holds whatever the stack:
 

@@ -66,6 +66,7 @@ queue, starts at [Unary and job-queue backends](#unary-and-job-queue-backends).
 14. [Per-tenant API keys](#per-tenant-api-keys) *(server)*
 15. [Building providers from your own configuration](#building-providers-from-your-own-configuration)
     - [A tower stack as the transport](#a-tower-stack-as-the-transport)
+    - [From a Cloudflare Worker](#from-a-cloudflare-worker)
 16. [Handling errors](#handling-errors)
 17. [Capabilities, warnings and policy](#capabilities-warnings-and-policy)
     - [Checking requests at startup](#checking-requests-at-startup)
@@ -1934,6 +1935,60 @@ fn tower_reqwest_transport() -> reqwest::Result<impl HttpTransport> {
   `allama_http::TransportError` classifies the rest (a `tower` timeout's
   `Elapsed` as a timeout, say), which otherwise count as transport
   failures.
+
+### From a Cloudflare Worker
+
+A Worker calls an HTTP provider (OpenAI, Anthropic, Gemini, any
+OpenAI-compatible API) over the Workers `fetch` API: `tower-worker-fetch`'s
+`FetchService`, under a `TowerTransport`. It needs `allama-http` with the
+`tower` feature, `tower` with `util`, and the provider crate without its
+default features, so `reqwest` stays out of the Worker. Workers AI models
+need no HTTP at all: `allama-cloudflare-worker` calls them through the `AI`
+binding.
+
+The one thing the transport must set is the redirect mode:
+
+```rust,ignore
+fn transport(fetch: FetchService) -> impl HttpTransport {
+    let stack = ServiceBuilder::new()
+        .map_request(|mut request: http::Request<RequestBody>| {
+            request.extensions_mut().insert(Redirect::Manual);
+            request
+        })
+        .service(fetch);
+    TowerTransport::new(stack)
+}
+```
+
+`FetchService::new()` is the global `fetch`;
+`FetchService::from(env.service("API")?)` sends through a service binding
+instead. The provider takes the transport like any other:
+`.http_transport(transport(FetchService::new()))`.
+
+- **`Redirect::Manual` on every request.** A request built in Rust has
+  `fetch`'s default mode, `follow`, and the Workers runtime sends every
+  header to the redirect's target, the provider's key included. In
+  `manual` mode the `3xx` comes back, and the provider reports it.
+- **The provider's timeouts still apply.** `TowerTransport` bounds every
+  non-streaming call with the provider's
+  [request timeout](../../CONTEXT.md#request-timeout), on the runtime's
+  `setTimeout`, and dropping the call aborts the fetch; streams keep their
+  stream timeouts. `tower-worker-fetch`'s `Timeout` extension is not
+  needed. `tower`'s timeout, `Buffer` and rate limit layers run on
+  `tokio`'s timers and tasks, which a Worker does not have.
+- **A failed `fetch` is a transport failure.** The runtime does not tell
+  a refused connection from other network failures, so neither does the
+  transport; both are retryable.
+- **`tower-worker-fetch` turns on `worker`'s `http` feature.** Cargo
+  unifies features, so the Worker's own fetch handler then takes and
+  returns `http` types (`HttpRequest`, `http::Response`), whichever crate
+  asked for the feature.
+
+`crates/allama-examples-worker` is the whole Worker: it streams a reply
+from the API its `wrangler.toml` names, or from a stand-in it serves
+itself, and its checks run under `wrangler dev` (`devenv test`): unary and
+streaming calls, a service binding, the request timeout aborting the
+fetch, the stream idle bound, and a redirect not followed.
 
 ## Handling errors
 

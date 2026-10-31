@@ -20,6 +20,10 @@ Outside a Worker, use `allama-openai-compat`'s Cloudflare preset (chat and
 embeddings), `allama-systemone`'s (decisions) and `allama-cloudflare`
 (extraction) instead.
 
+Inside a Worker, other providers (OpenAI, Anthropic, Gemini) go over the
+Workers `fetch` API: see the applications guide,
+[From a Cloudflare Worker](../../docs/guides/applications.md#from-a-cloudflare-worker).
+
 ## Identity
 
 `Provider::provider_name()` returns `"cloudflare"`, and responses, stream

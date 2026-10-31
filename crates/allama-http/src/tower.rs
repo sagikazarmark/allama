@@ -37,7 +37,9 @@ use crate::{
 ///   that converts the body (`|request| request.map(reqwest::Body::wrap)`).
 ///   Native only: `reqwest`'s futures are not `Send` on `wasm32`.
 /// - A `fetch` service on Cloudflare Workers (`tower-worker-fetch`), which
-///   takes any body.
+///   takes any body. Every request needs its `Redirect::Manual` extension
+///   (see [Redirects](#redirects)); `allama-examples-worker` is a Worker
+///   built this way.
 ///
 /// ```
 /// use allama_http::http::{Request, Response, StatusCode, Uri};

@@ -141,6 +141,13 @@ Transports:
   stand-in OpenAI-compatible server, so it needs no credentials; its tests
   check both stacks, the stream idle bound, redirects and transport
   options (`cargo test -p allama-examples --example tower_transport`)
+- [`allama-examples-worker`](../allama-examples-worker), a crate of its
+  own: a Cloudflare Worker that streams a chat completion over the Workers
+  `fetch` API (`tower-worker-fetch` under `TowerTransport`), from the
+  OpenAI-compatible API its `wrangler.toml` names or a stand-in it serves
+  itself. `devenv up` serves it under `wrangler dev`, and `devenv test`
+  runs its checks (the request timeout aborting the fetch, the stream idle
+  bound, redirects not followed, a service binding)
 
 Writing a provider:
 

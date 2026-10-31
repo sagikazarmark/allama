@@ -1,0 +1,20 @@
+name = "allama-examples-worker"
+main = "build/index.js"
+compatibility_date = "2026-09-02"
+workers_dev = false
+
+# The upstream OpenAI-compatible API. Empty: the stand-in this Worker serves
+# itself. Put the key in `.dev.vars` (`API_KEY=...`), or `wrangler secret put
+# API_KEY` for a deployment.
+[vars]
+BASE_URL = ""
+MODEL = ""
+
+# `/test-binding` and `/test-timeout` reach this Worker through a service
+# binding to itself.
+[[services]]
+binding = "SELF"
+service = "allama-examples-worker"
+
+[build]
+command = "worker-build --release"

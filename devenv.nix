@@ -1,4 +1,9 @@
-{ lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 {
   dotenv.enable = true;
@@ -24,9 +29,28 @@
       pkg-config
     ];
 
+  # Builds the example Worker (crates/allama-examples-worker), at the version
+  # of `worker` in Cargo.lock.
   worker-build = {
     enable = true;
   };
+
+  # `devenv up` serves the example Worker under `wrangler dev` (process
+  # `wrangler-worker`).
+  wrangler = {
+    enable = true;
+
+    dev.worker.directory = "crates/allama-examples-worker";
+  };
+
+  # The shell's RUSTFLAGS make the host linker lld (`-fuse-ld=lld`), an
+  # argument rust-lld rejects when it links wasm; the Worker is all wasm.
+  processes.wrangler-worker.env.RUSTFLAGS = "";
+
+  # `devenv test` starts the example Worker, then runs its checks against it.
+  enterTest = ''
+    just worker-smoke "http://127.0.0.1:${toString config.processes.wrangler-worker.ports.http.value}"
+  '';
 
   languages = {
     rust = {

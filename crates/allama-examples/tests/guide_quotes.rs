@@ -9,12 +9,17 @@
 //! stay the same program.
 
 /// The examples the applications guide quotes, by file name.
-const APPLICATIONS_QUOTED: [(&str, &str); 3] = [
+const APPLICATIONS_QUOTED: [(&str, &str); 4] = [
     ("axum_sse.rs", include_str!("../examples/axum_sse.rs")),
     ("chat_repl.rs", include_str!("../examples/chat_repl.rs")),
     (
         "tower_transport.rs",
         include_str!("../examples/tower_transport.rs"),
+    ),
+    // The example Worker, a crate of its own: a Worker is a `cdylib`.
+    (
+        "allama-examples-worker",
+        include_str!("../../allama-examples-worker/src/lib.rs"),
     ),
 ];
 
