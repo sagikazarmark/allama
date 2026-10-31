@@ -26,7 +26,7 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 allama = { workspace = true, features = ["mock", "tracing"] }
 allama-cloudflare-worker = { workspace = true }
 allama-conformance = { workspace = true, features = ["chat-extract", "server"] }
-allama-http = { workspace = true, features = ["reqwest"] }
+allama-http = { workspace = true, features = ["reqwest", "tower"] }
 allama-openai-compat = { workspace = true }
 
 # The documented `main`s (READMEs, guides) return `anyhow::Result`, so a
@@ -34,6 +34,9 @@ allama-openai-compat = { workspace = true }
 anyhow = { workspace = true }
 axum = { workspace = true }
 futures-util = { workspace = true }
+# The `tower_transport` example's tests serve a `ReplayTransport` as a
+# `tower` service.
+http-body-util = { workspace = true }
 # The current OpenTelemetry releases: the `trace_context` example (the
 # observability guide's propagation recipe) injects through the
 # application's own `opentelemetry`.
@@ -42,6 +45,10 @@ opentelemetry = { workspace = true, features = ["trace"] }
 opentelemetry_sdk = { workspace = true, features = ["testing", "trace"] }
 reqwest = { workspace = true, features = ["rustls"] }
 tokio = { workspace = true, features = ["net", "sync"] }
+# The `tower_transport` example's stack: its layers, and `tower-reqwest`'s
+# client service.
+tower = { workspace = true, features = ["limit", "util"] }
+tower-reqwest = { workspace = true }
 tracing = { workspace = true, features = ["default"] }
 tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -92,6 +99,14 @@ name = "trace_context"
 # Run its propagation tests (the header is sent, and a caller's
 # `traceparent` wins) with `cargo test`. `tests/guide_quotes.rs` checks that
 # the observability guide quotes this file verbatim.
+test = true
+
+[[example]]
+name = "tower_transport"
+# Run its tests (both stacks against a local server, the stream idle bound,
+# the redirect and transport-options contracts) with `cargo test`.
+# `tests/guide_quotes.rs` checks that the applications guide quotes this file
+# verbatim.
 test = true
 
 [package.metadata.release]

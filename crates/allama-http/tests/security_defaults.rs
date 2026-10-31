@@ -1,5 +1,6 @@
 //! The security defaults of the default transport, against local servers:
-//! a redirect is never followed, and bodies are read under a size cap.
+//! a redirect is never followed, also with its client under a `tower`
+//! stack, and bodies are read under a size cap.
 //!
 //! [`assert_redirect_not_followed`] is the transport-level form of the
 //! cross-adapter check: an origin answers `307` with a `Location` on
@@ -15,6 +16,8 @@ use allama_http::{
     HttpRequest, HttpResponse, HttpTransport, ReqwestTransport, TransportError, TransportErrorKind,
     status_error,
 };
+#[cfg(feature = "tower")]
+use allama_http::{RequestBody, TowerTransport};
 use http::{HeaderMap, HeaderValue, StatusCode, Uri};
 
 /// Spawn a target server and an origin that redirects every request to it
@@ -107,6 +110,99 @@ async fn a_client_without_redirects_keeps_the_guarantee() {
     })
     .await;
     assert_eq!(response.status, 307);
+}
+
+/// The default transport's client at the bottom of a `tower` stack keeps
+/// the guarantee: the redirect comes back to the provider.
+#[cfg(feature = "tower")]
+#[tokio::test]
+async fn a_tower_stack_over_the_default_client_never_follows_a_redirect() {
+    for status in [301, 302, 303, 307, 308] {
+        let response = assert_redirect_not_followed(status, |url| async move {
+            let stack = tower::ServiceBuilder::new()
+                .concurrency_limit(4)
+                .service(ReqwestTransport::new().into_service());
+            TowerTransport::new(stack)
+                .send(
+                    HttpRequest::post(
+                        Uri::try_from(format!("{url}/v1/messages")).unwrap(),
+                        r#"{"prompt":"secret"}"#,
+                    )
+                    .header("x-api-key", HeaderValue::from_static("SECRET-KEY-123")),
+                )
+                .await
+                .unwrap()
+        })
+        .await;
+        assert_eq!(response.status, status);
+        let err = response.map_error(map_http).await;
+        assert!(
+            matches!(err, Error::UnexpectedResponse { .. }),
+            "{status}: {err:?}"
+        );
+        assert!(
+            err.as_log().to_string().contains("`localhost`"),
+            "{}",
+            err.as_log()
+        );
+    }
+}
+
+/// A `reqwest` client as a `tower` service (as `tower-reqwest` makes one).
+#[cfg(feature = "tower")]
+fn client_service(
+    client: reqwest::Client,
+) -> impl tower::Service<
+    http::Request<RequestBody>,
+    Response = http::Response<reqwest::Body>,
+    Error = reqwest::Error,
+    Future = impl Send,
+> + Clone
++ Send
++ Sync
++ 'static {
+    tower::service_fn(move |request: http::Request<RequestBody>| {
+        let request = reqwest::Request::try_from(request.map(reqwest::Body::wrap));
+        let client = client.clone();
+        async move { Ok(http::Response::from(client.execute(request?).await?)) }
+    })
+}
+
+/// A client of your own behind `TowerTransport` keeps its redirect policy:
+/// `reqwest::Client::new()` follows redirects, which the docs warn about
+/// (a `302` here: `reqwest` replays no streamed body on a `307`), and one
+/// built with `Policy::none()` does not.
+#[cfg(feature = "tower")]
+#[tokio::test]
+async fn a_tower_stack_keeps_its_clients_redirect_policy() {
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let response = assert_redirect_not_followed(307, |url| async move {
+        TowerTransport::new(client_service(client))
+            .send(HttpRequest::post(Uri::try_from(url).unwrap(), "{}"))
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(response.status, 307);
+
+    let target = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::OK, "followed")]).await;
+    let origin = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::FOUND, "").header(
+        "location",
+        HeaderValue::try_from(format!("{}/elsewhere", target.url())).unwrap(),
+    )])
+    .await;
+    let response = TowerTransport::new(client_service(reqwest::Client::new()))
+        .send(HttpRequest::post(
+            Uri::try_from(origin.url()).unwrap(),
+            "{}",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status, 200);
+    assert_eq!(target.recorded_requests().await.len(), 1);
 }
 
 /// A success body past the limit fails without being buffered whole.

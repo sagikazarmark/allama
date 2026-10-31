@@ -10,15 +10,20 @@
 //!
 //! - [`ReqwestTransport`] (feature `reqwest`, default) is what providers use
 //!   unless told otherwise.
+//! - [`TowerTransport`] (feature `tower`) makes a `tower` service over `http`
+//!   types a transport: a stack of `tower` layers over the default client
+//!   ([`ReqwestTransport::into_service`]), over a client of your own, or a
+//!   `fetch` service on Cloudflare Workers.
 //! - [`ReplayTransport`] serves canned responses in memory and records the
 //!   requests: transport-level fixtures that exercise the whole adapter
 //!   without a server, on any target.
 //! - Custom transports cover other HTTP stacks, proxies, or recording.
 //!
-//! This is a seam for provider crates, not middleware for applications: it
-//! carries bytes, and the portable `allama` types stay above it. Beside the
-//! seam, it holds the helpers every provider shares, first-party or not,
-//! starting with the HTTP error helpers:
+//! The seam carries bytes, and the portable `allama` types stay above it:
+//! what a provider call means (retries, fallback, timeouts per workload) is
+//! the provider wrappers' business, not a transport's, even one made of
+//! `tower` layers. Beside the seam, it holds the helpers every provider
+//! shares, first-party or not, starting with the HTTP error helpers:
 //!
 //! - [`status_error`] is what an error status means on its own, the
 //!   fallback every provider refines from its error codes and body, so one
@@ -75,9 +80,12 @@
 //!
 //! | Bound | Where | Default | Disable |
 //! | --- | --- | --- | --- |
-//! | Connect (TCP + TLS) | [`ReqwestTransport::new`] | [`DEFAULT_CONNECT_TIMEOUT`] (not on `wasm32`) | pass your own client to [`ReqwestTransport::from_client`] |
-//! | Whole non-streaming exchange | [`HttpRequest::timeout`], set by the provider | [`DEFAULT_REQUEST_TIMEOUT`] in the bundled crates | the provider builder's `timeout` |
+//! | Connect (TCP + TLS) | [`ReqwestTransport::new`]; a `tower` service's client | [`DEFAULT_CONNECT_TIMEOUT`] (not on `wasm32`) | pass your own client to [`ReqwestTransport::from_client`] |
+//! | Whole non-streaming exchange | [`HttpRequest::timeout`], set by the provider, enforced by [`ReqwestTransport`] and [`TowerTransport`] | [`DEFAULT_REQUEST_TIMEOUT`] in the bundled crates | the provider builder's `timeout` |
 //! | Stream headers, gap between stream chunks | [`StreamTimeouts`], applied by the provider | [`StreamTimeouts::default`] | the provider builder's `stream_timeouts` |
+//!
+//! A timeout a `tower` stack or a client of your own applies still holds
+//! next to these: the shorter bound fires first.
 //!
 //! `allama::wrappers::TimeoutProvider` sits above all of them and bounds
 //! decoded calls and stream events, with the same `Error::Timeout` shape.
@@ -105,7 +113,10 @@
 //!   target host ([`redirect_error`]): following it would send the key and
 //!   the prompt to a host the application never configured. A client you
 //!   pass to [`ReqwestTransport::from_client`] keeps its own redirect
-//!   policy; on `wasm32`, the host `fetch`'s applies.
+//!   policy, and so does the client at the bottom of a [`TowerTransport`]
+//!   stack (`reqwest::Client::new()` follows redirects; see the Redirects
+//!   section of [`TowerTransport`]); on `wasm32`, the host `fetch`'s
+//!   applies.
 //! - **Bounded bodies.** Success bodies are read with
 //!   [`HttpResponse::bytes_limited`] under the builder's
 //!   `max_response_size` ([`DEFAULT_MAX_RESPONSE_SIZE`]), error bodies with
@@ -139,7 +150,12 @@
 //!   helpers read;
 //! - `reqwest` 0.13 (feature `reqwest`): [`ReqwestTransport::from_client`];
 //! - `reqwest-middleware` 0.5 (feature `reqwest-middleware`):
-//!   `ReqwestTransport::from_middleware`.
+//!   `ReqwestTransport::from_middleware`;
+//! - `tower-service` 0.3 (feature `tower`): the service [`TowerTransport`]
+//!   takes, and [`ReqwestService`];
+//! - `http-body` 1 and `http-body-util` 0.1 (feature `tower`): the bodies
+//!   of the service's requests and responses ([`RequestBody`],
+//!   [`ReqwestBody`]).
 //!
 //! The provider crates take a client only as an [`HttpTransport`]
 //! (`http_transport(ReqwestTransport::from_client(..))`), so `reqwest`
@@ -180,6 +196,14 @@
     not(feature = "reqwest"),
     doc = "[`ReqwestTransport`]: crate\n[`ReqwestTransport::new`]: crate\n[`DEFAULT_CONNECT_TIMEOUT`]: crate\n[`ReqwestTransport::from_client`]: crate"
 )]
+#![cfg_attr(
+    not(feature = "tower"),
+    doc = "[`TowerTransport`]: crate\n[`RequestBody`]: crate"
+)]
+#![cfg_attr(
+    not(all(feature = "reqwest", feature = "tower")),
+    doc = "[`ReqwestTransport::into_service`]: crate\n[`ReqwestService`]: crate\n[`ReqwestBody`]: crate"
+)]
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 
@@ -211,6 +235,8 @@ mod reqwest;
 mod retry_after;
 pub mod sse;
 mod timeout;
+#[cfg(feature = "tower")]
+mod tower;
 
 pub use credential::{
     Credential, CredentialKind, CredentialPlacement, CredentialSlot, is_credential_header,
@@ -223,8 +249,12 @@ pub use options::{HttpRequestOptions, OPTIONS_NAMESPACE};
 pub use replay::{ReplayResponse, ReplayTransport};
 #[cfg(feature = "reqwest")]
 pub use reqwest::{DEFAULT_CONNECT_TIMEOUT, ReqwestTransport};
+#[cfg(all(feature = "reqwest", feature = "tower"))]
+pub use reqwest::{ReqwestBody, ReqwestService};
 pub use retry_after::{parse_retry_after, retry_after};
 pub use timeout::StreamTimeouts;
+#[cfg(feature = "tower")]
+pub use tower::{RequestBody, TowerTransport};
 
 /// A boxed future returned by [`HttpTransport::send`].
 pub type SendFuture<'a> =
@@ -617,12 +647,19 @@ pub fn request_uri(url: impl Into<String>) -> allama::Result<Uri> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RequestTimeout(pub Duration);
 
+/// Marks the values of credential headers (names [`is_sensitive_header`]
+/// matches) [sensitive](HeaderValue::set_sensitive), so the `http` crate's
+/// own `Debug` output, and that of a client or `tower` layer that logs the
+/// request, redacts them. Equality ignores the flag, so the conversion
+/// stays lossless.
 impl From<HttpRequest> for http::Request<Bytes> {
     fn from(request: HttpRequest) -> Self {
+        let mut headers = request.headers;
+        mark_sensitive(&mut headers);
         let mut http = http::Request::new(request.body);
         *http.method_mut() = request.method;
         *http.uri_mut() = request.uri;
-        *http.headers_mut() = request.headers;
+        *http.headers_mut() = headers;
         if let Some(timeout) = request.timeout {
             http.extensions_mut().insert(RequestTimeout(timeout));
         }
@@ -644,6 +681,17 @@ impl From<http::Request<Bytes>> for HttpRequest {
                 .extensions
                 .get::<RequestTimeout>()
                 .map(|timeout| timeout.0),
+        }
+    }
+}
+
+/// Mark the values of credential headers (see [`is_sensitive_header`])
+/// [sensitive](HeaderValue::set_sensitive), before the headers leave for a
+/// client whose own `Debug` output would otherwise print them.
+pub(crate) fn mark_sensitive(headers: &mut HeaderMap) {
+    for (name, value) in headers.iter_mut() {
+        if is_sensitive_header(name.as_str()) {
+            value.set_sensitive(true);
         }
     }
 }
@@ -1312,6 +1360,35 @@ impl From<TransportError> for allama::Error {
     fn from(err: TransportError) -> Self {
         err.into_error()
     }
+}
+
+/// The kind of an HTTP client's failure, walking `err` and its sources: a
+/// timeout (a `reqwest` timeout, an I/O `TimedOut`), a request `reqwest`
+/// could not build, or `fallback`.
+#[cfg(any(feature = "reqwest", feature = "tower"))]
+pub(crate) fn error_kind(
+    err: &(dyn std::error::Error + 'static),
+    fallback: TransportErrorKind,
+) -> TransportErrorKind {
+    let mut current = Some(err);
+    while let Some(err) = current {
+        #[cfg(feature = "reqwest")]
+        if let Some(reqwest_err) = err.downcast_ref::<::reqwest::Error>() {
+            if reqwest_err.is_timeout() {
+                return TransportErrorKind::Timeout;
+            }
+            if reqwest_err.is_builder() {
+                return TransportErrorKind::InvalidRequest;
+            }
+        }
+        if let Some(io_err) = err.downcast_ref::<std::io::Error>()
+            && io_err.kind() == std::io::ErrorKind::TimedOut
+        {
+            return TransportErrorKind::Timeout;
+        }
+        current = err.source();
+    }
+    fallback
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]

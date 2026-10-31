@@ -1,19 +1,24 @@
 use std::error::Error as StdError;
 use std::fmt;
-use std::io::ErrorKind;
 use std::time::Duration;
 
 use futures_util::StreamExt;
 
 use crate::{
     HttpRequest, HttpResponse, HttpTransport, SendFuture, TransportError, TransportErrorKind,
-    is_sensitive_header,
+    mark_sensitive,
 };
 
 #[cfg(feature = "reqwest-middleware")]
 type Client = reqwest_middleware::ClientWithMiddleware;
 #[cfg(not(feature = "reqwest-middleware"))]
 type Client = reqwest::Client;
+
+#[cfg(feature = "tower")]
+mod service;
+
+#[cfg(feature = "tower")]
+pub use service::{ReqwestBody, ReqwestService};
 
 /// The connect timeout (TCP and TLS handshake) of [`ReqwestTransport::new`]:
 /// 10 s.
@@ -186,11 +191,7 @@ impl ReqwestTransport {
         })?;
         // Marked sensitive, so `reqwest` and the `http` crate keep them out
         // of their own `Debug` output.
-        for (name, value) in &mut headers {
-            if is_sensitive_header(name.as_str()) {
-                value.set_sensitive(true);
-            }
-        }
+        mark_sensitive(&mut headers);
         let mut built = reqwest::Request::new(method, url);
         *built.headers_mut() = headers;
         if !body.is_empty() {
@@ -252,7 +253,7 @@ fn send_error(err: reqwest::Error) -> TransportError {
 /// The transport error for a `reqwest` failure, with its URL redacted and
 /// the redacted error attached as the source, so a caller can tell a TLS
 /// failure from a DNS one or a reset by downcasting it.
-fn with_cause(err: reqwest::Error, fallback: TransportErrorKind) -> TransportError {
+pub(crate) fn with_cause(err: reqwest::Error, fallback: TransportErrorKind) -> TransportError {
     let err = redact_url(err);
     classify(&err, fallback, err.to_string()).with_source(err)
 }
@@ -277,28 +278,7 @@ fn classify(
     fallback: TransportErrorKind,
     message: String,
 ) -> TransportError {
-    let mut kind = fallback;
-    let mut current = Some(err);
-    while let Some(err) = current {
-        if let Some(reqwest_err) = err.downcast_ref::<reqwest::Error>() {
-            if reqwest_err.is_timeout() {
-                kind = TransportErrorKind::Timeout;
-                break;
-            }
-            if reqwest_err.is_builder() {
-                kind = TransportErrorKind::InvalidRequest;
-                break;
-            }
-        }
-        if let Some(io_err) = err.downcast_ref::<std::io::Error>()
-            && io_err.kind() == ErrorKind::TimedOut
-        {
-            kind = TransportErrorKind::Timeout;
-            break;
-        }
-        current = err.source();
-    }
-    TransportError::new(kind, message)
+    TransportError::new(crate::error_kind(err, fallback), message)
 }
 
 // These tests need `allama-conformance`, a path-only dev-dependency that

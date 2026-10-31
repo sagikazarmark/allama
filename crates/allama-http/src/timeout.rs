@@ -215,7 +215,7 @@ impl Stream for IdleTimeoutBody {
 
 /// The error for an expired bound, phrased like `TimeoutProvider`'s:
 /// `"<what> exceeded <limit>"`.
-fn expired(what: &str, limit: Duration) -> TransportError {
+pub(crate) fn expired(what: &str, limit: Duration) -> TransportError {
     TransportError::new(
         TransportErrorKind::Timeout,
         format!("{what} exceeded {limit:?}"),

@@ -19,6 +19,7 @@ That makes the transport replaceable:
 | Transport | Use |
 | --- | --- |
 | `ReqwestTransport` (feature `reqwest`, default) | What providers use unless told otherwise, with a 10 s connect timeout (`DEFAULT_CONNECT_TIMEOUT`) unless you pass your own client. `reqwest-middleware` sends through your `reqwest-middleware` client; `http-tracing` adds `reqwest-tracing` spans (which do not propagate trace context; see below). TLS: `default-tls` (default), `rustls`, `native-tls`, or `rustls-ring` (`ring` instead of `aws-lc-rs`, so static musl builds need no cmake). On `wasm32-unknown-unknown` it sends through the host's `fetch` |
+| `TowerTransport` (feature `tower`) | Any `tower` service over `http` types: a stack of `tower` layers over the default client (`ReqwestTransport::into_service`), over a client of your own (`tower-reqwest`), or a `fetch` service on Cloudflare Workers. See [below](#a-tower-stack-as-the-transport) |
 | `ReplayTransport` | Serves canned responses in memory and records requests: run a real adapter over recorded wire data with no server, on any target |
 | your own | Another HTTP stack, a proxy, recording |
 
@@ -49,8 +50,8 @@ async fn main() -> allama::Result<()> {
 
 | Bound | Default | Change it |
 | --- | --- | --- |
-| Connect (TCP + TLS) | 10 s in `ReqwestTransport::new` (not on `wasm32`) | the provider builder's `http_transport(ReqwestTransport::from_client(...))` |
-| Whole non-streaming call | 120 s (`DEFAULT_REQUEST_TIMEOUT`), whatever the transport, set per request by the provider crates | the provider builder's `timeout(...)`; `timeout(None)` removes it |
+| Connect (TCP + TLS) | 10 s in `ReqwestTransport::new` (not on `wasm32`); a `tower` stack's client sets its own | the provider builder's `http_transport(ReqwestTransport::from_client(...))` |
+| Whole non-streaming call | 120 s (`DEFAULT_REQUEST_TIMEOUT`), whatever the transport, set per request by the provider crates and enforced by `ReqwestTransport` and `TowerTransport` | the provider builder's `timeout(...)`; `timeout(None)` removes it |
 | Stream headers (`setup`), gap between stream chunks (`idle`) | 120 s and 300 s (`StreamTimeouts::default`); none for the Ollama and vLLM presets | the provider builder's `stream_timeouts(...)` |
 
 The stream bounds are enforced above the transport, so they apply to any
@@ -58,7 +59,9 @@ The stream bounds are enforced above the transport, so they apply to any
 think for minutes before their first token, and the bound exists to catch
 dead connections, not slow models. For tighter, workload-specific limits
 wrap the provider in `allama::wrappers::TimeoutProvider`; whichever bound is
-shorter fires first, and both fail with a retryable `Error::Timeout`.
+shorter fires first, and both fail with a retryable `Error::Timeout`. A
+timeout of a client of your own, or of a `tower` stack, applies next to
+these in the same way.
 
 ## Network defaults
 
@@ -69,9 +72,10 @@ What a broken or hostile endpoint can make a caller do is bounded:
   credential headers (and, on a `307`/`308`, the prompt) to the
   `Location` host. The bundled providers report a `3xx` as
   `Error::UnexpectedResponse` naming that host (`redirect_error`). A
-  client passed to `ReqwestTransport::from_client` keeps its own policy:
-  build it with `.redirect(reqwest::redirect::Policy::none())`. On
-  `wasm32`, the host `fetch`'s policy applies.
+  client passed to `ReqwestTransport::from_client`, or at the bottom of a
+  `TowerTransport` stack, keeps its own policy: build it with
+  `.redirect(reqwest::redirect::Policy::none())` (`reqwest::Client::new()`
+  follows up to 10). On `wasm32`, the host `fetch`'s policy applies.
 - **Bounded bodies.** `HttpResponse::bytes_limited` reads a success body
   under the builder's `max_response_size` (`DEFAULT_MAX_RESPONSE_SIZE`,
   256 MiB); `HttpResponse::map_error` reads at most 64 KiB of an error
@@ -106,7 +110,11 @@ major (pre-1.0: minor) version of any of them is a breaking release of
   read;
 - `reqwest` 0.13 (feature `reqwest`): `ReqwestTransport::from_client`;
 - `reqwest-middleware` 0.5 (feature `reqwest-middleware`):
-  `ReqwestTransport::from_middleware`.
+  `ReqwestTransport::from_middleware`;
+- `tower-service` 0.3 (feature `tower`): the service `TowerTransport`
+  takes, and `ReqwestService`;
+- `http-body` 1 and `http-body-util` 0.1 (feature `tower`): the bodies of
+  the service's requests and responses (`RequestBody`, `ReqwestBody`).
 
 Provider crates take a client only as
 `http_transport(ReqwestTransport::from_client(..))`, so `reqwest` appears
@@ -122,6 +130,63 @@ call fails with `Error::InvalidRequest`, naming the `allama-http`
 namespace and both types, instead of sending the configured key without
 the tenant's credential and headers; with one version for every crate,
 the same mix is a compile error.
+
+## A tower stack as the transport
+
+With the `tower` feature, `TowerTransport` makes any `tower` service that
+takes an `http::Request<RequestBody>` (`RequestBody` is
+`http_body_util::Full<Bytes>`) and returns an `http::Response` with a
+streaming body a transport. Put your layers on top of the default
+transport's client, which keeps its guarantees (no redirects on native
+targets, URL redaction, failure classification; on `wasm32`, the host
+`fetch` applies its own redirect policy):
+
+```rust
+use allama_http::{ReqwestTransport, TowerTransport};
+use tower::ServiceBuilder;
+
+let stack = ServiceBuilder::new()
+    .concurrency_limit(4)
+    .service(ReqwestTransport::new().into_service());
+let provider = allama_openai_compat::Provider::builder()
+    .base_url("http://localhost:8000/v1")
+    .http_transport(TowerTransport::new(stack))
+    .build()?;
+# let _ = provider;
+# Ok::<(), allama::Error>(())
+```
+
+Or bring a client of your own: `tower-reqwest`'s `HttpClientService`
+behind `.map_request(|request: http::Request<RequestBody>| request.map(reqwest::Body::wrap))`,
+with a client that follows no redirects, or a `fetch` service on
+Cloudflare Workers with its `Redirect::Manual` extension. The
+`tower_transport` example in `allama-examples` runs both stacks.
+
+What holds whatever the stack:
+
+- **The request timeout.** `TowerTransport` enforces `HttpRequest::timeout`
+  over the whole exchange (waiting for the service to be ready, the
+  headers, the body), as `reqwest`'s request timeout does, and passes it
+  on as a `RequestTimeout` extension. A `tower` timeout layer bounds only
+  the wait for the headers.
+- **Failure classes.** A `TransportError` the service returns is passed
+  through (`ReqwestService` returns them), even inside a layer's own error
+  (`Buffer`'s); a `reqwest` error is classified as `ReqwestTransport` does;
+  anything else is a transport error with its text, URLs redacted, as the
+  upstream message. Classify your stack's own failures with a `map_err`
+  layer that returns a `TransportError` (a `tower` timeout's `Elapsed` as
+  a `Timeout`, say).
+- **Credential headers** are marked sensitive, so a layer that logs
+  requests prints them redacted.
+
+The service is cloned for each request, so every layer must be `Clone`
+(`tower`'s `RateLimit` needs a `Buffer`), and must be `Send` and `Sync`:
+type-erase a stack with `BoxCloneSyncService`, not `BoxCloneService`, and
+put a stack that is not `Sync` behind a `Buffer`, which is. A concurrency limit
+releases its permit when the response headers arrive, so it bounds
+requests being set up, not open streams. Do not add a retry layer:
+`RetryingProvider` retries whole calls, honouring the provider's retry
+signals, and never replays a stream the caller started reading.
 
 ## Per-request headers and credentials
 

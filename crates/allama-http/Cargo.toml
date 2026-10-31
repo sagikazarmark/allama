@@ -24,6 +24,10 @@ rustls-ring = ["reqwest", "reqwest/rustls-no-provider", "dep:rustls"]
 reqwest-middleware = ["reqwest", "dep:reqwest-middleware"]
 # `reqwest-tracing` spans for every request.
 http-tracing = ["reqwest-middleware", "dep:reqwest-tracing"]
+# `TowerTransport`: a `tower` service over `http` types as a transport, and
+# (with `reqwest`) `ReqwestTransport::into_service` for the bottom of a stack.
+# The service trait alone, not `tower`.
+tower = ["dep:http-body", "dep:http-body-util", "dep:tower-service"]
 
 [dependencies]
 allama = { workspace = true }
@@ -33,11 +37,14 @@ futures-core = { workspace = true }
 futures-timer = { workspace = true }
 futures-util = { workspace = true }
 http = { workspace = true }
+http-body = { workspace = true, optional = true }
+http-body-util = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 reqwest-middleware = { workspace = true, optional = true }
 reqwest-tracing = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tower-service = { workspace = true, optional = true }
 web-time = { workspace = true }
 
 # The `ring` crypto provider for `rustls-ring`, installed by
@@ -59,7 +66,10 @@ allama = { workspace = true, features = ["mock", "tracing"] }
 allama-conformance = { path = "../allama-conformance", default-features = false, features = ["server"] }
 
 criterion = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt", "sync"] }
+# Layers for the `TowerTransport` tests (`buffer`, `limit` and `timeout` need
+# tokio).
+tower = { workspace = true, features = ["buffer", "limit", "timeout", "util"] }
 tracing = { workspace = true, features = ["default"] }
 tracing-subscriber = { workspace = true }
 
