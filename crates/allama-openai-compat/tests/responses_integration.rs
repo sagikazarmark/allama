@@ -8,6 +8,7 @@ use allama::{
     ChatStreamExt, ContentBlock, FinishReason, ProviderIdentity, SystemPrompt, WarningKind,
 };
 use allama_conformance::{MockHttpResponse, TestHttpServer};
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_openai_compat::{
     ResponsesProvider, ResponsesQuirks, ResponsesRequestOptions, StreamingSupport, SystemOptions,
 };
@@ -62,8 +63,9 @@ fn weather_request() -> ChatRequest {
 #[tokio::test]
 async fn identity_namespace_and_stateless_replay() {
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &reasoning_tool_body()).header("x-request-id", "req_1"),
-        MockHttpResponse::json_value(200, &text_body()),
+        MockHttpResponse::json_value(StatusCode::OK, &reasoning_tool_body())
+            .header("x-request-id", HeaderValue::from_static("req_1")),
+        MockHttpResponse::json_value(StatusCode::OK, &text_body()),
     ])
     .await;
     let provider = provider(&server, ResponsesQuirks::new(NAMESPACE));
@@ -118,8 +120,8 @@ async fn identity_namespace_and_stateless_replay() {
 #[tokio::test]
 async fn state_from_another_namespace_is_not_replayed() {
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &reasoning_tool_body()),
-        MockHttpResponse::json_value(200, &text_body()),
+        MockHttpResponse::json_value(StatusCode::OK, &reasoning_tool_body()),
+        MockHttpResponse::json_value(StatusCode::OK, &text_body()),
     ])
     .await;
     let local = provider(&server, ResponsesQuirks::new(NAMESPACE));
@@ -196,7 +198,8 @@ async fn streams_are_stamped_with_identity_and_namespace() {
 
 #[tokio::test]
 async fn quirks_shape_the_request() {
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &text_body())]).await;
+    let server =
+        TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &text_body())]).await;
     let mut quirks = ResponsesQuirks::new(NAMESPACE);
     quirks.supports_strict = false;
     quirks.function_call_status_null = true;
@@ -226,10 +229,10 @@ async fn quirks_shape_the_request() {
 #[tokio::test]
 async fn unsupported_mode_and_errors_never_send_or_are_stamped() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        401,
+        StatusCode::UNAUTHORIZED,
         &json!({"error": {"message": "bad key", "type": "invalid_request_error", "code": "invalid_api_key"}}),
     )
-    .header("x-request-id", "req_err")])
+    .header("x-request-id", HeaderValue::from_static("req_err"))])
     .await;
     let mut quirks = ResponsesQuirks::new(NAMESPACE);
     quirks.streaming = StreamingSupport::NonStreamingOnly;
@@ -256,9 +259,9 @@ async fn background_responses_are_polled_and_cancelled_by_id() {
     let mut cancelled = queued.clone();
     cancelled["status"] = json!("cancelled");
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &queued),
-        MockHttpResponse::json_value(200, &done),
-        MockHttpResponse::json_value(200, &cancelled),
+        MockHttpResponse::json_value(StatusCode::OK, &queued),
+        MockHttpResponse::json_value(StatusCode::OK, &done),
+        MockHttpResponse::json_value(StatusCode::OK, &cancelled),
     ])
     .await;
     let provider = provider(&server, ResponsesQuirks::new(NAMESPACE));
@@ -308,7 +311,8 @@ async fn background_responses_are_polled_and_cancelled_by_id() {
 
 #[tokio::test]
 async fn continuation_sends_only_the_new_turn() {
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &text_body())]).await;
+    let server =
+        TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &text_body())]).await;
     let provider = provider(&server, ResponsesQuirks::new(NAMESPACE));
     let request = ChatRequest::new("m")
         .user("And tomorrow?")
@@ -342,8 +346,8 @@ async fn continuation_sends_only_the_new_turn() {
 #[tokio::test]
 async fn raw_response_is_read_through_the_provider_namespace() {
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &text_body()),
-        MockHttpResponse::json_value(200, &text_body()),
+        MockHttpResponse::json_value(StatusCode::OK, &text_body()),
+        MockHttpResponse::json_value(StatusCode::OK, &text_body()),
     ])
     .await;
     let provider = provider(&server, ResponsesQuirks::new(NAMESPACE));
@@ -392,10 +396,13 @@ mod litellm {
 
     #[tokio::test]
     async fn unary_reasoning_comes_from_output_text_parts() {
-        let response = provider(ReplayResponse::json(200, fixture("litellm_text.json")))
-            .chat(&ChatRequest::new("ollama/qwen3:1.7b").user("Say hi in one word."))
-            .await
-            .unwrap();
+        let response = provider(ReplayResponse::json(
+            StatusCode::OK,
+            fixture("litellm_text.json"),
+        ))
+        .chat(&ChatRequest::new("ollama/qwen3:1.7b").user("Say hi in one word."))
+        .await
+        .unwrap();
         assert!(response.reasoning_text().is_some_and(|r| !r.is_empty()));
         assert!(response.text().is_some_and(|t| !t.is_empty()));
     }

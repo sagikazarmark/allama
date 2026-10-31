@@ -13,7 +13,8 @@
 //!   (<https://developers.cloudflare.com/workers-ai/platform/errors/>)
 
 use allama::Error;
-use allama_http::{ErrorEnvelope, Headers};
+use allama_http::ErrorEnvelope;
+use allama_http::http::{HeaderMap, StatusCode};
 use serde_json::Value;
 
 /// Messages for a model the server does not know, reported with a status
@@ -55,18 +56,19 @@ const CONTEXT_PHRASES: &[&str] = &["context length", "context window", "maximum 
 /// that is no envelope still informs the category, but is kept only as the
 /// body.
 #[must_use]
-pub fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
+pub fn map_http_error(status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
     map_http_error_with_hint(status, headers, body, None)
 }
 
 /// [`map_http_error`] with a preset's hint appended to the refusal for a
 /// missing System One endpoint (a `404` that names no model).
 pub(crate) fn map_http_error_with_hint(
-    status: u16,
-    headers: &Headers,
+    http_status: StatusCode,
+    headers: &HeaderMap,
     body: &str,
     missing_endpoint_hint: Option<&str>,
 ) -> Error {
+    let status = http_status.as_u16();
     let envelope = error_in_body(body);
     let structured = envelope.is_some();
     let text = envelope
@@ -116,11 +118,11 @@ pub(crate) fn map_http_error_with_hint(
             // A structured 404 names a model the server does not know.
             404 => Error::model_not_found(message),
             // What the status means on its own, shared by every adapter.
-            _ => allama_http::status_error(status, message),
+            _ => allama_http::status_error(http_status, message),
         }
     };
     let mapped = mapped
-        .with_context(allama_http::error_context(status, headers))
+        .with_context(allama_http::error_context(http_status, headers))
         .authored();
     let mapped = match envelope {
         Some(envelope) => envelope.apply(mapped),
@@ -231,15 +233,24 @@ fn text(value: Option<&Value>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use allama_http::http::StatusCode;
     use serde_json::json;
 
-    fn headers(pairs: &[(&str, &str)]) -> Headers {
-        pairs.iter().copied().collect()
+    fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+        pairs
+            .iter()
+            .map(|(name, value)| {
+                (
+                    allama_http::http::HeaderName::try_from(*name).unwrap(),
+                    allama_http::http::HeaderValue::try_from(*value).unwrap(),
+                )
+            })
+            .collect()
     }
 
     fn http(status: u16, body: Value) -> Error {
         map_http_error(
-            status,
+            StatusCode::from_u16(status).unwrap(),
             &headers(&[("x-request-id", "req_1")]),
             &body.to_string(),
         )
@@ -254,11 +265,18 @@ mod tests {
             (529, "overloaded"),
             (499, "provider"),
         ] {
-            let err = map_http_error(status, &Headers::new(), "<html>gateway</html>");
+            let err = map_http_error(
+                StatusCode::from_u16(status).unwrap(),
+                &HeaderMap::new(),
+                "<html>gateway</html>",
+            );
             assert_eq!(err.kind_name(), kind, "HTTP {status}");
             assert_eq!(err.status(), Some(status));
         }
-        assert!(!map_http_error(499, &Headers::new(), "").is_retryable());
+        assert!(
+            !map_http_error(StatusCode::from_u16(499).unwrap(), &HeaderMap::new(), "")
+                .is_retryable()
+        );
     }
 
     #[test]
@@ -471,7 +489,11 @@ mod tests {
             json!({"detail": {"error_type": "not_found_error", "message": "Not found"}}),
         );
         assert!(matches!(err, Error::ModelNotFound { .. }), "{err:?}");
-        let err = map_http_error(404, &Headers::new(), "404 page not found");
+        let err = map_http_error(
+            StatusCode::NOT_FOUND,
+            &HeaderMap::new(),
+            "404 page not found",
+        );
         assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
         // The server answered, so the refusal is the provider's.
         assert_eq!(
@@ -485,7 +507,11 @@ mod tests {
 
     #[test]
     fn non_json_bodies_are_kept_out_of_the_message() {
-        let err = map_http_error(502, &Headers::new(), "<html>my SSN is 123-45-6789</html>");
+        let err = map_http_error(
+            StatusCode::BAD_GATEWAY,
+            &HeaderMap::new(),
+            "<html>my SSN is 123-45-6789</html>",
+        );
         assert_eq!(err.message(), "HTTP 502");
         assert_eq!(err.upstream_message(), None);
         assert_eq!(
@@ -493,7 +519,7 @@ mod tests {
             Some("<html>my SSN is 123-45-6789</html>")
         );
         assert_eq!(
-            map_http_error(503, &Headers::new(), "").message(),
+            map_http_error(StatusCode::SERVICE_UNAVAILABLE, &HeaderMap::new(), "").message(),
             "HTTP 503"
         );
     }

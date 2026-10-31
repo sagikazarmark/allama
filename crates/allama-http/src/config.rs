@@ -2,6 +2,11 @@
 //! the headers a provider sends with every request, and how a URL shows in
 //! `Debug` output.
 //!
+//! The checks run when the provider is built, so the `http` types a request
+//! is made of ([`HeaderName`], [`HeaderValue`], [`Uri`]) are
+//! built from values already known to fit them: a request never fails on
+//! the builder's own configuration.
+//!
 //! Every bundled HTTP provider's `build()` (and `from_env()`) runs these
 //! checks, so a malformed value fails there, with an
 //! [authored](allama::Error::authored) [`allama::Error::Configuration`]
@@ -30,13 +35,15 @@
 
 use std::borrow::Cow;
 
-use crate::{CredentialSlot, DEFAULT_USER_AGENT, Headers, is_credential_header};
+use http::{HeaderMap, HeaderName, HeaderValue, Uri};
+
+use crate::{CredentialSlot, DEFAULT_USER_AGENT, is_credential_header};
 
 /// Check and normalize a base URL from a builder setting or environment
 /// variable named `setting`: surrounding whitespace and trailing slashes
 /// are removed, and the URL must be an absolute `http` or `https` URL with
 /// a host, no whitespace or control characters, and no query or fragment
-/// (requests append their path to it).
+/// (requests append their path to it), that parses as a [`Uri`].
 ///
 /// A user name and password in the URL (`https://user:pass@gateway`) are
 /// kept, since some gateways take them; [`redact_url`] hides them from
@@ -79,7 +86,11 @@ pub fn base_url(setting: &str, value: &str) -> allama::Result<String> {
     if port.is_some_and(|port| port.parse::<u16>().is_err()) {
         return Err(invalid("its port is not a number up to 65535"));
     }
-    Ok(value.trim_end_matches('/').to_owned())
+    let value = value.trim_end_matches('/');
+    if Uri::try_from(value).is_err() {
+        return Err(invalid("it holds characters a URI cannot carry"));
+    }
+    Ok(value.to_owned())
 }
 
 /// Check a secret (an API key or token) from a builder setting or
@@ -106,6 +117,42 @@ pub fn secret(setting: &str, value: &str) -> allama::Result<String> {
     Ok(value.to_owned())
 }
 
+/// A secret, such as a key [`secret`] checked or `Bearer <key>`, as the
+/// value of the header that carries it, marked
+/// [sensitive](HeaderValue::set_sensitive) so `Debug` output redacts it.
+/// A provider builds it once, when it is built, and sets it on every
+/// request.
+///
+/// ```
+/// use allama_http::config;
+///
+/// let key = config::secret("ACME_API_KEY", "sk-acme\n")?;
+/// let value = config::sensitive_value("ACME_API_KEY", &format!("Bearer {key}"))?;
+/// assert_eq!(value, "Bearer sk-acme");
+/// assert!(value.is_sensitive());
+/// # Ok::<(), allama::Error>(())
+/// ```
+///
+/// # Errors
+///
+/// An authored [`allama::Error::Configuration`] naming `setting`, never the
+/// value, when the value holds a character an HTTP header value cannot
+/// carry (anything but visible ASCII, spaces and tabs).
+pub fn sensitive_value(setting: &str, value: &str) -> allama::Result<HeaderValue> {
+    let invalid = || {
+        allama::Error::configuration(format!(
+            "`{setting}` contains characters an HTTP header cannot carry"
+        ))
+        .authored()
+    };
+    if !is_header_value(value) {
+        return Err(invalid());
+    }
+    let mut value = HeaderValue::from_str(value).map_err(|_| invalid())?;
+    value.set_sensitive(true);
+    Ok(value)
+}
+
 /// The headers a provider sends with every request: `User-Agent:`
 /// [`DEFAULT_USER_AGENT`], then `headers` (a builder's
 /// `header(name, value)` settings, in order), each replacing the headers of
@@ -125,8 +172,8 @@ pub fn secret(setting: &str, value: &str) -> allama::Result<String> {
 ///
 /// let slot = CredentialSlot::new("acme", CredentialPlacement::Bearer);
 /// let headers = config::static_headers([("x-route", "eu")], &slot)?;
-/// assert_eq!(headers.get("user-agent"), Some(DEFAULT_USER_AGENT));
-/// assert_eq!(headers.get("x-route"), Some("eu"));
+/// assert_eq!(headers["user-agent"], DEFAULT_USER_AGENT);
+/// assert_eq!(headers["x-route"], "eu");
 ///
 /// let err = config::static_headers([("x-api-key", "sk-acme")], &slot).unwrap_err();
 /// assert!(matches!(err, allama::Error::Configuration { .. }));
@@ -141,28 +188,31 @@ pub fn secret(setting: &str, value: &str) -> allama::Result<String> {
 /// character a header cannot carry (anything but visible ASCII, spaces and
 /// tabs), or the header carries a credential: it is on the exact credential
 /// list ([`is_credential_header`]), or `slot` writes or replaces it.
-pub fn static_headers<I, N, V>(headers: I, slot: &CredentialSlot) -> allama::Result<Headers>
+pub fn static_headers<I, N, V>(headers: I, slot: &CredentialSlot) -> allama::Result<HeaderMap>
 where
     I: IntoIterator<Item = (N, V)>,
     N: Into<String>,
     V: Into<String>,
 {
-    let mut all = Headers::new();
-    all.insert("user-agent", DEFAULT_USER_AGENT);
+    let mut all = HeaderMap::new();
+    all.insert(
+        http::header::USER_AGENT,
+        HeaderValue::from_static(DEFAULT_USER_AGENT),
+    );
     for (name, value) in headers {
         let (name, value) = (name.into(), value.into());
-        if !is_header_name(&name) {
+        let Ok(header) = HeaderName::try_from(name.as_str()) else {
             return Err(allama::Error::configuration(format!(
                 "`{name}` is not a valid HTTP header name"
             ))
             .authored());
-        }
-        if !is_header_value(&value) {
+        };
+        let Ok(value) = HeaderValue::try_from(value) else {
             return Err(allama::Error::configuration(format!(
                 "the value of the header `{name}` contains characters an HTTP header cannot carry"
             ))
             .authored());
-        }
+        };
         if is_credential_header(&name) || slot.owns_header(&name) {
             return Err(allama::Error::configuration(format!(
                 "the header `{name}` carries a credential: configure the key with the builder's \
@@ -170,8 +220,7 @@ where
             ))
             .authored());
         }
-        all.remove(&name);
-        all.insert(name, value);
+        all.insert(header, value);
     }
     Ok(all)
 }
@@ -278,34 +327,9 @@ fn split_authority(authority: &str) -> Option<(&str, Option<&str>)> {
     })
 }
 
-/// An HTTP header name: a non-empty token.
-fn is_header_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.bytes().all(|b| {
-            b.is_ascii_alphanumeric()
-                || matches!(
-                    b,
-                    b'!' | b'#'
-                        | b'$'
-                        | b'%'
-                        | b'&'
-                        | b'\''
-                        | b'*'
-                        | b'+'
-                        | b'-'
-                        | b'.'
-                        | b'^'
-                        | b'_'
-                        | b'`'
-                        | b'|'
-                        | b'~'
-                )
-        })
-}
-
 /// A value every HTTP client sends as given: visible ASCII, spaces and
 /// tabs.
-fn is_header_value(value: &str) -> bool {
+pub(crate) fn is_header_value(value: &str) -> bool {
     value
         .bytes()
         .all(|b| b == b'\t' || (b' '..=b'~').contains(&b))
@@ -378,10 +402,18 @@ mod tests {
     fn static_headers_start_with_the_user_agent_and_refuse_credentials() {
         let slot = CredentialSlot::new("acme", CredentialPlacement::Header("x-acme-key".into()))
             .replaces("x-acme-legacy");
+        let pairs = |headers: &HeaderMap| {
+            let mut pairs: Vec<_> = headers
+                .iter()
+                .map(|(name, value)| (name.to_string(), value.to_str().unwrap().to_owned()))
+                .collect();
+            pairs.sort_unstable();
+            pairs
+        };
         let headers = static_headers(Vec::<(String, String)>::new(), &slot).unwrap();
         assert_eq!(
-            headers.iter().collect::<Vec<_>>(),
-            [("user-agent", DEFAULT_USER_AGENT)]
+            pairs(&headers),
+            [("user-agent".to_owned(), DEFAULT_USER_AGENT.to_owned())]
         );
         assert!(DEFAULT_USER_AGENT.starts_with("allama/"));
 
@@ -396,11 +428,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            headers.iter().collect::<Vec<_>>(),
+            pairs(&headers),
             [
-                ("User-Agent", "my-app/1.0"),
-                ("X-ROUTE", "b"),
-                ("Idempotency-Key", "fine")
+                ("idempotency-key".to_owned(), "fine".to_owned()),
+                ("user-agent".to_owned(), "my-app/1.0".to_owned()),
+                ("x-route".to_owned(), "b".to_owned()),
             ]
         );
 
@@ -419,6 +451,19 @@ mod tests {
                 "{name}: {err:?}"
             );
             assert!(!format!("{err} {err:?}").contains("SECRET"), "{err}");
+        }
+    }
+
+    #[test]
+    fn sensitive_values_fit_a_header_and_are_marked() {
+        let value = sensitive_value("KEY", "Bearer sk-x").unwrap();
+        assert_eq!(value, "Bearer sk-x");
+        assert!(value.is_sensitive());
+        for value in ["sk-\nx", "sk-\u{e9}", "sk\0"] {
+            let err = sensitive_value("OPENAI_API_KEY", value).unwrap_err();
+            assert!(matches!(err, allama::Error::Configuration { .. }));
+            assert!(err.to_string().contains("OPENAI_API_KEY"), "{err}");
+            assert!(!err.to_string().contains("sk"), "{err}");
         }
     }
 

@@ -100,9 +100,11 @@ use allama::{
     ValidationCoverage, Warning, WarningKind,
 };
 use allama_http::config::redact_url;
+use allama_http::http::header::{AUTHORIZATION, CONTENT_TYPE};
+use allama_http::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use allama_http::{
-    CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, Headers, HttpRequest,
-    HttpResponse, HttpTransport,
+    CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, HttpRequest, HttpResponse,
+    HttpTransport, request_uri,
 };
 use serde::{Deserialize, Serialize};
 
@@ -259,11 +261,12 @@ impl Provider {
         let body = serde_json::to_string(&wire::encode(request, &options, d)?)?;
         let config = &self.inner.transport;
         let url = format!("{}/{}", config.base_url, model_path(&request.model)?);
-        let mut http = HttpRequest::post(url, body)
-            .header("content-type", "application/json")
+        let uri = request_uri(url).map_err(|err| err.with_provider(PROVIDER_NAME))?;
+        let mut http = HttpRequest::post(uri, body)
+            .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
             .timeout(config.timeout);
         if let Some((name, value)) = &config.auth {
-            http = http.header(name, value);
+            http = http.header(name.clone(), value.clone());
         }
         let http = http
             .with_headers(&config.headers)
@@ -336,12 +339,16 @@ impl ExtractionProvider for Provider {
                         .as_deref()
                         .and_then(|code| code.parse::<u16>().ok())
                         .filter(|code| (400..=599).contains(code))
+                        .and_then(|code| StatusCode::from_u16(code).ok())
                     {
                         Some(code) => map_http_error(code, &headers, &text),
                         None => envelope
                             .apply(
-                                Error::provider(format!("error envelope with HTTP {status}"))
-                                    .authored(),
+                                Error::provider(format!(
+                                    "error envelope with HTTP {}",
+                                    status.as_u16()
+                                ))
+                                .authored(),
                             )
                             .with_body(text.into_owned()),
                     },
@@ -560,7 +567,9 @@ impl ProviderBuilder {
             .api_token
             .map(|token| {
                 let token = allama_http::config::secret("api_token", token.trim())?;
-                Ok::<_, Error>(("authorization".to_owned(), format!("Bearer {token}")))
+                let value =
+                    allama_http::config::sensitive_value("api_token", &format!("Bearer {token}"))?;
+                Ok::<_, Error>((AUTHORIZATION, value))
             })
             .transpose()?;
         let http = match self.http {
@@ -599,10 +608,11 @@ impl ProviderBuilder {
 struct TransportConfig {
     /// The `run` URL without a trailing slash.
     base_url: String,
-    /// The auth header, when a token is configured.
-    auth: Option<(String, String)>,
+    /// The auth header, its value marked sensitive, when a token is
+    /// configured.
+    auth: Option<(HeaderName, HeaderValue)>,
     /// The headers sent with every request.
-    headers: Headers,
+    headers: HeaderMap,
     /// Request timeout.
     timeout: Option<Duration>,
     /// The largest response body, in bytes.
@@ -812,12 +822,12 @@ fn model_path(model: &str) -> Result<&str> {
     }
 }
 
-fn request_id(headers: &Headers) -> Option<String> {
+fn request_id(headers: &HeaderMap) -> Option<String> {
     ["cf-ray", "x-request-id"]
         .into_iter()
         .find_map(|name| headers.get(name))
         .filter(|value| !value.is_empty())
-        .map(String::from)
+        .map(|value| String::from_utf8_lossy(value.as_bytes()).into_owned())
 }
 
 /// Environment variable `name`, trimmed; `None` when unset or blank.

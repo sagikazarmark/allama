@@ -7,6 +7,7 @@ use allama::{
 use allama_cloudflare::{
     Confidence, Distributions, ExtractionRequestOptions, Guesses, Provider, RawResponse, RunDetails,
 };
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_http::{Credential, HttpRequestOptions, ReplayResponse, ReplayTransport};
 use serde_json::Value;
 
@@ -59,8 +60,10 @@ fn invoice_request() -> ExtractionRequest {
 
 #[tokio::test]
 async fn invoice_round_trip() {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, fixture("clairic/invoice.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("clairic/invoice.json"),
+    )]);
     let provider = provider(&transport);
     let request = invoice_request().with_option(ExtractionRequestOptions::new().raw_response());
     let response = provider.extract_values(&request).await.unwrap();
@@ -73,13 +76,16 @@ async fn invoice_round_trip() {
     assert!(body.get("images").is_none());
     let requests = transport.requests();
     assert!(
-        requests[0].url.ends_with("/ai/run/@cf/cloudflare/clairic"),
+        requests[0]
+            .uri
+            .to_string()
+            .ends_with("/ai/run/@cf/cloudflare/clairic"),
         "{}",
-        requests[0].url
+        requests[0].uri.to_string()
     );
     assert_eq!(
         requests[0].headers.get("authorization"),
-        Some("Bearer cf-token")
+        Some(&HeaderValue::from_static("Bearer cf-token"))
     );
 
     let invoice_number = response.text("invoice_number").unwrap();
@@ -149,8 +155,10 @@ async fn invoice_round_trip() {
 
 #[tokio::test]
 async fn options_shape_the_body() {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, fixture("clairic/invoice.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("clairic/invoice.json"),
+    )]);
     let request = invoice_request()
         .image(Image::bytes("image/png", b"\x89PNG"))
         .reference_date("2026-10-09".parse().unwrap())
@@ -179,7 +187,10 @@ async fn http_errors_are_mapped() {
         (400, "clairic/bad_field.json", "invalid_request"),
     ];
     for (status, path, kind) in cases {
-        let transport = ReplayTransport::new([ReplayResponse::json(status, fixture(path))]);
+        let transport = ReplayTransport::new([ReplayResponse::json(
+            StatusCode::from_u16(status).unwrap(),
+            fixture(path),
+        )]);
         let err = provider(&transport)
             .extract_values(&invoice_request())
             .await
@@ -193,7 +204,7 @@ async fn http_errors_are_mapped() {
 #[tokio::test]
 async fn an_error_envelope_with_a_success_status_is_an_error() {
     let transport = ReplayTransport::new([ReplayResponse::json(
-        200,
+        StatusCode::OK,
         fixture("clairic/unknown_model.json"),
     )]);
     let err = provider(&transport)
@@ -283,8 +294,10 @@ async fn invalid_requests_fail_before_sending() {
 
 #[tokio::test]
 async fn answers_that_do_not_match_the_request_are_rejected() {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, fixture("clairic/invoice.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("clairic/invoice.json"),
+    )]);
     let request = ExtractionRequest::new("@cf/cloudflare/clairic", INVOICE)
         .field("invoice_number", Field::number());
     let err = provider(&transport)
@@ -296,15 +309,17 @@ async fn answers_that_do_not_match_the_request_are_rejected() {
 
 #[tokio::test]
 async fn a_per_request_credential_replaces_the_token() {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, fixture("clairic/invoice.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("clairic/invoice.json"),
+    )]);
     let request = invoice_request().with_option(
         HttpRequestOptions::new().credential("cloudflare", Credential::api_key("per-request")),
     );
     provider(&transport).extract_values(&request).await.unwrap();
     assert_eq!(
         transport.requests()[0].headers.get("authorization"),
-        Some("Bearer per-request")
+        Some(&HeaderValue::from_static("Bearer per-request"))
     );
 }
 
@@ -322,8 +337,10 @@ fn the_provider_is_reachable_by_downcast() {
 async fn spans_place_on_non_ascii_input() {
     let input =
         "Café Zoë — réf. A-1 (ancienne réf. A-1 annulée). Nouvelle réf. B-2, livrée le 3 mars.";
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, fixture("clairic/spans.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("clairic/spans.json"),
+    )]);
     let request = ExtractionRequest::new("@cf/cloudflare/clairic", input)
         .field("new_ref", Field::text().instructions("The new reference"))
         .field(

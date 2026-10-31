@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use allama_conformance::{MockHttpResponse, TestHttpServer};
+use allama_http::http::{HeaderValue, StatusCode};
 use serde_json::json;
 
 const SECRET: &str = "sk-capture-test-not-a-real-key";
@@ -20,9 +21,8 @@ const REQUEST: &str = r#"{"model":"demo","stream":true,"messages":[]}"#;
 #[tokio::test(flavor = "multi_thread")]
 async fn raw_mode_captures_a_unary_response() {
     let body = json!({"id": "resp_1", "output": [{"type": "text", "text": "Hello"}]});
-    let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &body).header("x-request-id", "req_1")
-    ])
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &body)
+        .header("x-request-id", HeaderValue::from_static("req_1"))])
     .await;
     let dir = Workdir::new("unary");
     let output = dir.path("response_raw.json");
@@ -89,7 +89,7 @@ async fn raw_mode_captures_a_streaming_response() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn raw_mode_keeps_a_content_type_header_given() {
-    let server = TestHttpServer::spawn([MockHttpResponse::text(200, "ok")]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::OK, "ok")]).await;
     let dir = Workdir::new("content-type");
     let output = dir.path("response_raw.txt");
 
@@ -113,9 +113,10 @@ async fn raw_mode_keeps_a_content_type_header_given() {
 async fn raw_mode_writes_error_responses_with_their_status() {
     let body = json!({"error": {"type": "rate_limit_error", "message": "slow down"}});
     let server =
-        TestHttpServer::spawn(
-            [MockHttpResponse::json_value(429, &body).header("retry-after", "3")],
-        )
+        TestHttpServer::spawn([
+            MockHttpResponse::json_value(StatusCode::TOO_MANY_REQUESTS, &body)
+                .header("retry-after", HeaderValue::from_static("3")),
+        ])
         .await;
     let dir = Workdir::new("error");
     let output = dir.path("error_rate_limited.json");
@@ -134,7 +135,7 @@ async fn raw_mode_writes_error_responses_with_their_status() {
 async fn raw_mode_refuses_a_capture_that_contains_a_secret() {
     // An endpoint that echoes the credential back, as some error pages do.
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        401,
+        StatusCode::UNAUTHORIZED,
         &json!({"error": format!("invalid key {SECRET}")}),
     )])
     .await;

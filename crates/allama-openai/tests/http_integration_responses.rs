@@ -8,6 +8,7 @@ use std::time::Duration;
 use allama::prelude::*;
 use allama::{ContentPart, Image, ImageDetail, RequestField, StreamErrorKind, WarningKind};
 use allama_conformance::{MockHttpResponse, TestHttpServer, contract};
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_openai::ResponsesProvider;
 use serde_json::json;
 
@@ -27,18 +28,17 @@ fn provider(server: &TestHttpServer) -> ResponsesProvider {
 
 fn api_error(status: u16, code: &str, kind: &str, message: &str) -> MockHttpResponse {
     MockHttpResponse::json_value(
-        status,
+        StatusCode::from_u16(status).unwrap(),
         &json!({"error": {"message": message, "type": kind, "code": code, "param": null}}),
     )
-    .header("x-request-id", "req_err")
-    .header("retry-after-ms", "1500")
+    .header("x-request-id", HeaderValue::from_static("req_err"))
+    .header("retry-after-ms", HeaderValue::from_static("1500"))
 }
 
 #[tokio::test]
 async fn responses_image_and_file_request_shape() {
-    let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &ok_body()).header("x-request-id", "req_ok")
-    ])
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &ok_body())
+        .header("x-request-id", HeaderValue::from_static("req_ok"))])
     .await;
     let response = provider(&server)
         .chat(&ChatRequest::new("gpt-4.1").user(vec![
@@ -91,7 +91,7 @@ async fn responses_http_errors_are_typed() {
             "invalid_request_error",
             "Your input exceeds the context window of this model.",
         ),
-        MockHttpResponse::text(503, "upstream unavailable"),
+        MockHttpResponse::text(StatusCode::SERVICE_UNAVAILABLE, "upstream unavailable"),
     ];
     // The contracts call `chat` and then `chat_stream`, so their failures
     // (all but the rate limit) answer twice.
@@ -120,7 +120,7 @@ async fn responses_http_errors_are_typed() {
 #[tokio::test]
 async fn responses_hints_warn_and_strict_policy_fails_before_sending() {
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &ok_body()),
+        MockHttpResponse::json_value(StatusCode::OK, &ok_body()),
         MockHttpResponse::sse(include_str!("../fixtures/responses/text_stream.sse")),
     ])
     .await;
@@ -146,7 +146,8 @@ async fn responses_hints_warn_and_strict_policy_fails_before_sending() {
 /// rejection, not a table in this crate, decides.
 #[tokio::test]
 async fn responses_reasoning_model_gets_sampling_as_asked() {
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &ok_body())]).await;
+    let server =
+        TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &ok_body())]).await;
     let response = provider(&server)
         .chat(&ChatRequest::new("gpt-5-nano").user("hi").temperature(0.2))
         .await
@@ -171,7 +172,7 @@ async fn responses_refusals_without_a_code_are_unsupported() {
     let event = json!({"type": "error", "sequence_number": 1, "message": message,
                        "param": "temperature", "code": null});
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(400, &refusal).header("x-request-id", "req_err"),
+        MockHttpResponse::json_value(StatusCode::BAD_REQUEST, &refusal).header("x-request-id", HeaderValue::from_static("req_err")),
         MockHttpResponse::sse(format!(
             "event: response.created\n\
              data: {{\"type\":\"response.created\",\"response\":{{\"id\":\"resp_1\",\"status\":\"in_progress\",\"output\":[]}}}}\n\n\
@@ -261,7 +262,7 @@ async fn reasoning_effort_maps_to_supported_levels() {
     let server = TestHttpServer::spawn(
         cases
             .iter()
-            .map(|_| MockHttpResponse::json_value(200, &ok_body()))
+            .map(|_| MockHttpResponse::json_value(StatusCode::OK, &ok_body()))
             .collect::<Vec<_>>(),
     )
     .await;
@@ -300,7 +301,7 @@ async fn tool_choice_variants() {
     let server = TestHttpServer::spawn(
         choices
             .iter()
-            .map(|_| MockHttpResponse::json_value(200, &ok_body()))
+            .map(|_| MockHttpResponse::json_value(StatusCode::OK, &ok_body()))
             .collect::<Vec<_>>(),
     )
     .await;
@@ -328,7 +329,7 @@ async fn responses_mid_stream_error_is_typed() {
         "event: error\n",
         "data: {\"type\":\"error\",\"code\":\"insufficient_quota\",\"message\":\"You exceeded your current quota\",\"param\":null}\n\n",
     ))
-    .header("x-request-id", "req_sse")])
+    .header("x-request-id", HeaderValue::from_static("req_sse"))])
     .await;
     let err = provider(&server)
         .chat_stream(&ChatRequest::new("gpt-4.1").user("hi"))
@@ -394,8 +395,11 @@ async fn replay_transport_runs_the_adapter_without_a_server() {
         .unwrap();
     assert!(response.citations().count() > 0);
     let sent = &transport.requests()[0];
-    assert_eq!(sent.url, "https://api.openai.com/v1/responses");
-    assert_eq!(sent.headers.get("authorization"), Some("Bearer replay-key"));
+    assert_eq!(sent.uri.to_string(), "https://api.openai.com/v1/responses");
+    assert_eq!(
+        sent.headers.get("authorization"),
+        Some(&HeaderValue::from_static("Bearer replay-key"))
+    );
 }
 
 /// The builder's size cap reaches the decoder: an event past it fails the
@@ -503,20 +507,21 @@ async fn interrupted_background_streams_resume_without_repeating_events() {
 
     let resumed = &transport.requests()[2];
     assert_eq!(
-        resumed.url,
+        resumed.uri.to_string(),
         format!(
             "https://api.openai.com/v1/responses/{}?stream=true",
             position.response_id
         )
     );
-    assert_eq!(resumed.method, allama_http::Method::Get);
+    assert_eq!(resumed.method, allama_http::http::Method::GET);
 }
 
 /// The provider-specific continuation methods stay reachable
 /// through wrappers and type erasure.
 #[tokio::test]
 async fn retrieve_response_through_wrappers_and_erasure() {
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &ok_body())]).await;
+    let server =
+        TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &ok_body())]).await;
     let erased = allama::DynChatProvider::new(allama::wrappers::RetryingProvider::new(
         provider(&server),
         allama::wrappers::RetryPolicy::default(),
@@ -547,7 +552,7 @@ async fn responses_http_errors_carry_the_server_retry_directive() {
         "server_error",
         "The server had an error",
     )
-    .header("x-should-retry", "false")])
+    .header("x-should-retry", HeaderValue::from_static("false"))])
     .await;
     let err = provider(&server)
         .chat(&ChatRequest::new("gpt-4.1").user("hi"))

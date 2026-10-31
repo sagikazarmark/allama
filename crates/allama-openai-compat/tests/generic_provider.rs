@@ -8,6 +8,7 @@
 use allama::prelude::*;
 use allama::{ContentPart, FinishReason, UnsupportedPolicy, WarningKind};
 use allama_conformance::{MockHttpResponse, TestHttpServer};
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_openai_compat::{ChatRequestOptions, CompatQuirks, Provider, SeedField};
 use serde_json::json;
 
@@ -81,7 +82,7 @@ async fn generic_provider_streams_with_typed_options() {
 #[tokio::test]
 async fn generic_provider_honors_options_warnings_and_request_ids() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "id": "chatcmpl-1",
             "model": "m",
@@ -89,7 +90,7 @@ async fn generic_provider_honors_options_warnings_and_request_ids() {
             "usage": {"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4}
         }),
     )
-    .header("x-request-id", "req_abc")])
+    .header("x-request-id", HeaderValue::from_static("req_abc"))])
     .await;
     let mut quirks = CompatQuirks::new("openai-compat:custom");
     quirks.seed_field = SeedField::Unsupported;
@@ -145,7 +146,7 @@ async fn generic_provider_honors_options_warnings_and_request_ids() {
 #[tokio::test]
 async fn generic_provider_maps_quota_errors() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        429,
+        StatusCode::TOO_MANY_REQUESTS,
         &json!({"error": {"message": "You exceeded your current quota", "type": "insufficient_quota", "code": "insufficient_quota"}}),
     )])
     .await;

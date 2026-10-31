@@ -8,6 +8,7 @@ use std::time::Duration;
 use allama::prelude::*;
 use allama::wrappers::{RetryPolicy, RetryingProvider};
 use allama::{ChatStreamExt, StreamErrorKind, StreamEvent};
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::{Provider, ResponsesProvider};
 use futures_util::StreamExt;
@@ -46,7 +47,10 @@ fn responses_body() -> Vec<u8> {
 }
 
 fn sse(body: Vec<u8>) -> ReplayResponse {
-    ReplayResponse::new(200, body).header("content-type", "text/event-stream")
+    ReplayResponse::new(StatusCode::OK, body).header(
+        "content-type",
+        HeaderValue::from_static("text/event-stream"),
+    )
 }
 
 fn assert_invalid_utf8(err: &Error, provider: &str) {

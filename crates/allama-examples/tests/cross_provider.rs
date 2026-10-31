@@ -15,6 +15,7 @@ use allama::{
     ToolDefinition, WarningKind,
 };
 use allama_conformance::{MockHttpResponse, TestHttpServer};
+use allama_http::http::StatusCode;
 use allama_openai::CustomToolCall;
 use serde_json::{Value, json};
 
@@ -46,9 +47,9 @@ async fn claude_thinking_history_continues_on_gemini3_via_fallback() {
         .unwrap()
         .to_owned();
     let anthropic_server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &recorded),
+        MockHttpResponse::json_value(StatusCode::OK, &recorded),
         MockHttpResponse::json_value(
-            529,
+            StatusCode::from_u16(529).unwrap(),
             &json!({"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}),
         ),
     ])
@@ -73,7 +74,7 @@ async fn claude_thinking_history_continues_on_gemini3_via_fallback() {
 
     // Turn 2: Anthropic is overloaded, Gemini 3 answers.
     let gemini_server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "responseId": "resp-2", "modelVersion": "gemini-3.5-flash",
             "candidates": [{"content": {"role": "model", "parts": [{"text": "It is 18°C and clear in Paris."}]}, "finishReason": "STOP"}],
@@ -216,7 +217,7 @@ fn custom_tool_history() -> ChatRequest {
 /// A Responses provider whose endpoint is unavailable.
 async fn unavailable_responses() -> (TestHttpServer, allama_openai::ResponsesProvider) {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        503,
+        StatusCode::SERVICE_UNAVAILABLE,
         &json!({"error": {"message": "The server is overloaded.", "type": "server_error"}}),
     )])
     .await;
@@ -292,7 +293,7 @@ fn assert_dropped_pair(response: &allama::ChatResponse, sent: &Value) {
 #[tokio::test]
 async fn a_custom_tool_turn_fails_over_from_responses_to_anthropic() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-haiku-4-5-20251001",
             "content": [{"type": "text", "text": "About 42."}],
@@ -316,7 +317,7 @@ async fn a_custom_tool_turn_fails_over_from_responses_to_anthropic() {
 #[tokio::test]
 async fn a_custom_tool_turn_fails_over_from_responses_to_gemini() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "responseId": "resp-1", "modelVersion": "gemini-3.5-flash",
             "candidates": [{"content": {"role": "model", "parts": [{"text": "About 42."}]}, "finishReason": "STOP"}],
@@ -338,7 +339,7 @@ async fn a_custom_tool_turn_fails_over_from_responses_to_gemini() {
 #[tokio::test]
 async fn a_custom_tool_turn_fails_over_from_responses_to_a_compatible_endpoint() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &chat_completion("About 42."),
     )])
     .await;
@@ -362,7 +363,7 @@ async fn a_custom_tool_turn_fails_over_from_responses_to_a_compatible_endpoint()
 #[tokio::test]
 async fn a_custom_tool_turn_round_trips_from_responses_to_chat_completions() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &chat_completion("42 users."),
     )])
     .await;
@@ -390,7 +391,7 @@ async fn a_custom_tool_turn_round_trips_from_responses_to_chat_completions() {
 #[tokio::test]
 async fn a_chat_completions_custom_call_continues_on_responses() {
     let chat_server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "id": "chatcmpl-1", "model": "gpt-5.1",
             "choices": [{"index": 0, "finish_reason": "tool_calls", "message": {
@@ -415,7 +416,7 @@ async fn a_chat_completions_custom_call_continues_on_responses() {
     history.push_message(Message::user(vec![call.output("1")]));
 
     let responses_server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "id": "resp_1", "object": "response", "status": "completed", "model": "gpt-5.1",
             "output": [{"id": "msg_1", "type": "message", "role": "assistant", "status": "completed",
@@ -457,9 +458,9 @@ async fn a_gemini_tool_turn_with_made_up_ids_continues_on_anthropic_and_mistral(
         .unwrap();
     parts.push(json!({"functionCall": {"name": "search", "args": {"q": "tokio docs"}}}));
     let gemini_server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &recorded),
+        MockHttpResponse::json_value(StatusCode::OK, &recorded),
         MockHttpResponse::json_value(
-            503,
+            StatusCode::SERVICE_UNAVAILABLE,
             &json!({"error": {"code": 503, "message": "The model is overloaded.", "status": "UNAVAILABLE"}}),
         ),
     ])
@@ -483,7 +484,7 @@ async fn a_gemini_tool_turn_with_made_up_ids_continues_on_anthropic_and_mistral(
 
     // Turn 2: Gemini is overloaded, Anthropic answers.
     let anthropic_server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-haiku-4-5-20251001",
             "content": [{"type": "text", "text": "Here are the docs."}],
@@ -533,8 +534,11 @@ async fn a_gemini_tool_turn_with_made_up_ids_continues_on_anthropic_and_mistral(
     assert_paired(&calls, &uses, &results);
 
     // The same history on Mistral.
-    let mistral_server =
-        TestHttpServer::spawn([MockHttpResponse::json_value(200, &chat_completion("Here."))]).await;
+    let mistral_server = TestHttpServer::spawn([MockHttpResponse::json_value(
+        StatusCode::OK,
+        &chat_completion("Here."),
+    )])
+    .await;
     let mistral = allama_openai_compat::providers::Mistral::builder("test-key")
         .unwrap()
         .base_url(mistral_server.url())

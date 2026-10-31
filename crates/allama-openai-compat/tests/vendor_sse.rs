@@ -14,6 +14,7 @@ use allama::{
 };
 use allama_conformance::stream_frames::{StreamFraming, assert_unknown_stream_frames_surfaced};
 use allama_conformance::{FixtureDir, assert_stream_fixture_eq, load_text_fixture};
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::{CompatQuirks, Provider};
 use futures_util::StreamExt;
@@ -215,7 +216,7 @@ async fn unary_responses_keep_top_level_vendor_fields() {
         .base_url("http://upstream/v1")
         .provider_name("vendor")
         .http_transport(ReplayTransport::new([ReplayResponse::json(
-            200,
+            StatusCode::OK,
             json!({
                 "id": "p1", "object": "chat.completion", "created": 1_727_000_000, "model": "sonar",
                 "citations": ["https://a.example"],
@@ -279,7 +280,7 @@ async fn http_errors_use_dialect_quota_codes() {
         .provider_name("vendor")
         .quirks(quirks)
         .http_transport(ReplayTransport::new([ReplayResponse::json(
-            429,
+            StatusCode::TOO_MANY_REQUESTS,
             json!({"error": {"message": "monthly quota used", "code": "quota_exceeded"}})
                 .to_string(),
         )]))

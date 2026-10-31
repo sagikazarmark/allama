@@ -82,9 +82,11 @@ use allama::{
     ValidationCoverage, Warning, WarningKind,
 };
 use allama_http::config::redact_url;
+use allama_http::http::header::CONTENT_TYPE;
+use allama_http::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use allama_http::{
-    CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, Headers, HttpRequest,
-    HttpResponse, HttpTransport,
+    CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, HttpRequest, HttpResponse,
+    HttpTransport, request_uri,
 };
 use serde::{Deserialize, Serialize};
 
@@ -239,11 +241,12 @@ impl Provider {
             wire::Dialect::WorkersAi => format!("{}/{}", config.url(), model_path(&request.model)?),
             wire::Dialect::SystemOne | wire::Dialect::Ollama => config.url(),
         };
-        let mut http = HttpRequest::post(url, body)
-            .header("content-type", "application/json")
+        let uri = request_uri(url).map_err(|err| err.with_provider(self.provider_name()))?;
+        let mut http = HttpRequest::post(uri, body)
+            .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
             .timeout(config.timeout);
         if let Some((name, value)) = &config.auth {
-            http = http.header(name, value);
+            http = http.header(name.clone(), value.clone());
         }
         let http = http
             .with_headers(&config.headers)
@@ -332,6 +335,7 @@ impl DecisionProvider for Provider {
                     .as_deref()
                     .and_then(|code| code.parse::<u16>().ok())
                     .filter(|code| (400..=599).contains(code))
+                    .and_then(|code| StatusCode::from_u16(code).ok())
                 {
                     // The response's headers carry its retry hint.
                     Some(code) => error::map_http_error_with_hint(
@@ -342,8 +346,11 @@ impl DecisionProvider for Provider {
                     ),
                     None => envelope
                         .apply(
-                            Error::provider(format!("error envelope with HTTP {status}"))
-                                .authored(),
+                            Error::provider(format!(
+                                "error envelope with HTTP {}",
+                                status.as_u16()
+                            ))
+                            .authored(),
                         )
                         .with_body(text.into_owned()),
                 },
@@ -635,8 +642,14 @@ impl ProviderBuilder {
         let auth = self
             .auth
             .map(|(name, value)| {
-                let value = allama_http::config::secret(&format!("the `{name}` header"), &value)?;
-                Ok::<_, Error>((name, value))
+                let setting = format!("the `{name}` header");
+                let header = HeaderName::try_from(name.as_str()).map_err(|_| {
+                    Error::configuration(format!("`{name}` is not a valid HTTP header name"))
+                        .authored()
+                })?;
+                let value = allama_http::config::secret(&setting, &value)?;
+                let value = allama_http::config::sensitive_value(&setting, &value)?;
+                Ok::<_, Error>((header, value))
             })
             .transpose()?;
         let path = self.path.unwrap_or_else(|| "/v1/systemone".into());
@@ -697,11 +710,12 @@ struct TransportConfig {
     base_url: String,
     /// Endpoint path.
     path: String,
-    /// Auth header, when the endpoint requires one.
-    auth: Option<(String, String)>,
+    /// Auth header, its value marked sensitive, when the endpoint requires
+    /// one.
+    auth: Option<(HeaderName, HeaderValue)>,
     /// The headers sent with every request: the `User-Agent` and the
     /// builder's own.
-    headers: Headers,
+    headers: HeaderMap,
     /// Request id header name.
     request_id_header_name: String,
     /// Request timeout.
@@ -719,7 +733,7 @@ impl std::fmt::Debug for TransportConfig {
                 "auth",
                 &self.auth.as_ref().map(|(name, _)| (name, Redacted)),
             )
-            .field("headers", &self.headers)
+            .field("headers", &allama_http::redacted_headers(&self.headers))
             .field("request_id_header_name", &self.request_id_header_name)
             .field("timeout", &self.timeout)
             .field("max_response_size", &self.max_response_size)
@@ -797,23 +811,23 @@ impl allama::ProviderDataEntry for RawResponse {
 fn credential_slot(
     scope: Cow<'static, str>,
     placement: Option<CredentialPlacement>,
-    auth: Option<&(String, String)>,
+    auth: Option<&(HeaderName, HeaderValue)>,
     explicit: bool,
 ) -> CredentialSlot {
     let placement = placement.unwrap_or_else(|| match auth {
         Some((name, value))
-            if !name.eq_ignore_ascii_case("authorization") || !value.starts_with("Bearer ") =>
+            if name != allama_http::http::header::AUTHORIZATION
+                || !value.as_bytes().starts_with(b"Bearer ") =>
         {
-            CredentialPlacement::Header(name.clone().into())
+            CredentialPlacement::Header(name.as_str().to_owned().into())
         }
         _ => CredentialPlacement::Bearer,
     });
     let mut slot = CredentialSlot::new(scope, placement).required(auth.is_none() && explicit);
     if let (Some((name, _)), Some(own)) = (auth, slot.header_name())
-        && !own.eq_ignore_ascii_case(name)
+        && !own.eq_ignore_ascii_case(name.as_str())
     {
-        let name = name.clone();
-        slot = slot.replaces(name);
+        slot = slot.replaces(name.as_str().to_owned());
     }
     slot
 }
@@ -837,11 +851,11 @@ fn model_path(model: &str) -> Result<&str> {
     }
 }
 
-fn request_id(headers: &Headers, name: &str) -> Option<String> {
+fn request_id(headers: &HeaderMap, name: &str) -> Option<String> {
     headers
         .get(name)
         .filter(|value| !value.is_empty())
-        .map(String::from)
+        .map(|value| String::from_utf8_lossy(value.as_bytes()).into_owned())
 }
 
 /// A `Debug` placeholder for a secret value.
@@ -868,6 +882,7 @@ fn default_transport() -> Result<Arc<dyn HttpTransport>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use allama_http::http::StatusCode;
 
     /// One timeout model for every builder: unset, the default applies
     /// whatever the transport, a client of your own included; only an
@@ -901,8 +916,10 @@ mod tests {
             (Some(five), five),
             (Some(None), None),
         ] {
-            let transport =
-                allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+            let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "",
+            )]);
             let mut builder = Provider::builder()
                 .base_url("http://localhost:1")
                 .http_transport(transport.clone());
@@ -1050,8 +1067,13 @@ mod tests {
 
     #[test]
     fn the_credential_slot_follows_the_configured_credential() {
-        let auth = |name: &str, value: &str| Some((name.to_owned(), value.to_owned()));
-        let slot = |placement, auth: Option<(String, String)>, explicit| {
+        let auth = |name: &str, value: &str| {
+            Some((
+                HeaderName::try_from(name).unwrap(),
+                HeaderValue::try_from(value).unwrap(),
+            ))
+        };
+        let slot = |placement, auth: Option<(HeaderName, HeaderValue)>, explicit| {
             credential_slot("s".into(), placement, auth.as_ref(), explicit)
         };
         assert_eq!(
@@ -1060,7 +1082,7 @@ mod tests {
         );
         assert_eq!(
             slot(None, auth("Authorization", "raw-token"), false),
-            CredentialSlot::new("s", CredentialPlacement::Header("Authorization".into()))
+            CredentialSlot::new("s", CredentialPlacement::Header("authorization".into()))
         );
         assert_eq!(
             slot(None, None, false),

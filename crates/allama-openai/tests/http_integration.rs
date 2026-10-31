@@ -4,13 +4,14 @@
 use allama::prelude::*;
 use allama::{ContentPart, Image, ImageDetail, StreamErrorKind};
 use allama_conformance::{MockHttpResponse, TestHttpServer};
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_openai::Provider;
 use serde_json::json;
 
 #[tokio::test]
 async fn vision_and_pdf_request_shape() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({"id": "c", "model": "gpt-4.1", "choices": [{"index": 0, "finish_reason": "stop", "message": {"content": "red"}}]}),
     )])
     .await;
@@ -60,7 +61,7 @@ async fn clean_eof_without_done_is_incomplete() {
 #[tokio::test]
 async fn embed_maps_401_to_auth() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        401,
+        StatusCode::UNAUTHORIZED,
         &json!({"error": {"message": "bad key", "type": "invalid_request_error", "code": "invalid_api_key"}}),
     )])
     .await;
@@ -80,8 +81,8 @@ async fn raw_responses_from_both_apis() {
         "output": [{"type": "message", "id": "msg_1", "role": "assistant", "status": "completed",
                     "content": [{"type": "output_text", "text": "red", "annotations": []}]}]});
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &completion),
-        MockHttpResponse::json_value(200, &response),
+        MockHttpResponse::json_value(StatusCode::OK, &completion),
+        MockHttpResponse::json_value(StatusCode::OK, &response),
     ])
     .await;
 
@@ -141,12 +142,12 @@ async fn server_retry_directive_true_retries_a_conflict() {
 
     let server = TestHttpServer::spawn([
         MockHttpResponse::json_value(
-            409,
+            StatusCode::CONFLICT,
             &json!({"error": {"message": "conflict", "type": "invalid_request_error"}}),
         )
-        .header("x-should-retry", "true")
-        .header("x-request-id", "req_409"),
-        MockHttpResponse::json_value(200, &chat_ok_body()),
+        .header("x-should-retry", HeaderValue::from_static("true"))
+        .header("x-request-id", HeaderValue::from_static("req_409")),
+        MockHttpResponse::json_value(StatusCode::OK, &chat_ok_body()),
     ])
     .await;
     let provider = Provider::new_with_base_url("k", server.url()).unwrap();
@@ -160,11 +161,11 @@ async fn server_retry_directive_true_retries_a_conflict() {
 
     let server = TestHttpServer::spawn([
         MockHttpResponse::json_value(
-            409,
+            StatusCode::CONFLICT,
             &json!({"error": {"message": "conflict", "type": "invalid_request_error"}}),
         )
-        .header("x-should-retry", "true"),
-        MockHttpResponse::json_value(200, &chat_ok_body()),
+        .header("x-should-retry", HeaderValue::from_static("true")),
+        MockHttpResponse::json_value(StatusCode::OK, &chat_ok_body()),
     ])
     .await;
     let retrying = RetryingProvider::new(
@@ -186,12 +187,12 @@ async fn server_retry_directive_false_stops_a_rate_limit() {
 
     let server = TestHttpServer::spawn([
         MockHttpResponse::json_value(
-            429,
+            StatusCode::TOO_MANY_REQUESTS,
             &json!({"error": {"message": "slow down", "type": "requests", "code": "rate_limit_exceeded"}}),
         )
-        .header("x-should-retry", "false")
-        .header("retry-after-ms", "1"),
-        MockHttpResponse::json_value(200, &chat_ok_body()),
+        .header("x-should-retry", HeaderValue::from_static("false"))
+        .header("retry-after-ms", HeaderValue::from_static("1")),
+        MockHttpResponse::json_value(StatusCode::OK, &chat_ok_body()),
     ])
     .await;
     let retrying = RetryingProvider::new(

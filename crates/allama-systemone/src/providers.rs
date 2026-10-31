@@ -651,8 +651,12 @@ mod tests {
             "https://api.typesafe.ai/v1/systemone"
         );
         assert_eq!(
-            typesafe.transport().auth,
-            Some(("authorization".into(), "Bearer key".into()))
+            typesafe
+                .transport()
+                .auth
+                .as_ref()
+                .map(|(name, value)| (name.as_str(), value.to_str().unwrap())),
+            Some(("authorization", "Bearer key"))
         );
         assert_eq!(
             typesafe.decision_limits("jev-latest").max_score_levels,

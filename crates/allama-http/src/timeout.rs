@@ -228,7 +228,9 @@ mod tests {
     use futures_util::StreamExt;
 
     use super::*;
-    use crate::{Headers, ReplayResponse, ReplayTransport, SendFuture};
+    use http::{HeaderMap, StatusCode, Uri};
+
+    use crate::{ReplayResponse, ReplayTransport, SendFuture};
 
     const SHORT: Duration = Duration::from_millis(20);
 
@@ -254,13 +256,13 @@ mod tests {
                     )),
                     None => Box::pin(futures_util::stream::pending()),
                 };
-                Ok(HttpResponse::new(200, Headers::new(), body))
+                Ok(HttpResponse::new(StatusCode::OK, HeaderMap::new(), body))
             })
         }
     }
 
     fn request() -> HttpRequest {
-        HttpRequest::post("https://x", "{}")
+        HttpRequest::post(Uri::from_static("https://x"), "{}")
     }
 
     #[tokio::test]
@@ -296,7 +298,7 @@ mod tests {
             .send(&transport, request())
             .await
             .unwrap();
-        assert_eq!(response.status, 200);
+        assert_eq!(response.status, StatusCode::OK);
         let mut body = response.into_body();
         let err = body.next().await.unwrap().unwrap_err();
         assert_eq!(err.kind(), TransportErrorKind::Timeout);
@@ -402,12 +404,12 @@ mod tests {
 
     #[tokio::test]
     async fn unbounded_passes_responses_and_errors_through() {
-        let transport = ReplayTransport::new([ReplayResponse::new(201, "ok")]);
+        let transport = ReplayTransport::new([ReplayResponse::new(StatusCode::CREATED, "ok")]);
         let response = StreamTimeouts::unbounded()
             .send(&transport, request())
             .await
             .unwrap();
-        assert_eq!(response.status, 201);
+        assert_eq!(response.status, StatusCode::CREATED);
         assert_eq!(response.text().await.unwrap(), "ok");
 
         // The queue is empty now: the transport's own error comes back.
@@ -427,7 +429,9 @@ mod wasm_tests {
     use wasm_bindgen_test::wasm_bindgen_test;
 
     use super::*;
-    use crate::{Headers, SendFuture};
+    use http::{HeaderMap, StatusCode, Uri};
+
+    use crate::SendFuture;
 
     struct Stalled;
 
@@ -435,8 +439,8 @@ mod wasm_tests {
         fn send(&self, _request: HttpRequest) -> SendFuture<'_> {
             Box::pin(async {
                 Ok(HttpResponse::new(
-                    200,
-                    Headers::new(),
+                    StatusCode::OK,
+                    HeaderMap::new(),
                     Box::pin(futures_util::stream::pending()),
                 ))
             })
@@ -447,7 +451,7 @@ mod wasm_tests {
     async fn a_stalled_body_fails_the_idle_bound() {
         let response = StreamTimeouts::default()
             .idle(Some(Duration::from_millis(20)))
-            .send(&Stalled, HttpRequest::get("https://x"))
+            .send(&Stalled, HttpRequest::get(Uri::from_static("https://x")))
             .await
             .unwrap();
         let err = response.into_body().next().await.unwrap().unwrap_err();

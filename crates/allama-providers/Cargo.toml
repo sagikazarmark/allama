@@ -75,6 +75,7 @@ allama-systemone = { workspace = true, optional = true }
 [dev-dependencies]
 allama = { workspace = true, features = ["mock", "tracing"] }
 allama-conformance = { workspace = true, features = ["server"] }
+allama-http = { workspace = true }
 
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }

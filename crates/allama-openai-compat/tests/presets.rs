@@ -17,6 +17,7 @@ use allama::{
     ToolDefinition,
 };
 use allama_conformance::{FixtureDir, MockHttpResponse, TestHttpServer, assert_json_fixture_eq};
+use allama_http::http::StatusCode;
 use allama_openai_compat::providers::{
     Azure, Cloudflare, DeepInfra, DeepSeek, Fireworks, Groq, Mistral, Ollama, OpenRouter, Together,
     Vllm, XAi,
@@ -71,7 +72,7 @@ fn presets() -> Vec<(&'static str, ProviderBuilder)> {
 async fn each_preset_matches_its_fixture() {
     for (name, builder) in presets() {
         let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-            200,
+            StatusCode::OK,
             &json!({
                 "id": "c1", "model": "model-x",
                 "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": "ok"}}],
@@ -112,7 +113,7 @@ async fn each_preset_matches_its_fixture() {
 async fn each_preset_maps_the_embedding_input_type() {
     let embeddings_ok = || {
         MockHttpResponse::json_value(
-            200,
+            StatusCode::OK,
             &json!({"data": [{"embedding": [0.1], "index": 0}], "model": "model-x"}),
         )
     };

@@ -38,9 +38,11 @@ pub(crate) fn map_worker_error(err: worker::Error) -> Error {
         worker::Error::DailyLimitExceeded(_) => {
             Error::quota_exhausted("Workers AI daily limit exceeded").authored()
         }
-        worker::Error::InternalError(_) => {
-            allama_http::status_error(500, "Workers AI internal error").authored()
-        }
+        worker::Error::InternalError(_) => allama_http::status_error(
+            allama_http::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "Workers AI internal error",
+        )
+        .authored(),
         worker::Error::UnknownJsError { name, code, .. } => {
             classify(code.as_deref(), &message).with_provider_type_opt(name.as_deref())
         }
@@ -196,7 +198,10 @@ impl KnownCode {
         let message = format!("Workers AI error {}", self.code);
         let error = match self.refined {
             Some(kind) => kind.to_error(message, lower),
-            None => allama_http::status_error(self.status, message),
+            None => match allama_http::http::StatusCode::from_u16(self.status) {
+                Ok(status) => allama_http::status_error(status, message),
+                Err(_) => Error::provider(message),
+            },
         };
         error
             .with_status(self.status)

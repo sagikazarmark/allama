@@ -40,6 +40,7 @@
 //!
 //! ```
 //! use allama::prelude::*;
+//! use allama_http::http::StatusCode;
 //! use allama_http::{ReplayResponse, ReplayTransport};
 //! use allama_openai_compat::providers::Groq;
 //! use serde_json::json;
@@ -47,7 +48,7 @@
 //! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() -> allama::Result<()> {
 //! let transport = ReplayTransport::new([ReplayResponse::json(
-//!     200,
+//!     StatusCode::OK,
 //!     r#"{"id":"c1","model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}]}"#,
 //! )]);
 //! let groq = Groq::builder("key")?.http_transport(transport.clone()).build()?;
@@ -1449,6 +1450,7 @@ impl Cloudflare {
 mod tests {
     use super::*;
     use allama::ChatProvider;
+    use allama_http::http::{HeaderValue, StatusCode};
 
     /// Mistral models on Workers AI take only nine-character ids; the
     /// others take any, and keep the endpoint's rule.
@@ -1538,7 +1540,8 @@ mod tests {
         ]);
 
         // What the endpoint answers when the part is sent.
-        let transport = ReplayTransport::new([ReplayResponse::json(400, reply)]);
+        let transport =
+            ReplayTransport::new([ReplayResponse::json(StatusCode::BAD_REQUEST, reply)]);
         let unclaimed = crate::Provider::builder()
             .base_url("http://localhost:11434/v1")
             .quirks(Ollama::quirks())
@@ -1552,7 +1555,8 @@ mod tests {
         assert_eq!(transport.requests().len(), 1);
 
         // The preset refuses it first, naming the part.
-        let transport = ReplayTransport::new([ReplayResponse::json(400, reply)]);
+        let transport =
+            ReplayTransport::new([ReplayResponse::json(StatusCode::BAD_REQUEST, reply)]);
         let ollama = Ollama::builder("http://localhost:11434")
             .unwrap()
             .http_transport(transport.clone())
@@ -1668,7 +1672,7 @@ mod tests {
 
         let reply = || {
             ReplayResponse::json(
-                200,
+                StatusCode::OK,
                 r#"{"id":"c1","model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}]}"#,
             )
         };
@@ -1690,13 +1694,19 @@ mod tests {
             .await
             .unwrap();
         let sent = &transport.requests()[0];
-        assert_eq!(sent.url, "https://api.githubcopilot.com/chat/completions");
-        assert_eq!(sent.headers.get("authorization"), Some("Bearer gho_token"));
+        assert_eq!(
+            sent.uri.to_string(),
+            "https://api.githubcopilot.com/chat/completions"
+        );
+        assert_eq!(
+            sent.headers.get("authorization"),
+            Some(&HeaderValue::from_static("Bearer gho_token"))
+        );
         assert_eq!(
             sent.headers.get("copilot-integration-id"),
-            Some("copilot-developer-cli")
+            Some(&HeaderValue::from_static("copilot-developer-cli"))
         );
-        let body: serde_json::Value = serde_json::from_slice(sent.body.as_ref().unwrap()).unwrap();
+        let body: serde_json::Value = serde_json::from_slice(sent.body.as_ref()).unwrap();
         assert_eq!(body["model"], "claude-sonnet-4.5");
         assert_eq!(body["max_completion_tokens"], 100);
         assert_eq!(body["reasoning_effort"], "medium", "{body}");
@@ -1728,10 +1738,13 @@ mod tests {
             .unwrap();
         let sent = &transport.requests()[0];
         assert_eq!(
-            sent.url,
+            sent.uri.to_string(),
             "https://api.enterprise.githubcopilot.com/chat/completions"
         );
-        assert_eq!(sent.headers.get("copilot-integration-id"), Some("my-app"));
+        assert_eq!(
+            sent.headers.get("copilot-integration-id"),
+            Some(&HeaderValue::from_static("my-app"))
+        );
 
         assert!(GitHubCopilot::builder(" ").is_err());
         assert!(GitHubCopilot::builder_with_base_url("api.githubcopilot.com", "t").is_err());

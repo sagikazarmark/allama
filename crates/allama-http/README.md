@@ -9,8 +9,12 @@ The HTTP transport seam of `allama`'s HTTP provider crates
 
 Providers build an `HttpRequest`, send it through an `HttpTransport`, and
 decode the `HttpResponse`; request mapping, error classification and stream
-decoding never touch an HTTP client directly. That makes the transport
-replaceable:
+decoding never touch an HTTP client directly. Both are made of the `http`
+crate's types (`Method`, `Uri`, `HeaderMap`, `StatusCode`, re-exported as
+`allama_http::http`) and convert to and from `http::Request<Bytes>` and
+`http::Response<Body>`, so a transport over any `http`-based client
+(`hyper`, a `tower` service, a Workers `fetch`) maps them as they are.
+That makes the transport replaceable:
 
 | Transport | Use |
 | --- | --- |
@@ -20,12 +24,13 @@ replaceable:
 
 ```rust
 use allama::prelude::*;
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 
 #[tokio::main]
 async fn main() -> allama::Result<()> {
     let transport = ReplayTransport::new([ReplayResponse::json(
-        200,
+        StatusCode::OK,
         r#"{"id":"msg_1","model":"claude-haiku-4-5","stop_reason":"end_turn",
             "content":[{"type":"text","text":"Hello"}],"usage":{"input_tokens":3,"output_tokens":1}}"#,
     )]);
@@ -35,7 +40,7 @@ async fn main() -> allama::Result<()> {
         .build()?;
     let response = provider.chat(&ChatRequest::new("claude-haiku-4-5").user("Hi")).await?;
     assert_eq!(response.text().as_deref(), Some("Hello"));
-    assert_eq!(transport.requests()[0].url, "https://api.anthropic.com/v1/messages");
+    assert_eq!(transport.requests()[0].uri, "https://api.anthropic.com/v1/messages");
     Ok(())
 }
 ```
@@ -75,10 +80,13 @@ What a broken or hostile endpoint can make a caller do is bounded:
   timeouts), not in total bytes: its length is the answer's, which
   `max_output_tokens` bounds, and a byte cap would cut off a legitimate
   long answer mid-stream.
-- **Checked configuration.** `config::base_url`, `config::secret` and
-  `config::static_headers` refuse malformed base URLs, keys no header can
-  carry, and credential headers among a builder's `header(..)` settings,
-  at `build()`, with a `Configuration` error naming the setting.
+- **Checked configuration.** `config::base_url`, `config::secret`,
+  `config::sensitive_value` and `config::static_headers` refuse malformed
+  base URLs, keys no header can carry, and credential headers among a
+  builder's `header(..)` settings, at `build()`, with a `Configuration`
+  error naming the setting. They return the `http` types requests are
+  made of, so a request never fails on the builder's configuration;
+  `request_uri` checks what a request adds to the base URL (a model id).
 - **A `User-Agent`.** The bundled providers send `allama/<version>`
   (`DEFAULT_USER_AGENT`) unless `header("user-agent", ..)` replaces it.
 
@@ -88,6 +96,9 @@ This crate names these third-party crates in its public API, so a new
 major (pre-1.0: minor) version of any of them is a breaking release of
 `allama-http`:
 
+- `http` 1: re-exported as `allama_http::http`, the method, URI, headers
+  and status of `HttpRequest` and `HttpResponse`, and of the helpers that
+  read them;
 - `bytes` 1: `Bytes`, re-exported, carries request and response bodies;
 - `futures-core` 0.3: the `Body` stream and the framers' stream bounds;
 - `serde` and `serde_json` 1: the JSON form of `HttpRequestOptions`,
@@ -121,11 +132,12 @@ HTTP adapter applies it with `HttpRequest::apply_options`.
 
 ```rust
 use allama::ChatRequest;
+use allama_http::http::HeaderValue;
 use allama_http::{Credential, HttpRequestOptions};
 
 let request = ChatRequest::new("gpt-4o-mini").user("Hi").with_option(
     HttpRequestOptions::new()
-        .header("x-tenant-id", "acme")
+        .header("x-tenant-id", HeaderValue::from_static("acme"))
         .credential("openai", Credential::api_key("sk-tenant-key")),
 );
 ```
@@ -170,11 +182,13 @@ the `trace_context` example in `allama-examples` runs it.
 
 ## Secrets in logs
 
-`Debug` output of `Headers`, `HttpRequest` and `HttpResponse` redacts
-credential headers (`authorization`, `x-api-key`, `cookie`, … and any name
-containing `key`, `token`, `secret` or `auth`) and every credential
-`apply_options` placed; `is_sensitive_header` is the rule, for provider
-crates that print their own configuration. It only redacts: a plain
+`Debug` output of `HttpRequest`, `HttpResponse` and `HttpRequestOptions`
+redacts credential headers (`authorization`, `x-api-key`, `cookie`, … and
+any name containing `key`, `token`, `secret` or `auth`) and every value
+marked sensitive (`HeaderValue::set_sensitive`), as every credential
+`apply_options` placed is; `is_sensitive_header` is the rule, and
+`redacted_headers` prints a `HeaderMap` by it, for provider crates and
+transports that print their own. It only redacts: a plain
 `Idempotency-Key` header is still sent.
 
 ## Error helpers

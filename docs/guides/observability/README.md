@@ -223,14 +223,16 @@ the application installs one; the W3C `TraceContextPropagator` sends
 opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
 ```
 
-One function writes the context into a request's headers. It never
-overwrites a `traceparent` the caller set:
+One function writes the context into a request's headers, the `http`
+crate's `HeaderMap` that `allama_http::http` re-exports (crates such as
+`opentelemetry-http` inject into it too). It never overwrites a
+`traceparent` the caller set:
 
 ```rust,ignore
 /// Write the current span's trace context into `headers` through the
 /// global propagator, unless they already carry a `traceparent`.
-fn inject_trace_context(headers: &mut Headers) {
-    if headers.get("traceparent").is_some() {
+fn inject_trace_context(headers: &mut HeaderMap) {
+    if headers.contains_key("traceparent") {
         return;
     }
     let context = tracing::Span::current().context();
@@ -239,13 +241,15 @@ fn inject_trace_context(headers: &mut Headers) {
     });
 }
 
-/// Writes the propagator's fields as headers, one value per name.
-struct HeaderInjector<'a>(&'a mut Headers);
+/// Writes the propagator's fields as headers, one value per name. A field
+/// no header can carry is left out.
+struct HeaderInjector<'a>(&'a mut HeaderMap);
 
 impl Injector for HeaderInjector<'_> {
     fn set(&mut self, name: &str, value: String) {
-        self.0.remove(name);
-        self.0.insert(name, value);
+        if let (Ok(name), Ok(value)) = (HeaderName::try_from(name), HeaderValue::try_from(value)) {
+            self.0.insert(name, value);
+        }
     }
 }
 ```

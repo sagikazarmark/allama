@@ -11,7 +11,8 @@ use allama_conformance::contract::{
     assert_structured_output_contract_stream, collect_chat_stream,
 };
 use allama_conformance::stream_errors::{ErrorKindProbe, assert_stream_errors_classified};
-use allama_http::{Headers, ReplayResponse, ReplayTransport};
+use allama_http::http::{HeaderMap, HeaderValue, StatusCode};
+use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::{CompatQuirks, Provider, ResponsesProvider};
 use serde_json::{Value, json};
 use support::envelope;
@@ -21,8 +22,16 @@ mod support;
 /// The vendor's own quota code, beside OpenAI's `insufficient_quota`.
 const VENDOR_QUOTA_CODE: &str = "quota_exceeded";
 
-fn headers(pairs: &[(&str, &str)]) -> Headers {
-    pairs.iter().copied().collect()
+fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+    pairs
+        .iter()
+        .map(|(name, value)| {
+            (
+                allama_http::http::HeaderName::try_from(*name).unwrap(),
+                allama_http::http::HeaderValue::try_from(*value).unwrap(),
+            )
+        })
+        .collect()
 }
 
 /// The failures the error-kind contracts expect, in contract order, each
@@ -38,8 +47,8 @@ fn failures() -> ReplayTransport {
     ReplayTransport::new(kinds.into_iter().flat_map(|(status, kind)| {
         let body = envelope(kind, "insufficient_quota").unwrap();
         [
-            ReplayResponse::json(status, body.clone()),
-            ReplayResponse::json(status, body),
+            ReplayResponse::json(StatusCode::from_u16(status).unwrap(), body.clone()),
+            ReplayResponse::json(StatusCode::from_u16(status).unwrap(), body),
         ]
     }))
 }
@@ -87,7 +96,8 @@ async fn responses_error_kinds_hold_on_both_paths() {
 /// A `200` whose body is no response: what a proxy answers in place of
 /// the endpoint's JSON.
 fn malformed() -> ReplayTransport {
-    ReplayTransport::new([ReplayResponse::new(200, MALFORMED_BODY).header("x-request-id", "req_1")])
+    ReplayTransport::new([ReplayResponse::new(StatusCode::OK, MALFORMED_BODY)
+        .header("x-request-id", HeaderValue::from_static("req_1"))])
 }
 
 #[tokio::test]
@@ -131,7 +141,11 @@ async fn chat_stream_error_events_are_classified_like_http_errors() {
             )
         },
         |status, pairs, body| {
-            CompatQuirks::default().map_http_error(status, &headers(pairs), &body)
+            CompatQuirks::default().map_http_error(
+                StatusCode::from_u16(status).unwrap(),
+                &headers(pairs),
+                &body,
+            )
         },
         |body| chat_stream_with(CompatQuirks::new("openai-compat:vendor"), body),
     )
@@ -145,7 +159,13 @@ async fn vendor_quota_codes_are_classified_on_both_paths() {
     assert_stream_errors_classified(
         |kind| envelope(kind, VENDOR_QUOTA_CODE),
         |envelope| format!("data: {}\n\ndata: {envelope}\n\n", chat_chunk()),
-        |status, pairs, body| quirks.map_http_error(status, &headers(pairs), &body),
+        |status, pairs, body| {
+            quirks.map_http_error(
+                StatusCode::from_u16(status).unwrap(),
+                &headers(pairs),
+                &body,
+            )
+        },
         |body| chat_stream_with(quirks.clone(), body),
     )
     .await;
@@ -196,7 +216,11 @@ async fn responses_stream_errors_are_classified_like_http_errors() {
         },
         failed,
         |status, pairs, body| {
-            CompatQuirks::default().map_http_error(status, &headers(pairs), &body)
+            CompatQuirks::default().map_http_error(
+                StatusCode::from_u16(status).unwrap(),
+                &headers(pairs),
+                &body,
+            )
         },
         responses_stream,
     )
@@ -228,7 +252,7 @@ async fn chat_structured_output_is_json_on_both_paths() {
         "choices": [{"index": 0, "delta": {"role": "assistant", "content": ANSWER}, "finish_reason": "stop"}]
     });
     let transport = ReplayTransport::new([
-        ReplayResponse::json(200, response.to_string()),
+        ReplayResponse::json(StatusCode::OK, response.to_string()),
         ReplayResponse::sse(format!("data: {chunk}\n\ndata: [DONE]\n\n")),
     ]);
     let provider = chat_provider(CompatQuirks::new("openai-compat:vendor"), transport);
@@ -268,7 +292,7 @@ async fn responses_structured_output_is_json_on_both_paths() {
         ));
     }
     let transport = ReplayTransport::new([
-        ReplayResponse::json(200, response.to_string()),
+        ReplayResponse::json(StatusCode::OK, response.to_string()),
         ReplayResponse::sse(sse),
     ]);
     let provider = responses_provider(transport);
@@ -286,11 +310,11 @@ async fn ollama_refuses_embeddings_for_a_chat_only_model() {
 
     let message = "This server does not support embeddings. Start it with `--embeddings`";
     let transport = ReplayTransport::new([ReplayResponse::json(
-        501,
+        StatusCode::NOT_IMPLEMENTED,
         json!({"error": {"message": message, "type": "api_error", "param": null, "code": null}})
             .to_string(),
     )
-    .header("x-request-id", "req_501")]);
+    .header("x-request-id", HeaderValue::from_static("req_501"))]);
     let provider = Ollama::builder("http://localhost:11434")
         .unwrap()
         .http_transport(transport.clone())

@@ -6,6 +6,7 @@
 
 use allama::prelude::*;
 use allama::{RequestField, Subject, UnsupportedPolicy, Warning, WarningKind};
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::providers::{Azure, Mistral};
 use allama_openai_compat::{
@@ -15,7 +16,7 @@ use serde_json::{Value, json};
 
 fn chat_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "c1", "object": "chat.completion", "model": "m",
             "choices": [{"index": 0, "finish_reason": "stop",
@@ -28,7 +29,7 @@ fn chat_ok() -> ReplayResponse {
 
 fn responses_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "resp_1", "object": "response", "status": "completed", "model": "m",
             "output": [{"type": "message", "id": "msg_1", "role": "assistant",
@@ -44,7 +45,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }

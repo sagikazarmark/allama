@@ -7,11 +7,12 @@
 use allama::{ChatProvider, ChatRequest};
 use allama_anthropic::{ChatRequestOptions, Provider};
 use allama_conformance::{MockHttpResponse, TestHttpServer};
+use allama_http::http::StatusCode;
 use serde_json::{Value, json};
 
 fn ok() -> MockHttpResponse {
     MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-haiku-4-5",
             "content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn",

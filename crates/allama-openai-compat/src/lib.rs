@@ -58,10 +58,9 @@ use allama::{
 use allama_http::ReqwestTransport;
 pub use allama_http::StreamTimeouts;
 use allama_http::config::redact_url;
+use allama_http::http::{HeaderMap, HeaderName, HeaderValue};
 use allama_http::sse::SseDecoder;
-use allama_http::{
-    CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, Headers, HttpTransport,
-};
+use allama_http::{CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, HttpTransport};
 
 #[doc(hidden)]
 pub mod binding;
@@ -654,21 +653,21 @@ pub(crate) fn credential_slot(
     scope: Option<Cow<'static, str>>,
     provider_name: Cow<'static, str>,
     placement: Option<CredentialPlacement>,
-    auth: Option<&(String, String)>,
+    auth: Option<&(HeaderName, HeaderValue)>,
 ) -> CredentialSlot {
     let explicit = scope.is_some();
     let placement = placement.unwrap_or_else(|| match auth {
-        Some((name, _)) if !name.eq_ignore_ascii_case("authorization") => {
-            CredentialPlacement::Header(Cow::Owned(name.clone()))
+        Some((name, _)) if name != allama_http::http::header::AUTHORIZATION => {
+            CredentialPlacement::Header(Cow::Owned(name.as_str().to_owned()))
         }
         _ => CredentialPlacement::Bearer,
     });
     let mut slot = CredentialSlot::new(scope.unwrap_or(provider_name), placement)
         .required(explicit && auth.is_none());
     if let (Some((name, _)), Some(header)) = (auth, slot.header_name())
-        && !header.eq_ignore_ascii_case(name)
+        && !header.eq_ignore_ascii_case(name.as_str())
     {
-        slot = slot.replaces(name.clone());
+        slot = slot.replaces(name.as_str().to_owned());
     }
     slot
 }
@@ -677,7 +676,7 @@ pub(crate) fn credential_slot(
 pub(crate) fn rescope(
     slot: &CredentialSlot,
     scope: Cow<'static, str>,
-    auth: Option<&(String, String)>,
+    auth: Option<&(HeaderName, HeaderValue)>,
 ) -> CredentialSlot {
     let mut slot = slot.clone();
     slot.scope = scope;
@@ -701,11 +700,19 @@ pub(crate) fn resolve_timeout(timeout: Option<Option<Duration>>) -> Option<Durat
 }
 
 /// The configured auth header with its value trimmed and checked
-/// ([`allama_http::config::secret`]), named after the header.
-pub(crate) fn checked_auth(auth: Option<(String, String)>) -> Result<Option<(String, String)>> {
+/// ([`allama_http::config::secret`]), named after the header, as the
+/// header it is sent as, its value marked sensitive.
+pub(crate) fn checked_auth(
+    auth: Option<(String, String)>,
+) -> Result<Option<(HeaderName, HeaderValue)>> {
     auth.map(|(name, value)| {
-        let value = allama_http::config::secret(&format!("the `{name}` header"), &value)?;
-        Ok((name, value))
+        let setting = format!("the `{name}` header");
+        let header = HeaderName::try_from(name.as_str()).map_err(|_| {
+            Error::configuration(format!("`{name}` is not a valid HTTP header name")).authored()
+        })?;
+        let value = allama_http::config::secret(&setting, &value)?;
+        let value = allama_http::config::sensitive_value(&setting, &value)?;
+        Ok((header, value))
     })
     .transpose()
 }
@@ -735,11 +742,12 @@ pub(crate) struct TransportConfig {
     pub(crate) chat_completions_path: String,
     /// Embeddings path.
     pub(crate) embeddings_path: String,
-    /// Auth header, when the endpoint requires one.
-    pub(crate) auth: Option<(String, String)>,
+    /// Auth header, its value marked sensitive, when the endpoint requires
+    /// one.
+    pub(crate) auth: Option<(HeaderName, HeaderValue)>,
     /// The headers sent with every request: the `User-Agent`, the
     /// organization and project headers, and the builder's own.
-    pub(crate) headers: Headers,
+    pub(crate) headers: HeaderMap,
     /// Request id header name.
     pub(crate) request_id_header_name: String,
     /// Retry-after header name.
@@ -764,7 +772,7 @@ impl std::fmt::Debug for TransportConfig {
                 "auth",
                 &self.auth.as_ref().map(|(name, _)| (name, Redacted)),
             )
-            .field("headers", &self.headers)
+            .field("headers", &allama_http::redacted_headers(&self.headers))
             .field("request_id_header_name", &self.request_id_header_name)
             .field("retry_after_header_name", &self.retry_after_header_name)
             .field("timeout", &self.timeout)
@@ -789,17 +797,17 @@ impl TransportConfig {
 
 /// Read a header value as a string.
 #[must_use]
-pub(crate) fn extract_request_id(headers: &Headers, name: &str) -> Option<String> {
+pub(crate) fn extract_request_id(headers: &HeaderMap, name: &str) -> Option<String> {
     headers
         .get(name)
         .filter(|value| !value.is_empty())
-        .map(String::from)
+        .map(|value| String::from_utf8_lossy(value.as_bytes()).into_owned())
 }
 
 /// Parse a retry-after hint from `name` and `retry-after-ms`.
 #[must_use]
-pub(crate) fn extract_retry_after(headers: &Headers, name: &str) -> Option<Duration> {
-    headers.retry_after(name)
+pub(crate) fn extract_retry_after(headers: &HeaderMap, name: &str) -> Option<Duration> {
+    allama_http::retry_after(headers, name)
 }
 
 /// A `Debug` placeholder for a secret value.
@@ -814,6 +822,7 @@ impl std::fmt::Debug for Redacted {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use allama_http::http::{HeaderValue, StatusCode};
 
     /// One timeout model for every builder: unset, the default applies
     /// whatever the transport, a client of your own included; only an
@@ -847,8 +856,10 @@ mod tests {
             (Some(five), five),
             (Some(None), None),
         ] {
-            let transport =
-                allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+            let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "",
+            )]);
             let mut builder = Provider::builder()
                 .base_url("http://localhost:1/v1")
                 .http_transport(transport.clone());
@@ -950,8 +961,10 @@ mod tests {
     /// and credential headers are refused.
     #[tokio::test]
     async fn builder_checks_and_sends_its_headers() {
-        let transport =
-            allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+        let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "",
+        )]);
         let provider = Provider::builder()
             .base_url("http://localhost:1/v1")
             .bearer_token(" sk-x\n")
@@ -966,12 +979,21 @@ mod tests {
         )
         .await;
         let sent = &transport.requests()[0];
-        assert_eq!(sent.headers.get("authorization"), Some("Bearer sk-x"));
-        assert_eq!(sent.headers.get("openai-organization"), Some("org-1"));
-        assert_eq!(sent.headers.get("x-route"), Some("eu"));
+        assert_eq!(
+            sent.headers.get("authorization"),
+            Some(&HeaderValue::from_static("Bearer sk-x"))
+        );
+        assert_eq!(
+            sent.headers.get("openai-organization"),
+            Some(&HeaderValue::from_static("org-1"))
+        );
+        assert_eq!(
+            sent.headers.get("x-route"),
+            Some(&HeaderValue::from_static("eu"))
+        );
         assert_eq!(
             sent.headers.get("user-agent"),
-            Some(allama_http::DEFAULT_USER_AGENT)
+            Some(&HeaderValue::try_from(allama_http::DEFAULT_USER_AGENT).unwrap())
         );
 
         for builder in [
@@ -995,9 +1017,9 @@ mod tests {
 
     #[test]
     fn retry_after_prefers_milliseconds() {
-        let headers: Headers = [("retry-after", "3"), ("Retry-After-Ms", "1500")]
-            .into_iter()
-            .collect();
+        let mut headers = HeaderMap::new();
+        headers.insert("retry-after", HeaderValue::from_static("3"));
+        headers.insert("retry-after-ms", HeaderValue::from_static("1500"));
         assert_eq!(
             extract_retry_after(&headers, "retry-after"),
             Some(Duration::from_millis(1500))

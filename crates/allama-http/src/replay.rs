@@ -4,10 +4,11 @@ use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use futures_util::StreamExt;
+use http::header::{CONTENT_TYPE, IntoHeaderName};
+use http::{HeaderMap, HeaderValue, StatusCode};
 
 use crate::{
-    Body, Headers, HttpRequest, HttpResponse, HttpTransport, SendFuture, TransportError,
-    TransportErrorKind,
+    Body, HttpRequest, HttpResponse, HttpTransport, SendFuture, TransportError, TransportErrorKind,
 };
 
 /// An [`HttpTransport`] that serves canned responses in order and records
@@ -110,8 +111,8 @@ impl HttpTransport for ReplayTransport {
 /// splits it.
 #[derive(Debug, Clone)]
 pub struct ReplayResponse {
-    status: u16,
-    headers: Headers,
+    status: StatusCode,
+    headers: HeaderMap,
     chunks: Vec<Bytes>,
     failure: Option<(TransportErrorKind, String)>,
     stalls: bool,
@@ -120,7 +121,7 @@ pub struct ReplayResponse {
 impl ReplayResponse {
     /// A response with `body` in one chunk.
     #[must_use]
-    pub fn new(status: u16, body: impl Into<Bytes>) -> Self {
+    pub fn new(status: StatusCode, body: impl Into<Bytes>) -> Self {
         Self::chunks(status, [body])
     }
 
@@ -129,22 +130,23 @@ impl ReplayResponse {
     /// test places on purpose.
     ///
     /// ```
+    /// use allama_http::http::{HeaderValue, StatusCode, Uri};
     /// use allama_http::{HttpRequest, HttpTransport, ReplayResponse, ReplayTransport};
     /// use futures_util::StreamExt;
     ///
     /// # async fn example() {
-    /// let ndjson = ReplayResponse::chunks(200, ["{\"text\":\"Hel\"}\n{\"te", "xt\":\"lo\"}\n"])
-    ///     .header("content-type", "application/x-ndjson");
+    /// let ndjson = ReplayResponse::chunks(StatusCode::OK, ["{\"text\":\"Hel\"}\n{\"te", "xt\":\"lo\"}\n"])
+    ///     .header("content-type", HeaderValue::from_static("application/x-ndjson"));
     /// let transport = ReplayTransport::new([ndjson]);
-    /// let response = transport.send(HttpRequest::get("https://x")).await.unwrap();
+    /// let response = transport.send(HttpRequest::get(Uri::from_static("https://x"))).await.unwrap();
     /// assert_eq!(response.into_body().count().await, 2);
     /// # }
     /// ```
     #[must_use]
-    pub fn chunks(status: u16, chunks: impl IntoIterator<Item = impl Into<Bytes>>) -> Self {
+    pub fn chunks(status: StatusCode, chunks: impl IntoIterator<Item = impl Into<Bytes>>) -> Self {
         Self {
             status,
-            headers: Headers::new(),
+            headers: HeaderMap::new(),
             chunks: chunks.into_iter().map(Into::into).collect(),
             failure: None,
             stalls: false,
@@ -154,8 +156,8 @@ impl ReplayResponse {
     /// A JSON response with `body` as written: a captured body, or one
     /// that is not valid JSON on purpose.
     #[must_use]
-    pub fn json(status: u16, body: impl Into<Bytes>) -> Self {
-        Self::new(status, body).header("content-type", "application/json")
+    pub fn json(status: StatusCode, body: impl Into<Bytes>) -> Self {
+        Self::new(status, body).header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
     }
 
     /// A JSON response with `value` serialized as its body.
@@ -164,7 +166,7 @@ impl ReplayResponse {
     ///
     /// When `value` does not serialize.
     #[must_use]
-    pub fn json_value(status: u16, value: &impl serde::Serialize) -> Self {
+    pub fn json_value(status: StatusCode, value: &impl serde::Serialize) -> Self {
         let body = serde_json::to_vec(value).expect("serialize replayed JSON response");
         Self::json(status, body)
     }
@@ -177,7 +179,8 @@ impl ReplayResponse {
             .as_ref()
             .split_inclusive("\n\n")
             .map(|event| Bytes::from(event.to_owned()));
-        Self::chunks(200, chunks).header("content-type", "text/event-stream")
+        Self::chunks(StatusCode::OK, chunks)
+            .header(CONTENT_TYPE, HeaderValue::from_static("text/event-stream"))
     }
 
     /// A `200` newline-delimited JSON response, delivered one line per
@@ -186,6 +189,7 @@ impl ReplayResponse {
     /// boundaries yourself, or another status.
     ///
     /// ```
+    /// use allama_http::http::Uri;
     /// use allama_http::{HttpRequest, HttpTransport, ReplayResponse, ReplayTransport};
     /// use futures_util::StreamExt;
     ///
@@ -193,8 +197,8 @@ impl ReplayResponse {
     /// let transport = ReplayTransport::new([ReplayResponse::ndjson(
     ///     "{\"delta\":\"Hel\"}\n{\"delta\":\"lo\"}\n{\"done\":true}\n",
     /// )]);
-    /// let response = transport.send(HttpRequest::get("https://x")).await.unwrap();
-    /// assert_eq!(response.headers.get("content-type"), Some("application/x-ndjson"));
+    /// let response = transport.send(HttpRequest::get(Uri::from_static("https://x"))).await.unwrap();
+    /// assert_eq!(response.headers["content-type"], "application/x-ndjson");
     /// assert_eq!(response.into_body().count().await, 3);
     /// # }
     /// ```
@@ -204,25 +208,33 @@ impl ReplayResponse {
             .as_ref()
             .split_inclusive('\n')
             .map(|line| Bytes::from(line.to_owned()));
-        Self::chunks(200, chunks).header("content-type", "application/x-ndjson")
+        Self::chunks(StatusCode::OK, chunks).header(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/x-ndjson"),
+        )
     }
 
     /// A request that gets no response, failing with `kind`.
     #[must_use]
     pub fn failure(kind: TransportErrorKind, message: impl Into<String>) -> Self {
         Self {
-            status: 0,
-            headers: Headers::new(),
+            status: StatusCode::OK,
+            headers: HeaderMap::new(),
             chunks: Vec::new(),
             failure: Some((kind, message.into())),
             stalls: false,
         }
     }
 
-    /// Add a response header.
+    /// Add a response header, after the values of the same name already
+    /// set.
+    ///
+    /// The name is a [`HeaderName`](http::HeaderName) or a `&'static str`,
+    /// which panics when it is not a valid header name, as in
+    /// [`HeaderMap::append`].
     #[must_use]
-    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.insert(name, value);
+    pub fn header(mut self, name: impl IntoHeaderName, value: HeaderValue) -> Self {
+        self.headers.append(name, value);
         self
     }
 
@@ -231,12 +243,13 @@ impl ReplayResponse {
     /// one byte at a time, splitting every line ending and UTF-8 sequence.
     ///
     /// ```
+    /// use allama_http::http::Uri;
     /// use allama_http::{HttpRequest, HttpTransport, ReplayResponse, ReplayTransport};
     /// use futures_util::StreamExt;
     ///
     /// # async fn example() {
     /// let transport = ReplayTransport::new([ReplayResponse::sse("data: hi\n\n").split_every(4)]);
-    /// let response = transport.send(HttpRequest::get("https://x")).await.unwrap();
+    /// let response = transport.send(HttpRequest::get(Uri::from_static("https://x"))).await.unwrap();
     /// assert_eq!(response.into_body().count().await, 3);
     /// # }
     /// ```
@@ -270,33 +283,38 @@ impl ReplayResponse {
 mod tests {
     use futures_util::StreamExt;
 
+    use http::Uri;
+
     use super::*;
+
+    fn get(uri: &'static str) -> HttpRequest {
+        HttpRequest::get(Uri::from_static(uri))
+    }
 
     #[tokio::test]
     async fn responses_are_served_in_order_and_requests_recorded() {
         let transport = ReplayTransport::new([
-            ReplayResponse::json(200, r#"{"n":1}"#).header("request-id", "req_1"),
+            ReplayResponse::json(StatusCode::OK, r#"{"n":1}"#)
+                .header("request-id", HeaderValue::from_static("req_1")),
             ReplayResponse::failure(TransportErrorKind::Timeout, "slow"),
         ]);
         let first = transport
-            .send(HttpRequest::post("https://x/a", "1"))
+            .send(HttpRequest::post(Uri::from_static("https://x/a"), "1"))
             .await
             .unwrap();
-        assert_eq!(first.headers.get("Request-Id"), Some("req_1"));
+        assert_eq!(first.headers["Request-Id"], "req_1");
         assert_eq!(first.text().await.unwrap(), r#"{"n":1}"#);
-        let second = transport
-            .send(HttpRequest::get("https://x/b"))
-            .await
-            .unwrap_err();
+        let second = transport.send(get("https://x/b")).await.unwrap_err();
         assert_eq!(second.kind(), TransportErrorKind::Timeout);
-        let exhausted = transport
-            .send(HttpRequest::get("https://x/c"))
-            .await
-            .unwrap_err();
+        let exhausted = transport.send(get("https://x/c")).await.unwrap_err();
         assert_eq!(exhausted.kind(), TransportErrorKind::Connect);
 
-        let urls: Vec<_> = transport.requests().into_iter().map(|r| r.url).collect();
-        assert_eq!(urls, ["https://x/a", "https://x/b", "https://x/c"]);
+        let uris: Vec<_> = transport
+            .requests()
+            .into_iter()
+            .map(|r| r.uri.to_string())
+            .collect();
+        assert_eq!(uris, ["https://x/a", "https://x/b", "https://x/c"]);
         assert_eq!(transport.remaining(), 0);
     }
 
@@ -304,11 +322,8 @@ mod tests {
     async fn sse_is_chunked_per_event() {
         let transport = ReplayTransport::default();
         transport.push(ReplayResponse::sse("data: a\n\ndata: b\n\n"));
-        let response = transport.send(HttpRequest::get("https://x")).await.unwrap();
-        assert_eq!(
-            response.headers.get("content-type"),
-            Some("text/event-stream")
-        );
+        let response = transport.send(get("https://x")).await.unwrap();
+        assert_eq!(response.headers["content-type"], "text/event-stream");
         let chunks: Vec<_> = response.into_body().collect().await;
         assert_eq!(chunks.len(), 2);
     }
@@ -317,26 +332,26 @@ mod tests {
     async fn bodies_arrive_in_the_chunks_they_were_built_with_or_split() {
         let body = |response: ReplayResponse| async {
             let transport = ReplayTransport::new([response]);
-            let response = transport.send(HttpRequest::get("https://x")).await.unwrap();
+            let response = transport.send(get("https://x")).await.unwrap();
             let chunks: Vec<Bytes> = response.into_body().map(Result::unwrap).collect().await;
             chunks
         };
         assert_eq!(
-            body(ReplayResponse::chunks(200, ["ab", "", "cde"])).await,
+            body(ReplayResponse::chunks(StatusCode::OK, ["ab", "", "cde"])).await,
             ["ab", "", "cde"]
         );
         assert_eq!(
-            body(ReplayResponse::chunks(200, ["ab", "", "cde"]).split_every(2)).await,
+            body(ReplayResponse::chunks(StatusCode::OK, ["ab", "", "cde"]).split_every(2)).await,
             ["ab", "cd", "e"]
         );
         assert_eq!(
-            body(ReplayResponse::new(200, "héllo").split_every(1))
+            body(ReplayResponse::new(StatusCode::OK, "héllo").split_every(1))
                 .await
                 .len(),
             "héllo".len()
         );
         assert!(
-            body(ReplayResponse::new(200, "").split_every(3))
+            body(ReplayResponse::new(StatusCode::OK, "").split_every(3))
                 .await
                 .is_empty()
         );
@@ -344,21 +359,17 @@ mod tests {
 
     #[test]
     fn json_takes_the_body_as_written_and_json_value_serializes() {
-        let written = ReplayResponse::json(400, "{not json");
+        let written = ReplayResponse::json(StatusCode::BAD_REQUEST, "{not json");
         assert_eq!(written.chunks, ["{not json"]);
-        let value = ReplayResponse::json_value(200, &serde_json::json!({"ok": true}));
+        let value = ReplayResponse::json_value(StatusCode::OK, &serde_json::json!({"ok": true}));
         assert_eq!(value.chunks, [r#"{"ok":true}"#]);
-        assert_eq!(value.headers.get("content-type"), Some("application/json"));
+        assert_eq!(value.headers["content-type"], "application/json");
     }
 
     #[tokio::test]
     async fn stalled_bodies_never_end() {
         let transport = ReplayTransport::new([ReplayResponse::sse("data: a\n\n").then_stall()]);
-        let mut body = transport
-            .send(HttpRequest::get("https://x"))
-            .await
-            .unwrap()
-            .into_body();
+        let mut body = transport.send(get("https://x")).await.unwrap().into_body();
         assert!(body.next().await.is_some());
         let next = futures_util::future::select(
             body.next(),

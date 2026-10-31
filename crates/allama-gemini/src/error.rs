@@ -36,19 +36,21 @@
 use std::time::Duration;
 
 use allama::{Error, ErrorContext, RequestField, Result, Subject};
-use allama_http::{Bytes, Headers, HttpResponse, TransportError};
+use allama_http::{Bytes, HttpResponse, TransportError};
 use serde::de::DeserializeOwned;
 
 use crate::PROVIDER_NAME;
 use crate::wire::{GeminiError, GeminiErrorResponse};
+use allama_http::http::{HeaderMap, StatusCode};
 
 /// Map a non-success HTTP response to an [`Error`].
 ///
 /// The status and headers are read with [`allama_http::error_context`]. A
 /// body that is no `google.rpc.Status` envelope still informs the category,
 /// but is kept only as the body; the message is `HTTP {status}`.
-pub(crate) fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
+pub(crate) fn map_http_error(status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
     let context = allama_http::error_context(status, headers);
+    let status = status.as_u16();
     match serde_json::from_str::<GeminiErrorResponse>(body) {
         Ok(parsed) => map_api_error(Some(status), &parsed.error, context),
         Err(_) => classify(
@@ -190,8 +192,12 @@ fn classify(
             Error::invalid_request(message)
         }
     } else {
-        // What the status means on its own, shared by every adapter.
-        allama_http::status_error(status, message)
+        // What the status means on its own, shared by every adapter. An
+        // in-stream `code` past what HTTP allows is a provider error.
+        match StatusCode::from_u16(status) {
+            Ok(status) => allama_http::status_error(status, message),
+            Err(_) => Error::provider(message).with_status(status),
+        }
     }
 }
 
@@ -374,7 +380,7 @@ pub(crate) fn map_transport_error(err: TransportError) -> Error {
 
 /// A success response's body, read whole.
 pub(crate) struct SuccessBody {
-    status: u16,
+    status: StatusCode,
     /// Gemini sends no request id; a proxy's `x-request-id` or `request-id`
     /// is kept, as on error responses.
     request_id: Option<String>,
@@ -422,11 +428,11 @@ pub(crate) fn conformance_map_http_error(
     body: &str,
     retry_after: Option<Duration>,
 ) -> Error {
-    let mut headers = Headers::new();
+    let mut headers = HeaderMap::new();
     if let Some(retry_after) = retry_after {
-        headers.insert("retry-after", retry_after.as_secs().to_string());
+        headers.insert("retry-after", retry_after.as_secs().into());
     }
-    map_http_error(status, &headers, body)
+    map_http_error(StatusCode::from_u16(status).unwrap(), &headers, body)
 }
 
 #[cfg(test)]
@@ -441,10 +447,19 @@ pub(crate) fn conformance_map_timeout_transport_error() -> Error {
 mod tests {
     use super::*;
     use allama_http::TransportErrorKind;
+    use allama_http::http::StatusCode;
     use serde_json::json;
 
-    fn headers(pairs: &[(&str, &str)]) -> Headers {
-        pairs.iter().copied().collect()
+    fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+        pairs
+            .iter()
+            .map(|(name, value)| {
+                (
+                    allama_http::http::HeaderName::try_from(*name).unwrap(),
+                    allama_http::http::HeaderValue::try_from(*value).unwrap(),
+                )
+            })
+            .collect()
     }
 
     fn body(code: u16, message: &str, status: &str) -> String {
@@ -454,8 +469,8 @@ mod tests {
     #[test]
     fn a_missing_cache_404_is_no_missing_model() {
         let err = map_http_error(
-            404,
-            &Headers::new(),
+            StatusCode::NOT_FOUND,
+            &HeaderMap::new(),
             &body(
                 404,
                 "CachedContent not found: cachedContents/abc",
@@ -465,8 +480,8 @@ mod tests {
         assert!(matches!(err, Error::InvalidRequest { .. }), "{err:?}");
         // A real permission problem stays an auth error.
         let err = map_http_error(
-            403,
-            &Headers::new(),
+            StatusCode::FORBIDDEN,
+            &HeaderMap::new(),
             &body(
                 403,
                 "Method doesn't allow unregistered callers.",
@@ -491,7 +506,7 @@ mod tests {
             }]
         }})
         .to_string();
-        let err = map_http_error(400, &Headers::new(), &body);
+        let err = map_http_error(StatusCode::BAD_REQUEST, &HeaderMap::new(), &body);
         assert!(matches!(err, Error::Auth { .. }), "{err:?}");
         let context = err.context().unwrap();
         assert_eq!(context.provider_code.as_deref(), Some("API_KEY_INVALID"));
@@ -504,7 +519,11 @@ mod tests {
     #[test]
     fn unauthenticated_and_permission_denied_map_to_auth() {
         for (code, status) in [(401, "UNAUTHENTICATED"), (403, "PERMISSION_DENIED")] {
-            let err = map_http_error(code, &Headers::new(), &body(code, "nope", status));
+            let err = map_http_error(
+                StatusCode::from_u16(code).unwrap(),
+                &HeaderMap::new(),
+                &body(code, "nope", status),
+            );
             assert!(matches!(err, Error::Auth { .. }), "{err:?}");
         }
     }
@@ -512,8 +531,8 @@ mod tests {
     #[test]
     fn status_402_is_quota_exhausted() {
         let err = map_http_error(
-            402,
-            &Headers::new(),
+            StatusCode::PAYMENT_REQUIRED,
+            &HeaderMap::new(),
             &body(
                 402,
                 "Your prepayment credits are depleted.",
@@ -536,7 +555,11 @@ mod tests {
             ]
         }})
         .to_string();
-        let err = map_http_error(429, &headers(&[("retry-after", "1")]), &body);
+        let err = map_http_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            &headers(&[("retry-after", "1")]),
+            &body,
+        );
         assert!(matches!(err, Error::RateLimited { .. }), "{err:?}");
         assert_eq!(err.retry_after(), Some(Duration::from_secs_f64(23.5)));
         assert!(err.is_retryable());
@@ -545,7 +568,7 @@ mod tests {
     #[test]
     fn status_429_falls_back_to_header_retry_after() {
         let err = map_http_error(
-            429,
+            StatusCode::TOO_MANY_REQUESTS,
             &headers(&[("retry-after", "2")]),
             &body(429, "Resource exhausted", "RESOURCE_EXHAUSTED"),
         );
@@ -556,8 +579,8 @@ mod tests {
     #[test]
     fn status_429_spend_cap_is_quota_exhausted() {
         let err = map_http_error(
-            429,
-            &Headers::new(),
+            StatusCode::TOO_MANY_REQUESTS,
+            &HeaderMap::new(),
             &body(
                 429,
                 "Your project has exceeded its monthly spending cap.",
@@ -604,7 +627,7 @@ mod tests {
             "GenerateRequestsPerMinutePerProjectPerModel-FreeTier",
             "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
         ]);
-        let err = map_http_error(429, &Headers::new(), &body);
+        let err = map_http_error(StatusCode::TOO_MANY_REQUESTS, &HeaderMap::new(), &body);
         assert!(matches!(err, Error::QuotaExhausted { .. }), "{err:?}");
         assert!(!err.is_retryable());
         // The hint is kept for callers that wait it out anyway.
@@ -615,7 +638,7 @@ mod tests {
             "GenerateContentInputTokensPerModelPerMinute-FreeTier",
             "GenerateRequestsPerMinutePerProjectPerModel-FreeTier",
         ]);
-        let err = map_http_error(429, &Headers::new(), &body);
+        let err = map_http_error(StatusCode::TOO_MANY_REQUESTS, &HeaderMap::new(), &body);
         assert!(matches!(err, Error::RateLimited { .. }), "{err:?}");
 
         // In a stream too.
@@ -633,8 +656,8 @@ mod tests {
         // (https://ai.google.dev/gemini-api/docs/troubleshooting).
         for status in [504, 408, 500] {
             let err = map_http_error(
-                status,
-                &Headers::new(),
+                StatusCode::from_u16(status).unwrap(),
+                &HeaderMap::new(),
                 &body(
                     status,
                     "Deadline expired before operation could complete.",
@@ -661,12 +684,20 @@ mod tests {
             (524, "timeout"),
             (499, "provider"),
         ] {
-            let err = map_http_error(status, &Headers::new(), "<html>gateway</html>");
+            let err = map_http_error(
+                StatusCode::from_u16(status).unwrap(),
+                &HeaderMap::new(),
+                "<html>gateway</html>",
+            );
             assert_eq!(err.kind_name(), kind, "HTTP {status}");
         }
         // `CANCELLED` is HTTP 499 in `google.rpc.Code`
         // (https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto).
-        let err = map_http_error(499, &Headers::new(), &body(499, "cancelled", "CANCELLED"));
+        let err = map_http_error(
+            StatusCode::from_u16(499).unwrap(),
+            &HeaderMap::new(),
+            &body(499, "cancelled", "CANCELLED"),
+        );
         assert!(matches!(err, Error::Provider { .. }), "{err:?}");
         assert!(!err.is_retryable());
     }
@@ -674,8 +705,8 @@ mod tests {
     #[test]
     fn not_found_maps_to_model_not_found() {
         let err = map_http_error(
-            404,
-            &Headers::new(),
+            StatusCode::NOT_FOUND,
+            &HeaderMap::new(),
             &body(
                 404,
                 "models/gemini-9-nope is not found for API version v1beta",
@@ -688,8 +719,8 @@ mod tests {
     #[test]
     fn context_length_is_detected_with_limit() {
         let err = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &body(
                 400,
                 "The input token count (1200000) exceeds the maximum number of tokens allowed (1048576).",
@@ -724,7 +755,11 @@ mod tests {
             ),
         ];
         for (text, field) in cases {
-            let err = map_http_error(400, &Headers::new(), &body(400, text, "INVALID_ARGUMENT"));
+            let err = map_http_error(
+                StatusCode::BAD_REQUEST,
+                &HeaderMap::new(),
+                &body(400, text, "INVALID_ARGUMENT"),
+            );
             assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
             assert_eq!(err.unsupported_field(), Some(field), "{text}");
             assert_eq!(
@@ -735,8 +770,8 @@ mod tests {
         }
         // A feature outside the table stays an invalid request.
         let err = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &body(
                 400,
                 "Audio input is not enabled for models/gemma-3-27b-it",
@@ -753,7 +788,11 @@ mod tests {
     #[test]
     fn penalties_not_enabled_are_unsupported_by_the_provider() {
         let text = "Penalty is not enabled for this model";
-        let err = map_http_error(400, &Headers::new(), &body(400, text, "INVALID_ARGUMENT"));
+        let err = map_http_error(
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
+            &body(400, text, "INVALID_ARGUMENT"),
+        );
         assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
         assert_eq!(
             err.unsupported_stage(),
@@ -788,8 +827,8 @@ mod tests {
     #[test]
     fn other_400_is_invalid_request() {
         let err = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &body(
                 400,
                 "You can only set only one of thinking budget and thinking level.",
@@ -802,17 +841,21 @@ mod tests {
     #[test]
     fn server_errors_map_by_status() {
         let err = map_http_error(
-            503,
-            &Headers::new(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            &HeaderMap::new(),
             &body(503, "overloaded", "UNAVAILABLE"),
         );
         assert!(matches!(err, Error::Overloaded { .. }));
-        let err = map_http_error(500, &Headers::new(), &body(500, "internal", "INTERNAL"));
+        let err = map_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &HeaderMap::new(),
+            &body(500, "internal", "INTERNAL"),
+        );
         assert!(matches!(err, Error::Provider { .. }));
         assert!(err.is_retryable());
         let err = map_http_error(
-            504,
-            &Headers::new(),
+            StatusCode::GATEWAY_TIMEOUT,
+            &HeaderMap::new(),
             &body(504, "deadline", "DEADLINE_EXCEEDED"),
         );
         assert!(matches!(err, Error::Timeout { .. }));
@@ -820,7 +863,7 @@ mod tests {
 
     #[test]
     fn unstructured_body_is_kept() {
-        let err = map_http_error(502, &Headers::new(), "Bad Gateway");
+        let err = map_http_error(StatusCode::BAD_GATEWAY, &HeaderMap::new(), "Bad Gateway");
         assert!(matches!(err, Error::Provider { .. }));
         assert_eq!(err.message(), "HTTP 502");
         assert_eq!(err.upstream_message(), None);
@@ -842,7 +885,7 @@ mod tests {
             }],
         }})
         .to_string();
-        let err = map_http_error(400, &Headers::new(), &body);
+        let err = map_http_error(StatusCode::BAD_REQUEST, &HeaderMap::new(), &body);
         assert_eq!(
             err.context().unwrap().param.as_deref(),
             Some("contents[0].parts[1], generation_config.seed")
@@ -860,7 +903,7 @@ mod tests {
             r#",{"description":"bad","field":"generation_config.seed"}"#,
             "",
         );
-        let err = map_http_error(400, &Headers::new(), &body);
+        let err = map_http_error(StatusCode::BAD_REQUEST, &HeaderMap::new(), &body);
         assert_eq!(
             err.context().unwrap().param.as_deref(),
             Some("contents[0].parts[1]")

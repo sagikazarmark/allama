@@ -6,13 +6,14 @@ use allama::prelude::*;
 use allama_conformance::assert_validation_agrees;
 use allama_conformance::probe::ProbeOutcome;
 use allama_gemini::Provider;
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use futures_util::StreamExt;
 use serde_json::{Value, json};
 
 fn chat_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "candidates": [{"content": {"role": "model", "parts": [{"text": "ok"}]},
                             "finishReason": "STOP", "index": 0}],
@@ -35,7 +36,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }

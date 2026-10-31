@@ -3,6 +3,7 @@
 
 use allama::{CapabilitySupport, EmbeddingCapability, EmbeddingProvider, EmbeddingRequest};
 use allama_conformance::{MockHttpResponse, TestHttpServer};
+use allama_http::http::StatusCode;
 use allama_openai_compat::providers::Cloudflare;
 
 #[tokio::test]
@@ -16,7 +17,8 @@ async fn cloudflare_openai_compat_embed_posts_expected_request() {
         "usage": {"prompt_tokens": 4, "total_tokens": 4}
     });
 
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &response_body)]).await;
+    let server =
+        TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &response_body)]).await;
 
     let provider = Cloudflare::builder("0123456789abcdef0123456789abcdef", "token-abc")
         .unwrap()

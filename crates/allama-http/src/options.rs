@@ -1,12 +1,15 @@
 //! Per-request transport options.
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use allama::ProviderOptions;
+use http::header::IntoHeaderName;
+use http::{HeaderMap, HeaderName, HeaderValue};
 use serde::de::{Error as _, IgnoredAny};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{Credential, CredentialKind, Headers, is_credential_header};
+use crate::{Credential, CredentialKind, RedactedHeaders, is_credential_header};
 #[cfg(doc)]
 use crate::{CredentialSlot, is_sensitive_header};
 
@@ -30,11 +33,12 @@ pub const OPTIONS_NAMESPACE: &str = "allama-http";
 ///
 /// ```
 /// use allama::ChatRequest;
+/// use allama_http::http::HeaderValue;
 /// use allama_http::{Credential, HttpRequestOptions};
 ///
 /// let request = ChatRequest::new("gpt-4o-mini").user("Hi").with_option(
 ///     HttpRequestOptions::new()
-///         .header("x-tenant-id", "acme")
+///         .header("x-tenant-id", HeaderValue::from_static("acme"))
 ///         .credential("openai", Credential::api_key("sk-tenant-key")),
 /// );
 /// # let _ = request;
@@ -53,12 +57,15 @@ pub const OPTIONS_NAMESPACE: &str = "allama-http";
 ///
 /// ```
 /// use allama::ChatRequest;
+/// use allama_http::http::HeaderValue;
 /// use allama_http::{Credential, HttpRequestOptions};
 ///
-/// fn tag(request: &ChatRequest, request_id: &str) -> ChatRequest {
+/// fn tag(request: &ChatRequest, request_id: HeaderValue) -> ChatRequest {
 ///     let mut request = request.clone();
 ///     match request.option_mut::<HttpRequestOptions>() {
-///         Some(options) => options.headers.insert("x-request-id", request_id),
+///         Some(options) => {
+///             options.headers.insert("x-request-id", request_id);
+///         }
 ///         None => {
 ///             let options = HttpRequestOptions::new().header("x-request-id", request_id);
 ///             request = request.with_option(options);
@@ -70,9 +77,9 @@ pub const OPTIONS_NAMESPACE: &str = "allama-http";
 /// let request = ChatRequest::new("m").user("Hi").with_option(
 ///     HttpRequestOptions::new().credential("openai", Credential::api_key("sk-tenant")),
 /// );
-/// let tagged = tag(&request, "req-1");
+/// let tagged = tag(&request, HeaderValue::from_static("req-1"));
 /// let options = tagged.option::<HttpRequestOptions>().unwrap();
-/// assert_eq!(options.headers.get("x-request-id"), Some("req-1"));
+/// assert_eq!(options.headers["x-request-id"], "req-1");
 /// assert!(options.credential_for("openai").is_some(), "the caller's key survives");
 /// ```
 ///
@@ -114,7 +121,9 @@ pub const OPTIONS_NAMESPACE: &str = "allama-http";
 /// # Secrets stay in the process
 ///
 /// - `Debug` output redacts credentials and credential headers (the names
-///   [`is_sensitive_header`] matches), as for [`Headers`].
+///   [`is_sensitive_header`] matches, and values marked
+///   [sensitive](HeaderValue::set_sensitive)), as for
+///   [`HttpRequest`](crate::HttpRequest).
 /// - Serialization omits credentials and the headers on the exact
 ///   credential list ([`is_credential_header`]), so a serialized request, a
 ///   `RecordingProvider` exchange, or a fixture never holds them. A request
@@ -135,15 +144,17 @@ pub const OPTIONS_NAMESPACE: &str = "allama-http";
 ///
 /// # JSON form
 ///
-/// `{"headers": {"x-tenant-id": "acme"}}` under [`OPTIONS_NAMESPACE`]. A
-/// header given more than once is exported once, with its values joined by
-/// `", "`.
-#[derive(Debug, Clone, Default)]
+/// `{"headers": {"x-tenant-id": "acme"}}` under [`OPTIONS_NAMESPACE`].
+/// Header names are exported in lowercase, and a header given more than
+/// once is exported once, with its values joined by `", "`. A name or value
+/// that is not a valid header is rejected with
+/// [`Error::InvalidRequest`](allama::Error::InvalidRequest).
+#[derive(Clone, Default)]
 #[non_exhaustive]
 pub struct HttpRequestOptions {
-    /// Headers to send, in order. Each replaces the adapter's headers of the
+    /// Headers to send. Each name replaces the adapter's headers of the
     /// same name.
-    pub headers: Headers,
+    pub headers: HeaderMap,
     /// Credentials by scope, in order: at most one placed by the adapter
     /// per scope, and one header credential per scope and header name.
     credentials: Vec<(String, Credential)>,
@@ -156,13 +167,16 @@ impl HttpRequestOptions {
         Self::default()
     }
 
-    /// Add a header to send.
+    /// Add a header to send, after the values of the same name already
+    /// set.
     ///
-    /// A header that carries a credential is refused when the request is
-    /// sent; use [`credential`](Self::credential) for those.
+    /// The name is a [`HeaderName`] or a `&'static str`, which panics when
+    /// it is not a valid header name, as in [`HeaderMap::append`]. A header
+    /// that carries a credential is refused when the request is sent; use
+    /// [`credential`](Self::credential) for those.
     #[must_use]
-    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.insert(name, value);
+    pub fn header(mut self, name: impl IntoHeaderName, value: HeaderValue) -> Self {
+        self.headers.append(name, value);
         self
     }
 
@@ -219,6 +233,15 @@ impl HttpRequestOptions {
     }
 }
 
+impl fmt::Debug for HttpRequestOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HttpRequestOptions")
+            .field("headers", &RedactedHeaders(&self.headers))
+            .field("credentials", &self.credentials)
+            .finish()
+    }
+}
+
 impl ProviderOptions for HttpRequestOptions {
     const NAMESPACE: &'static str = OPTIONS_NAMESPACE;
 }
@@ -231,20 +254,16 @@ impl Serialize for HttpRequestOptions {
         let exported = self
             .headers
             .iter()
-            .filter(|(name, _)| !is_credential_header(name));
+            .filter(|(name, _)| !is_credential_header(name.as_str()));
         for (name, value) in exported {
-            let key = headers
-                .keys()
-                .find(|key| key.eq_ignore_ascii_case(name))
-                .copied()
-                .unwrap_or(name);
+            let value = String::from_utf8_lossy(value.as_bytes());
             headers
-                .entry(key)
+                .entry(name.as_str())
                 .and_modify(|joined| {
                     joined.push_str(", ");
-                    joined.push_str(value);
+                    joined.push_str(&value);
                 })
-                .or_insert_with(|| value.to_owned());
+                .or_insert_with(|| value.into_owned());
         }
         Wire {
             headers,
@@ -271,8 +290,22 @@ impl<'de> Deserialize<'de> for HttpRequestOptions {
                  whose export omits them"
             )));
         }
+        let mut headers = HeaderMap::new();
+        for (name, value) in wire.headers {
+            let Ok(header) = HeaderName::try_from(name.as_str()) else {
+                return Err(D::Error::custom(format!(
+                    "`{name}` is not a valid HTTP header name"
+                )));
+            };
+            let Ok(value) = HeaderValue::try_from(value) else {
+                return Err(D::Error::custom(format!(
+                    "the value of header `{name}` contains characters an HTTP header cannot carry"
+                )));
+            };
+            headers.append(header, value);
+        }
         Ok(Self {
-            headers: wire.headers.into_iter().collect(),
+            headers,
             credentials: Vec::new(),
         })
     }
@@ -306,20 +339,25 @@ mod tests {
 
     use super::*;
 
+    fn value(value: &'static str) -> HeaderValue {
+        HeaderValue::from_static(value)
+    }
+
     #[test]
     fn export_omits_credentials_and_joins_repeated_headers() {
         let options = HttpRequestOptions::new()
-            .header("Authorization", "Bearer SECRET1")
-            .header("x-api-key", "SECRET2")
-            .header("x-tag", "a")
-            .header("X-Tag", "b")
-            .header("x-tenant-id", "acme");
+            .header("Authorization", value("Bearer SECRET1"))
+            .header("x-api-key", value("SECRET2"))
+            .header("x-tag", value("a"))
+            .header("X-Tag", value("b"))
+            .header("x-tenant-id", value("acme"));
         assert_eq!(
             serde_json::to_value(&options).unwrap(),
             json!({"headers": {"x-tag": "a, b", "x-tenant-id": "acme"}})
         );
         assert_eq!(
-            serde_json::to_value(HttpRequestOptions::new().header("x-api-key", "SECRET")).unwrap(),
+            serde_json::to_value(HttpRequestOptions::new().header("x-api-key", value("SECRET")))
+                .unwrap(),
             json!({})
         );
     }
@@ -332,7 +370,7 @@ mod tests {
             json!({"headers": {"x-tenant-id": "acme"}}),
         );
         let resolved = options.resolve::<HttpRequestOptions>().unwrap().unwrap();
-        assert_eq!(resolved.headers.get("x-tenant-id"), Some("acme"));
+        assert_eq!(resolved.headers["x-tenant-id"], "acme");
 
         options.insert_json(
             OPTIONS_NAMESPACE,
@@ -352,10 +390,25 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .headers
-                .iter()
-                .next()
-                .is_none()
+                .is_empty()
         );
+    }
+
+    /// The JSON form is untrusted input: a name or value no header can
+    /// carry is the caller's invalid request, and the value is never
+    /// quoted.
+    #[test]
+    fn json_form_rejects_invalid_headers() {
+        for headers in [
+            json!({"bad name": "v"}),
+            json!({"x-ok": "SECRET\r\nx-injected: 1"}),
+        ] {
+            let mut options = RequestOptions::new();
+            options.insert_json(OPTIONS_NAMESPACE, json!({ "headers": headers }));
+            let err = options.resolve::<HttpRequestOptions>().unwrap_err();
+            assert!(matches!(err, allama::Error::InvalidRequest { .. }), "{err}");
+            assert!(!format!("{err} {err:?}").contains("SECRET"), "{err}");
+        }
     }
 
     #[test]
@@ -385,14 +438,14 @@ mod tests {
             json!({"headers": {"Idempotency-Key": "idem-1", "x-author": "a"}}),
         );
         let resolved = options.resolve::<HttpRequestOptions>().unwrap().unwrap();
-        assert_eq!(resolved.headers.get("idempotency-key"), Some("idem-1"));
+        assert_eq!(resolved.headers["idempotency-key"], "idem-1");
         let typed = HttpRequestOptions::new()
-            .header("Idempotency-Key", "idem-1")
-            .header("x-author", "a")
-            .header("Authorization", "Bearer SECRET");
+            .header("Idempotency-Key", value("idem-1"))
+            .header("x-author", value("a"))
+            .header("Authorization", value("Bearer SECRET"));
         assert_eq!(
             serde_json::to_value(&typed).unwrap(),
-            json!({"headers": {"Idempotency-Key": "idem-1", "x-author": "a"}})
+            json!({"headers": {"idempotency-key": "idem-1", "x-author": "a"}})
         );
         let debug = format!("{typed:?}");
         assert!(
@@ -405,13 +458,13 @@ mod tests {
     fn credentials_stay_out_of_debug_and_serialized_requests() {
         let request = ChatRequest::new("m").user("Hi").with_option(
             HttpRequestOptions::new()
-                .header("Idempotency-Key", "idem-0")
+                .header("Idempotency-Key", value("idem-0"))
                 .credential("openai", Credential::api_key("SECRET1"))
                 .credential(
                     "openai",
                     Credential::header("cf-aig-authorization", "Bearer SECRET2"),
                 )
-                .header("x-tenant-id", "acme"),
+                .header("x-tenant-id", value("acme")),
         );
         let debug = format!("{request:?}");
         assert!(!debug.contains("SECRET"), "{debug}");
@@ -427,7 +480,7 @@ mod tests {
         assert!(!serialized.contains("SECRET"), "{serialized}");
         assert!(!serialized.contains("credentials"), "{serialized}");
         assert!(serialized.contains(
-            r#""allama-http":{"headers":{"Idempotency-Key":"idem-0","x-tenant-id":"acme"}}"#
+            r#""allama-http":{"headers":{"idempotency-key":"idem-0","x-tenant-id":"acme"}}"#
         ));
 
         let rebuilt: ChatRequest = serde_json::from_str(&serialized).unwrap();
@@ -436,8 +489,8 @@ mod tests {
             .resolve::<HttpRequestOptions>()
             .unwrap()
             .unwrap();
-        assert_eq!(resolved.headers.get("Idempotency-Key"), Some("idem-0"));
-        assert_eq!(resolved.headers.get("x-tenant-id"), Some("acme"));
+        assert_eq!(resolved.headers["Idempotency-Key"], "idem-0");
+        assert_eq!(resolved.headers["x-tenant-id"], "acme");
         assert_eq!(resolved.credentials().count(), 0);
         assert_eq!(rebuilt, request);
     }

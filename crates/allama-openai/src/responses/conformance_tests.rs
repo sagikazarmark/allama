@@ -27,6 +27,7 @@ use serde_json::{Value, json};
 
 use super::{ResponsesProvider, ResponsesRequestOptions};
 use crate::SystemOptions;
+use allama_http::http::{HeaderValue, StatusCode};
 
 fn fixtures() -> FixtureDir {
     FixtureDir::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures"))
@@ -43,9 +44,9 @@ async fn replay_server(name: &str) -> TestHttpServer {
 }
 
 fn recorded(name: &str) -> MockHttpResponse {
-    MockHttpResponse::text(200, load_text_fixture(&fixtures(), name))
-        .header("content-type", "application/json")
-        .header("x-request-id", "req_recorded")
+    MockHttpResponse::text(StatusCode::OK, load_text_fixture(&fixtures(), name))
+        .header("content-type", HeaderValue::from_static("application/json"))
+        .header("x-request-id", HeaderValue::from_static("req_recorded"))
 }
 
 /// Like [`assert_stream_fixture_eq`], but also (re)writes the events
@@ -236,7 +237,7 @@ async fn recorded_hosted_tool_items_round_trip_verbatim() {
     let raw = load_json_fixture(&fixtures(), "responses/hosted_tool.json");
     // Recorded without a request id.
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &raw),
+        MockHttpResponse::json_value(StatusCode::OK, &raw),
         recorded("responses/text.json"),
     ])
     .await;
@@ -286,7 +287,7 @@ async fn client_tool_calls_are_answered_with_typed_outputs() {
 
     let raw = load_json_fixture(&fixtures(), "responses/client_tools.json");
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &raw),
+        MockHttpResponse::json_value(StatusCode::OK, &raw),
         recorded("responses/text.json"),
     ])
     .await;
@@ -364,7 +365,7 @@ async fn client_tool_calls_are_answered_with_typed_outputs() {
 #[tokio::test]
 async fn recorded_url_citations_become_portable() {
     let raw = load_json_fixture(&fixtures(), "responses/citations.json");
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &raw)]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &raw)]).await;
     let response = provider(&server)
         .chat(&ChatRequest::new("gpt-4.1-mini").user("Latest Rust release?"))
         .await
@@ -378,7 +379,7 @@ async fn recorded_url_citations_become_portable() {
 #[tokio::test]
 async fn recorded_citation_offsets_are_code_points() {
     let raw = load_json_fixture(&fixtures(), "responses/citations_emoji.json");
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &raw)]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &raw)]).await;
     let response = provider(&server)
         .chat(&ChatRequest::new("gpt-4.1-mini").user("Latest Rust release?"))
         .await
@@ -453,7 +454,7 @@ async fn recorded_text_stream() {
         &fixtures(),
         "responses/text_stream.sse",
     ))
-    .header("x-request-id", "req_stream")])
+    .header("x-request-id", HeaderValue::from_static("req_stream"))])
     .await;
     let stream = provider(&server)
         .chat_stream(&ChatRequest::new("gpt-4.1-nano").user("Count from 1 to 12 in words."))
@@ -546,9 +547,12 @@ async fn recorded_reasoning_tool_stream() {
 #[tokio::test]
 async fn recorded_errors_map_to_typed_errors() {
     let error = |status: u16, name: &str| {
-        MockHttpResponse::text(status, load_text_fixture(&fixtures(), name))
-            .header("content-type", "application/json")
-            .header("x-request-id", "req_err")
+        MockHttpResponse::text(
+            StatusCode::from_u16(status).unwrap(),
+            load_text_fixture(&fixtures(), name),
+        )
+        .header("content-type", HeaderValue::from_static("application/json"))
+        .header("x-request-id", HeaderValue::from_static("req_err"))
     };
     let server = TestHttpServer::spawn([
         error(401, "responses/error_auth.json"),
@@ -593,7 +597,7 @@ async fn recorded_streams_match_their_terminal_response() {
             })
             .unwrap_or_else(|| panic!("{} has no terminal event", path.display()));
         let server = TestHttpServer::spawn([
-            MockHttpResponse::json_value(200, &terminal["response"]),
+            MockHttpResponse::json_value(StatusCode::OK, &terminal["response"]),
             MockHttpResponse::sse(text.clone()),
         ])
         .await;

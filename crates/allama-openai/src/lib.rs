@@ -524,6 +524,7 @@ impl ProviderBuilder {
 
 #[cfg(test)]
 mod tests {
+    use allama_http::http::{HeaderValue, StatusCode};
     use std::time::Duration;
 
     use allama::Error;
@@ -540,8 +541,10 @@ mod tests {
             (Some(five), five),
             (Some(None), None),
         ] {
-            let transport =
-                allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+            let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "",
+            )]);
             let mut builder = Provider::builder()
                 .api_key("k")
                 .http_transport(transport.clone());
@@ -606,8 +609,10 @@ mod tests {
     /// and the default `User-Agent` reach every request.
     #[tokio::test]
     async fn debug_is_redacted_and_headers_are_sent() {
-        let transport =
-            allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+        let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "",
+        )]);
         let builder = Provider::builder()
             .api_key(" sk-SECRET\n")
             .base_url("https://user:PASSWORD@gw.example/v1")
@@ -625,11 +630,17 @@ mod tests {
         let _ =
             allama::ChatProvider::chat(&provider, &allama::ChatRequest::new("m").user("hi")).await;
         let sent = &transport.requests()[0];
-        assert_eq!(sent.headers.get("authorization"), Some("Bearer sk-SECRET"));
-        assert_eq!(sent.headers.get("x-route"), Some("ROUTE-VALUE"));
+        assert_eq!(
+            sent.headers.get("authorization"),
+            Some(&HeaderValue::from_static("Bearer sk-SECRET"))
+        );
+        assert_eq!(
+            sent.headers.get("x-route"),
+            Some(&HeaderValue::from_static("ROUTE-VALUE"))
+        );
         assert_eq!(
             sent.headers.get("user-agent"),
-            Some(allama_http::DEFAULT_USER_AGENT)
+            Some(&HeaderValue::try_from(allama_http::DEFAULT_USER_AGENT).unwrap())
         );
     }
 

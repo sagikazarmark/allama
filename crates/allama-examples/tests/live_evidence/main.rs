@@ -65,9 +65,9 @@ use std::time::Duration;
 use allama::UnsupportedPolicy;
 use allama::adapter::Degradations;
 use allama::adapter::schema::StrictSchemaError;
-use allama_http::{
-    Headers, HttpRequest, HttpTransport, ReqwestTransport, TransportError, error_context,
-};
+use allama_http::http::header::CONTENT_TYPE;
+use allama_http::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Uri};
+use allama_http::{HttpRequest, HttpTransport, ReqwestTransport, TransportError, error_context};
 use serde_json::{Value, json};
 
 /// Record `observation` as `check/case`: print it, and write it to
@@ -88,15 +88,15 @@ pub fn record_raw(check: &str, file: &str, contents: &str) {
 /// One HTTP exchange: what the API answered.
 #[derive(Debug)]
 pub struct Exchange {
-    pub status: u16,
-    pub headers: Headers,
+    pub status: StatusCode,
+    pub headers: HeaderMap,
     pub body: String,
 }
 
 impl Exchange {
     /// Whether the API accepted the request (a 2xx status).
     pub fn accepted(&self) -> bool {
-        (200..300).contains(&self.status)
+        self.status.is_success()
     }
 
     /// The body as JSON, when it is JSON.
@@ -111,12 +111,15 @@ impl Exchange {
         let headers: serde_json::Map<String, Value> = self
             .headers
             .iter()
-            .filter(|(name, _)| kept_header(name))
-            .map(|(name, value)| (name.to_ascii_lowercase(), json!(value)))
+            .filter(|(name, _)| kept_header(name.as_str()))
+            .map(|(name, value)| {
+                let value = String::from_utf8_lossy(value.as_bytes());
+                (name.as_str().to_owned(), json!(value))
+            })
             .collect();
         let context = error_context(self.status, &self.headers);
         json!({
-            "status": self.status,
+            "status": self.status.as_u16(),
             "accepted": self.accepted(),
             "headers": headers,
             "allama_reads": {
@@ -161,9 +164,12 @@ pub async fn try_send(
 
 /// A JSON `POST` with a secret header.
 pub fn post_json(url: &str, secret: (&str, String), body: &Value) -> HttpRequest {
-    HttpRequest::post(url, body.to_string())
-        .header("content-type", "application/json")
-        .sensitive_header(secret.0, secret.1)
+    let uri = Uri::try_from(url).expect("the evidence URL is a valid URI");
+    let name = HeaderName::try_from(secret.0).expect("the secret header has a valid name");
+    let value = HeaderValue::try_from(secret.1).expect("the secret fits a header");
+    HttpRequest::post(uri, body.to_string())
+        .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
+        .sensitive_header(name, value)
 }
 
 /// The value of the environment variable `name`.
@@ -538,16 +544,22 @@ fn keyword_checks_tell_kept_from_broken() {
 
 #[test]
 fn records_keep_only_the_listed_headers() {
-    let mut headers = Headers::new();
-    headers.insert("Retry-After", "2");
-    headers.insert("x-should-retry", "true");
-    headers.insert("x-ratelimit-remaining-requests", "0");
-    headers.insert("anthropic-ratelimit-tokens-reset", "2026-10-03T00:00:00Z");
-    headers.insert("openai-organization", "acme-corp");
-    headers.insert("openai-project", "proj_123");
-    headers.insert("set-cookie", "session=secret");
+    let mut headers = HeaderMap::new();
+    headers.insert("Retry-After", HeaderValue::from_static("2"));
+    headers.insert("x-should-retry", HeaderValue::from_static("true"));
+    headers.insert(
+        "x-ratelimit-remaining-requests",
+        HeaderValue::from_static("0"),
+    );
+    headers.insert(
+        "anthropic-ratelimit-tokens-reset",
+        HeaderValue::from_static("2026-10-03T00:00:00Z"),
+    );
+    headers.insert("openai-organization", HeaderValue::from_static("acme-corp"));
+    headers.insert("openai-project", HeaderValue::from_static("proj_123"));
+    headers.insert("set-cookie", HeaderValue::from_static("session=secret"));
     let exchange = Exchange {
-        status: 429,
+        status: StatusCode::TOO_MANY_REQUESTS,
         headers,
         body: r#"{"error":{"type":"rate_limit_error"}}"#.into(),
     };

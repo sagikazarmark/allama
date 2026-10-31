@@ -3,6 +3,7 @@
 
 use allama::wrappers::{FallbackProvider, MapModelProvider};
 use allama::{ChatProvider, ChatRequest, Error};
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_http::{Credential, HttpRequest, HttpRequestOptions, ReplayResponse, ReplayTransport};
 
 const ANTHROPIC_OK: &str = r#"{"id":"msg_1","type":"message","role":"assistant","model":"claude-haiku-4-5","content":[{"type":"text","text":"hi"}],"stop_reason":"end_turn","usage":{"input_tokens":3,"output_tokens":1}}"#;
@@ -12,9 +13,9 @@ const OPENAI_OK: &str = r#"{"id":"c1","model":"gpt-5-mini","choices":[{"index":0
 fn values<'a>(request: &'a HttpRequest, name: &str) -> Vec<&'a str> {
     request
         .headers
+        .get_all(name)
         .iter()
-        .filter(|(key, _)| key.eq_ignore_ascii_case(name))
-        .map(|(_, value)| value)
+        .map(|value| value.to_str().unwrap())
         .collect()
 }
 
@@ -37,10 +38,11 @@ fn anthropic(transport: &ReplayTransport) -> allama_anthropic::Provider {
 #[tokio::test]
 async fn an_openai_scoped_key_never_reaches_the_anthropic_fallback() {
     let openai_transport = ReplayTransport::new([ReplayResponse::json(
-        503,
+        StatusCode::SERVICE_UNAVAILABLE,
         r#"{"error":{"message":"overloaded","type":"server_error"}}"#,
     )]);
-    let anthropic_transport = ReplayTransport::new([ReplayResponse::json(200, ANTHROPIC_OK)]);
+    let anthropic_transport =
+        ReplayTransport::new([ReplayResponse::json(StatusCode::OK, ANTHROPIC_OK)]);
     let provider = FallbackProvider::new(
         openai(&openai_transport, "openai-server-key"),
         MapModelProvider::new(anthropic(&anthropic_transport), |_: &str| {
@@ -72,7 +74,7 @@ async fn an_openai_scoped_key_never_reaches_the_anthropic_fallback() {
         !sent
             .headers
             .iter()
-            .any(|(_, value)| value.contains("TENANT-OPENAI-SECRET")),
+            .any(|(_, value)| value.to_str().unwrap().contains("TENANT-OPENAI-SECRET")),
         "the OpenAI key reached Anthropic"
     );
     assert!(!sent.body_text().unwrap().contains("TENANT-OPENAI-SECRET"));
@@ -80,8 +82,11 @@ async fn an_openai_scoped_key_never_reaches_the_anthropic_fallback() {
 
 #[tokio::test]
 async fn two_openai_accounts_with_two_scopes_each_send_their_own_key() {
-    let first_transport = ReplayTransport::new([ReplayResponse::json(429, r#"{"error":{}}"#)]);
-    let second_transport = ReplayTransport::new([ReplayResponse::json(200, OPENAI_OK)]);
+    let first_transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::TOO_MANY_REQUESTS,
+        r#"{"error":{}}"#,
+    )]);
+    let second_transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, OPENAI_OK)]);
     let first = allama_openai::Provider::builder()
         .api_key("server-key-a")
         .credential_scope("openai-account-a")
@@ -116,8 +121,12 @@ async fn two_openai_accounts_with_two_scopes_each_send_their_own_key() {
 #[tokio::test]
 async fn a_gateway_token_reaches_only_its_scope() {
     // OpenAI behind a gateway that wants its own token; Anthropic direct.
-    let openai_transport = ReplayTransport::new([ReplayResponse::json(500, r#"{"error":{}}"#)]);
-    let anthropic_transport = ReplayTransport::new([ReplayResponse::json(200, ANTHROPIC_OK)]);
+    let openai_transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        r#"{"error":{}}"#,
+    )]);
+    let anthropic_transport =
+        ReplayTransport::new([ReplayResponse::json(StatusCode::OK, ANTHROPIC_OK)]);
     let provider = FallbackProvider::new(
         openai(&openai_transport, "openai-server-key"),
         MapModelProvider::new(anthropic(&anthropic_transport), |_: &str| {
@@ -147,17 +156,22 @@ async fn a_gateway_token_reaches_only_its_scope() {
 
 #[tokio::test]
 async fn a_plain_credential_header_is_refused_and_never_failed_over() {
-    let openai_transport = ReplayTransport::new([ReplayResponse::json(200, OPENAI_OK)]);
-    let anthropic_transport = ReplayTransport::new([ReplayResponse::json(200, ANTHROPIC_OK)]);
+    let openai_transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, OPENAI_OK)]);
+    let anthropic_transport =
+        ReplayTransport::new([ReplayResponse::json(StatusCode::OK, ANTHROPIC_OK)]);
     let provider = FallbackProvider::new(
         openai(&openai_transport, "openai-server-key"),
         MapModelProvider::new(anthropic(&anthropic_transport), |_: &str| {
             "claude-haiku-4-5".into()
         }),
     );
-    let request = ChatRequest::new("gpt-5-mini")
-        .user("Hi")
-        .with_option(HttpRequestOptions::new().header("authorization", "Bearer PLAIN-SECRET"));
+    let request =
+        ChatRequest::new("gpt-5-mini")
+            .user("Hi")
+            .with_option(HttpRequestOptions::new().header(
+                "authorization",
+                HeaderValue::from_static("Bearer PLAIN-SECRET"),
+            ));
     let err = provider.chat(&request).await.unwrap_err();
     assert!(matches!(err, Error::Configuration { .. }), "{err:?}");
     assert!(!err.to_string().contains("PLAIN-SECRET"));

@@ -10,6 +10,7 @@ use allama::prelude::*;
 use allama::schemars::{self, JsonSchema};
 use allama::{Error, FinishReason};
 use allama_anthropic::Provider;
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use serde::Deserialize;
 use serde_json::json;
@@ -64,7 +65,7 @@ fn assert_refused(error: Error) {
 #[tokio::test]
 async fn a_refusal_fails_extraction_once() {
     let (provider, transport) = provider(ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "msg_1", "type": "message", "role": "assistant", "model": MODEL,
             "content": [], "stop_reason": "refusal", "stop_sequence": null,
@@ -107,7 +108,7 @@ async fn a_streamed_refusal_fails_extraction() {
 #[tokio::test]
 async fn a_refused_prefill_fails_extraction_without_a_fallback() {
     let (provider, transport) = provider(ReplayResponse::json(
-        400,
+        StatusCode::BAD_REQUEST,
         json!({"type": "error", "error": {"type": "invalid_request_error", "message":
             "Your API request included an `assistant` message in the final position, which \
              would pre-fill the `assistant` response. When using output format, pre-filling \

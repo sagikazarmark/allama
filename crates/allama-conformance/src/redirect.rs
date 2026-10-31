@@ -10,11 +10,18 @@
 use std::future::Future;
 
 use allama::Error;
+use allama_http::http::{HeaderValue, StatusCode};
 
 use crate::{MockHttpResponse, TestHttpServer};
 
 /// The redirect statuses the contract sends.
-pub const REDIRECT_STATUSES: [u16; 5] = [301, 302, 303, 307, 308];
+pub const REDIRECT_STATUSES: [StatusCode; 5] = [
+    StatusCode::MOVED_PERMANENTLY,
+    StatusCode::FOUND,
+    StatusCode::SEE_OTHER,
+    StatusCode::TEMPORARY_REDIRECT,
+    StatusCode::PERMANENT_REDIRECT,
+];
 
 /// Assert that an adapter never follows a redirect, on `chat` and on
 /// `chat_stream`.
@@ -42,26 +49,32 @@ where
     SFut: Future<Output = allama::Result<()>>,
 {
     for status in REDIRECT_STATUSES {
+        let code = status.as_u16();
         for streaming in [false, true] {
             let path = if streaming { "chat_stream" } else { "chat" };
-            let target =
-                TestHttpServer::spawn([MockHttpResponse::json(200, r#"{"stolen":true}"#)]).await;
+            let target = TestHttpServer::spawn([MockHttpResponse::json(
+                StatusCode::OK,
+                r#"{"stolen":true}"#,
+            )])
+            .await;
             // `localhost` rather than `127.0.0.1`: another host as far as the
             // client can tell, so a followed redirect would be cross-host.
-            let location = format!(
+            let location = HeaderValue::try_from(format!(
                 "{}/v1/stolen",
                 target.url().replace("127.0.0.1", "localhost")
-            );
+            ))
+            .expect("a local URL is a valid header value");
             // A retrying adapter may ask again; the origin keeps answering.
-            let origin = TestHttpServer::spawn(
-                (0..8).map(|_| MockHttpResponse::text(status, "").header("location", &location)),
-            )
-            .await;
+            let origin =
+                TestHttpServer::spawn((0..8).map(|_| {
+                    MockHttpResponse::text(status, "").header("location", location.clone())
+                }))
+                .await;
             let result = send(origin.url().to_owned(), streaming).await;
             let leaked = target.recorded_requests().await;
             assert!(
                 leaked.is_empty(),
-                "redirect_not_followed: {path} followed a {status} redirect to another host, \
+                "redirect_not_followed: {path} followed a {code} redirect to another host, \
                  sending it {} request(s)",
                 leaked.len()
             );
@@ -73,7 +86,7 @@ where
                 Err(err @ Error::UnexpectedResponse { .. }) => {
                     assert_eq!(
                         err.status(),
-                        Some(status),
+                        Some(code),
                         "redirect_not_followed: {path}: the error keeps the redirect status"
                     );
                     assert!(
@@ -82,7 +95,7 @@ where
                     );
                 }
                 other => panic!(
-                    "redirect_not_followed: {path}: a {status} redirect must fail with \
+                    "redirect_not_followed: {path}: a {code} redirect must fail with \
                      UnexpectedResponse, got {other:?}"
                 ),
             }
@@ -94,7 +107,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use allama_http::{HttpRequest, HttpTransport, ReqwestTransport, status_error};
+    use allama_http::{HttpRequest, HttpTransport, ReqwestTransport, request_uri, status_error};
 
     use super::*;
 
@@ -102,14 +115,17 @@ mod tests {
     /// uses (`HttpResponse::map_error`).
     async fn call(transport: ReqwestTransport, url: String) -> allama::Result<()> {
         let response = transport
-            .send(HttpRequest::post(format!("{url}/v1/chat"), "{}").header("x-api-key", "k"))
+            .send(
+                HttpRequest::post(request_uri(format!("{url}/v1/chat")).unwrap(), "{}")
+                    .header("x-api-key", HeaderValue::from_static("k")),
+            )
             .await
             .expect("the local server answers");
         if response.status == 200 {
             return Ok(());
         }
         Err(response
-            .map_error(|status, _, _| status_error(status, format!("HTTP {status}")))
+            .map_error(|status, _, _| status_error(status, format!("HTTP {}", status.as_u16())))
             .await)
     }
 

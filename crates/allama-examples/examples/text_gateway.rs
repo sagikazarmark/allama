@@ -27,11 +27,13 @@ use allama::{
     ValidationCoverage,
 };
 use allama_http::framing::{ChatFrameDecoder, FramedChatStream, VendorFrames};
+use allama_http::http::header::{AUTHORIZATION, CONTENT_TYPE};
+use allama_http::http::{HeaderMap, HeaderValue, StatusCode, Uri};
 use allama_http::ndjson::NdjsonStream;
 use allama_http::{
     CredentialPlacement, CredentialSlot, DEFAULT_MAX_RESPONSE_SIZE, DEFAULT_REQUEST_TIMEOUT,
-    Headers, HttpRequest, HttpResponse, HttpTransport, ReplayResponse, ReplayTransport,
-    StreamTimeouts, TransportError, error_context, error_envelope, malformed_response,
+    HttpRequest, HttpResponse, HttpTransport, ReplayResponse, ReplayTransport, StreamTimeouts,
+    TransportError, config, error_context, error_envelope, malformed_response, request_uri,
     status_error,
 };
 use serde::Deserialize;
@@ -48,31 +50,34 @@ const WIRE: WireSupport =
 #[derive(Clone)]
 pub struct Gateway {
     http: Arc<dyn HttpTransport>,
-    url: String,
-    token: String,
+    uri: Uri,
+    authorization: HeaderValue,
     slot: CredentialSlot,
 }
 
 impl std::fmt::Debug for Gateway {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Gateway")
-            .field("url", &self.url)
-            .field("token", &"<redacted>")
+            .field("uri", &self.uri)
+            .field("authorization", &"<redacted>")
             .finish_non_exhaustive()
     }
 }
 
 impl Gateway {
-    pub fn new(base_url: &str, token: &str, http: impl HttpTransport) -> Self {
-        let url = format!("{}/generate", base_url.trim_end_matches('/'));
+    /// Checks the configuration once, so no request fails on it later.
+    pub fn new(base_url: &str, token: &str, http: impl HttpTransport) -> Result<Self> {
+        let base_url = config::base_url("base_url", base_url)?;
+        let uri = request_uri(format!("{base_url}/generate"))?;
+        let authorization = config::sensitive_value("token", &format!("Bearer {token}"))?;
         let slot = CredentialSlot::new(PROVIDER_NAME, CredentialPlacement::Bearer);
-        let (http, token) = (Arc::new(http), token.to_owned());
-        Self {
+        let http = Arc::new(http);
+        Ok(Self {
             http,
-            url,
-            token,
+            uri,
+            authorization,
             slot,
-        }
+        })
     }
 
     /// Everything before sending, so validation (a dry run) runs it too.
@@ -114,9 +119,9 @@ impl Gateway {
         if let Some(max) = request.max_output_tokens {
             body["max_tokens"] = json!(max);
         }
-        HttpRequest::post(&self.url, body.to_string())
-            .header("content-type", "application/json")
-            .header("authorization", format!("Bearer {}", self.token))
+        HttpRequest::post(self.uri.clone(), body.to_string())
+            .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
+            .header(AUTHORIZATION, self.authorization.clone())
             .apply_options(&request.options, &self.slot)
     }
 
@@ -319,15 +324,17 @@ impl ChatFrameDecoder<String> for Lines {
 }
 
 /// The HTTP error mapping: a pure function, which the kit checks alone.
-pub fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
+pub fn map_http_error(status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
     let error = map_error(Some(status), body).with_context(error_context(status, headers));
     error.with_body_opt((!body.is_empty()).then_some(body))
 }
 
 /// An error envelope, from a response (`status`) or a stream line (`None`).
-fn map_error(status: Option<u16>, body: &str) -> Error {
+fn map_error(status: Option<StatusCode>, body: &str) -> Error {
     let envelope = error_envelope(body);
-    let message = status.map_or("the stream failed".to_owned(), |s| format!("HTTP {s}"));
+    let message = status.map_or("the stream failed".to_owned(), |s| {
+        format!("HTTP {}", s.as_u16())
+    });
     let error = match (
         envelope.as_ref().and_then(|e| e.error_type.as_deref()),
         status,
@@ -352,7 +359,7 @@ const STREAM: &str = "{\"delta\":\"Hel\"}\n{\"delta\":\"lo!\"}\n{\"done\":true,\
 
 fn answer(stream: bool) -> ReplayTransport {
     ReplayTransport::new([match stream {
-        false => ReplayResponse::json(200, ANSWER),
+        false => ReplayResponse::json(StatusCode::OK, ANSWER),
         true => ReplayResponse::ndjson(STREAM),
     }])
 }
@@ -361,10 +368,10 @@ fn answer(stream: bool) -> ReplayTransport {
 async fn main() -> Result<()> {
     // `temperature` has no slot on this wire: it is dropped, with a warning.
     let request = ChatRequest::new("small").user("Say hello").temperature(0.2);
-    let gateway = Gateway::new("https://gateway.test/v1", "key", answer(false));
+    let gateway = Gateway::new("https://gateway.test/v1", "key", answer(false))?;
     let response = gateway.chat(&request).await?;
     println!("{}; {}", response.text_or_empty(), response.warnings[0]);
-    let gateway = Gateway::new("https://gateway.test/v1", "key", answer(true));
+    let gateway = Gateway::new("https://gateway.test/v1", "key", answer(true))?;
     let streamed = gateway
         .chat_stream(&request)
         .await?
@@ -381,6 +388,7 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use allama::RequestOptions;
+    use allama_conformance::error_kinds::http_error_mapping;
     use allama_conformance::probe::ProbeOutcome;
     use allama_conformance::stream_end::StreamEnds;
     use allama_conformance::stream_errors::ErrorKindProbe;
@@ -392,7 +400,7 @@ mod tests {
     use super::*;
 
     fn gateway(transport: &ReplayTransport) -> Gateway {
-        Gateway::new("https://gateway.test/v1", "key", transport.clone())
+        Gateway::new("https://gateway.test/v1", "key", transport.clone()).unwrap()
     }
 
     /// `chat`, or `chat_stream` collected, over `transport`.
@@ -419,7 +427,7 @@ mod tests {
         let bodies = transport
             .requests()
             .into_iter()
-            .map(|r| serde_json::from_slice(&r.body.unwrap()).unwrap());
+            .map(|r| serde_json::from_slice(&r.body).unwrap());
         ProbeOutcome::new(result, bodies.collect())
     }
 
@@ -448,15 +456,19 @@ mod tests {
                 .await
         };
         let malformed = move |body: String| async move {
-            let answer = ReplayResponse::json(200, body).header("x-request-id", "req_1");
+            let answer = ReplayResponse::json(StatusCode::OK, body)
+                .header("x-request-id", HeaderValue::from_static("req_1"));
             gateway(&ReplayTransport::new([answer]))
                 .chat(&request())
                 .await
         };
         let unary = move |body: String| async move {
-            gateway(&ReplayTransport::new([ReplayResponse::json(200, body)]))
-                .chat(&request())
-                .await
+            gateway(&ReplayTransport::new([ReplayResponse::json(
+                StatusCode::OK,
+                body,
+            )]))
+            .chat(&request())
+            .await
         };
         // The same answer cut off at `max_tokens`, as the API sends it.
         let cut_off = ResponseCapture::new(
@@ -465,7 +477,7 @@ mod tests {
         );
         // Through the real HTTP client, for the redirect contract.
         let redirected = move |base_url: String, stream: bool| async move {
-            let gateway = Gateway::new(&base_url, "key", allama_http::ReqwestTransport::new());
+            let gateway = Gateway::new(&base_url, "key", allama_http::ReqwestTransport::new())?;
             match stream {
                 false => gateway.chat(&request()).await.map(drop),
                 true => gateway.chat_stream(&request()).await.map(drop),
@@ -483,9 +495,7 @@ mod tests {
             |r| probe(r, false),
             |r| probe(r, true),
         )
-        .error_mapping(|status, headers, body| {
-            map_http_error(status, &headers.iter().copied().collect(), &body)
-        })
+        .error_mapping(http_error_mapping(map_http_error))
         .error_envelope(envelope)
         .stream_body(move |envelope| format!("{first}\n{envelope}\n"))
         .stream_replay(replay)

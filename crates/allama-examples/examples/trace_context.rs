@@ -41,9 +41,9 @@
 use allama::prelude::*;
 use allama::wrappers::TracingProvider;
 use allama::{ProviderIdentity, Result};
+use allama_http::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use allama_http::{
-    Headers, HttpRequest, HttpRequestOptions, HttpTransport, ReplayResponse, ReplayTransport,
-    SendFuture,
+    HttpRequest, HttpRequestOptions, HttpTransport, ReplayResponse, ReplayTransport, SendFuture,
 };
 use allama_providers::Registry;
 use opentelemetry::propagation::Injector;
@@ -101,8 +101,8 @@ fn with_trace_context(request: &ChatRequest) -> Result<ChatRequest> {
 
 /// Write the current span's trace context into `headers` through the
 /// global propagator, unless they already carry a `traceparent`.
-fn inject_trace_context(headers: &mut Headers) {
-    if headers.get("traceparent").is_some() {
+fn inject_trace_context(headers: &mut HeaderMap) {
+    if headers.contains_key("traceparent") {
         return;
     }
     let context = tracing::Span::current().context();
@@ -111,13 +111,15 @@ fn inject_trace_context(headers: &mut Headers) {
     });
 }
 
-/// Writes the propagator's fields as headers, one value per name.
-struct HeaderInjector<'a>(&'a mut Headers);
+/// Writes the propagator's fields as headers, one value per name. A field
+/// no header can carry is left out.
+struct HeaderInjector<'a>(&'a mut HeaderMap);
 
 impl Injector for HeaderInjector<'_> {
     fn set(&mut self, name: &str, value: String) {
-        self.0.remove(name);
-        self.0.insert(name, value);
+        if let (Ok(name), Ok(value)) = (HeaderName::try_from(name), HeaderValue::try_from(value)) {
+            self.0.insert(name, value);
+        }
     }
 }
 
@@ -126,7 +128,7 @@ const MODEL: &str = "gpt-5-mini";
 /// The provider's network: one canned Chat Completions answer per call.
 fn wire(calls: usize) -> ReplayTransport {
     const ANSWER: &str = r#"{"id":"c1","model":"gpt-5-mini","choices":[{"index":0,"message":{"role":"assistant","content":"Hello!"},"finish_reason":"stop"}]}"#;
-    ReplayTransport::new((0..calls).map(|_| ReplayResponse::json(200, ANSWER)))
+    ReplayTransport::new((0..calls).map(|_| ReplayResponse::json(StatusCode::OK, ANSWER)))
 }
 
 /// The OpenAI provider, sending through `transport`.
@@ -143,9 +145,9 @@ fn sent_traceparent(wire: &ReplayTransport) -> Vec<String> {
     let request = requests.last().expect("a request was sent");
     request
         .headers
+        .get_all("traceparent")
         .iter()
-        .filter(|(name, _)| name.eq_ignore_ascii_case("traceparent"))
-        .map(|(_, value)| value.to_owned())
+        .map(|value| String::from_utf8_lossy(value.as_bytes()).into_owned())
         .collect()
 }
 
@@ -181,9 +183,9 @@ async fn main() -> anyhow::Result<()> {
 
     // A `traceparent` the caller sets is sent as it is.
     let caller_set = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01";
-    let request = ChatRequest::new(MODEL)
-        .user("Say hello")
-        .with_option(HttpRequestOptions::new().header("traceparent", caller_set));
+    let request = ChatRequest::new(MODEL).user("Say hello").with_option(
+        HttpRequestOptions::new().header("traceparent", HeaderValue::from_static(caller_set)),
+    );
     provider.chat(&request).await?;
     assert_eq!(sent_traceparent(&network), [caller_set]);
     println!("caller:   traceparent {:?}", sent_traceparent(&network));
@@ -287,7 +289,9 @@ mod tests {
     }
 
     fn caller_set_request() -> ChatRequest {
-        request().with_option(HttpRequestOptions::new().header("traceparent", CALLER_SET))
+        request().with_option(
+            HttpRequestOptions::new().header("traceparent", HeaderValue::from_static(CALLER_SET)),
+        )
     }
 
     #[tokio::test]
@@ -341,11 +345,12 @@ mod tests {
     async fn the_chat_wrapper_keeps_the_callers_other_headers() {
         let _telemetry = Telemetry::install();
         let network = wire(1);
-        let request =
-            request().with_option(HttpRequestOptions::new().header("x-tenant-id", "acme"));
+        let request = request().with_option(
+            HttpRequestOptions::new().header("x-tenant-id", HeaderValue::from_static("acme")),
+        );
         from_registry(&network).chat(&request).await.unwrap();
         let sent = &network.requests()[0];
-        assert_eq!(sent.headers.get("x-tenant-id"), Some("acme"));
+        assert_eq!(sent.headers["x-tenant-id"], "acme");
         assert_eq!(sent_traceparent(&network).len(), 1);
     }
 

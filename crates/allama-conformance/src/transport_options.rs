@@ -3,6 +3,7 @@
 use std::future::Future;
 
 use allama::{Error, RequestOptions};
+use allama_http::http::{HeaderName, HeaderValue};
 use allama_http::{
     Credential, CredentialPlacement, CredentialSlot, HttpRequest, HttpRequestOptions,
     OPTIONS_NAMESPACE,
@@ -103,14 +104,15 @@ impl TransportOutcome {
 /// ```
 /// use allama::{ChatRequest, RequestOptions};
 /// use allama_conformance::{TransportOutcome, assert_transport_options_applied};
+/// use allama_http::http::{HeaderValue, Uri};
 /// use allama_http::{CredentialPlacement, CredentialSlot, HttpRequest};
 ///
 /// # struct Adapter { slot: CredentialSlot }
 /// # impl Adapter {
 /// #     async fn send(&self, request: &ChatRequest) -> TransportOutcome {
-/// #         let http = HttpRequest::post("https://api.example.com/v1/chat", "{}")
-/// #             .header("content-type", "application/json")
-/// #             .header("authorization", "Bearer configured-key")
+/// #         let http = HttpRequest::post(Uri::from_static("https://api.example.com/v1/chat"), "{}")
+/// #             .header("content-type", HeaderValue::from_static("application/json"))
+/// #             .header("authorization", HeaderValue::from_static("Bearer configured-key"))
 /// #             .apply_options(&request.options, &self.slot);
 /// #         match http {
 /// #             Ok(http) => TransportOutcome::new(Ok(()), vec![http]),
@@ -164,8 +166,8 @@ where
     if slot.required {
         options.insert(
             HttpRequestOptions::new()
-                .header(ADDED.0, ADDED.1)
-                .header(REPLACED.0, REPLACED.1)
+                .header(ADDED.0, HeaderValue::from_static(ADDED.1))
+                .header(REPLACED.0, HeaderValue::from_static(REPLACED.1))
                 .credential(slot.scope.clone(), Credential::api_key(OWN_SECRET)),
         );
     } else {
@@ -243,19 +245,19 @@ where
              adapter sent {names:?}",
             slot.scope
         );
-        let body = request.body.as_deref().unwrap_or_default();
+        let body = &request.body;
         for secret in [FOREIGN_SECRET, FOREIGN_HEADER.1] {
             let leaked = request
                 .headers
-                .iter()
-                .any(|(_, value)| value.contains(secret))
-                || request.url.contains(secret)
+                .values()
+                .any(|value| contains(value.as_bytes(), secret.as_bytes()))
+                || request.uri.to_string().contains(secret)
                 || contains(body, secret.as_bytes());
             assert!(
                 !leaked,
                 "a credential addressed to another credential scope must never be sent; the \
                  adapter sent it to {}",
-                request.url
+                allama_http::config::redact_url(&request.uri.to_string())
             );
         }
         assert!(
@@ -282,7 +284,9 @@ where
     names.extend(slot.header_name());
     names.extend(slot.replaces.iter().map(AsRef::as_ref));
     for name in names {
-        let mut transport = HttpRequestOptions::new().header(name, PLAIN_SECRET);
+        let name = HeaderName::try_from(name).expect("a slot's header is a valid header name");
+        let mut transport =
+            HttpRequestOptions::new().header(name.clone(), HeaderValue::from_static(PLAIN_SECRET));
         if slot.required {
             transport = transport.credential(slot.scope.clone(), Credential::api_key(OWN_SECRET));
         }
@@ -367,19 +371,19 @@ fn last_sent<'a>(outcome: &'a TransportOutcome, what: &str) -> &'a HttpRequest {
     })
 }
 
-/// The values of `name` in `request`, ignoring case.
-fn values<'a>(request: &'a HttpRequest, name: &str) -> Vec<&'a str> {
+/// The values of `name` in `request`, ignoring case, decoded lossily.
+fn values(request: &HttpRequest, name: &str) -> Vec<String> {
     request
         .headers
+        .get_all(name)
         .iter()
-        .filter(|(key, _)| key.eq_ignore_ascii_case(name))
-        .map(|(_, value)| value)
+        .map(|value| String::from_utf8_lossy(value.as_bytes()).into_owned())
         .collect()
 }
 
 /// The header names of `request`, for messages that must not show values.
 fn header_names(request: &HttpRequest) -> Vec<&str> {
-    request.headers.iter().map(|(name, _)| name).collect()
+    request.headers.keys().map(HeaderName::as_str).collect()
 }
 
 /// Whether `haystack` contains `needle`.
@@ -391,22 +395,39 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use allama_http::http::Uri;
+
     use super::*;
+
+    fn post() -> HttpRequest {
+        HttpRequest::post(Uri::from_static("https://api.example.com/v1"), "{}")
+            .header("content-type", HeaderValue::from_static("application/json"))
+    }
+
+    fn value(value: &str) -> HeaderValue {
+        HeaderValue::try_from(value).unwrap()
+    }
 
     /// A conforming adapter: configured headers, then `apply_options`.
     fn adapter(
         slot: CredentialSlot,
     ) -> impl Fn(RequestOptions) -> std::future::Ready<TransportOutcome> {
         move |options| {
-            let mut request = HttpRequest::post("https://api.example.com/v1", "{}")
-                .header("content-type", "application/json");
+            let mut request = post();
             request = match slot.header_name() {
-                Some("authorization") => request.header("authorization", "Bearer configured"),
-                Some(name) => request.header(name, "configured"),
+                Some("authorization") => {
+                    request.header("authorization", value("Bearer configured"))
+                }
+                Some(name) => {
+                    request.header(HeaderName::try_from(name).unwrap(), value("configured"))
+                }
                 None => request,
             };
             for replaced in &slot.replaces {
-                request = request.header(replaced.as_ref(), "configured");
+                request = request.header(
+                    HeaderName::try_from(replaced.as_ref()).unwrap(),
+                    value("configured"),
+                );
             }
             std::future::ready(match request.apply_options(&options, &slot) {
                 Ok(request) => TransportOutcome::new(Ok(()), vec![request]),
@@ -435,8 +456,7 @@ mod tests {
     #[should_panic(expected = "x-allama-conformance")]
     async fn an_adapter_that_ignores_the_options_fails() {
         assert_transport_options_applied(&bearer(), |_options: RequestOptions| {
-            let request = HttpRequest::post("https://api.example.com/v1", "{}")
-                .header("content-type", "application/json");
+            let request = post();
             std::future::ready(TransportOutcome::new(Ok(()), vec![request]))
         })
         .await;
@@ -447,10 +467,12 @@ mod tests {
     async fn an_adapter_that_appends_instead_of_replacing_fails() {
         assert_transport_options_applied(&bearer(), |options: RequestOptions| {
             let json = options.json(OPTIONS_NAMESPACE).cloned().unwrap_or_default();
-            let mut request = HttpRequest::post("https://api.example.com/v1", "{}")
-                .header("content-type", "application/json");
+            let mut request = post();
             for (name, value) in json["headers"].as_object().into_iter().flatten() {
-                request = request.header(name.as_str(), value.as_str().unwrap());
+                request = request.header(
+                    HeaderName::try_from(name.as_str()).unwrap(),
+                    self::value(value.as_str().unwrap()),
+                );
             }
             std::future::ready(TransportOutcome::new(Ok(()), vec![request]))
         })
@@ -472,9 +494,7 @@ mod tests {
     async fn an_adapter_that_sends_every_credential_fails() {
         assert_transport_options_applied(&bearer(), |options: RequestOptions| {
             let slot = bearer();
-            let mut request = HttpRequest::post("https://api.example.com/v1", "{}")
-                .header("content-type", "application/json")
-                .header("authorization", "Bearer configured");
+            let mut request = post().header("authorization", value("Bearer configured"));
             let foreign = options
                 .get::<HttpRequestOptions>()
                 .and_then(|transport| transport.credential_for(FOREIGN_SCOPE))
@@ -483,7 +503,7 @@ mod tests {
                 Ok(applied) => {
                     request = applied;
                     if let Some(secret) = foreign {
-                        request = request.header("x-leak", secret);
+                        request = request.header("x-leak", value(&secret));
                     }
                     TransportOutcome::new(Ok(()), vec![request])
                 }
@@ -500,26 +520,27 @@ mod tests {
         // An adapter that replaces headers itself instead of calling
         // `apply_options`.
         assert_transport_options_applied(&bearer(), |options: RequestOptions| {
-            let mut request = HttpRequest::post("https://api.example.com/v1", "{}")
-                .header("content-type", "application/json")
-                .header("authorization", "Bearer configured");
+            let mut request = post().header("authorization", value("Bearer configured"));
             if let Some(transport) = options.resolve::<HttpRequestOptions>().unwrap() {
-                for (name, value) in transport.headers.iter() {
+                for (name, value) in &transport.headers {
                     request.headers.remove(name);
-                    request = request.header(name, value);
+                    request = request.header(name.clone(), value.clone());
                 }
                 if let Some(credential) = transport.credential_for("example") {
                     request.headers.remove("authorization");
                     request = request.sensitive_header(
                         "authorization",
-                        format!("Bearer {}", credential.expose_secret()),
+                        value(&format!("Bearer {}", credential.expose_secret())),
                     );
                 }
                 for (scope, credential) in transport.credentials() {
                     if let (allama_http::CredentialKind::Header(name), "example") =
                         (credential.kind(), scope)
                     {
-                        request = request.sensitive_header(name, credential.expose_secret());
+                        request = request.sensitive_header(
+                            HeaderName::try_from(name.as_str()).unwrap(),
+                            value(credential.expose_secret()),
+                        );
                     }
                 }
             }

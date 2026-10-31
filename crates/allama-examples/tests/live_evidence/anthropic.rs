@@ -17,6 +17,7 @@ use schemars::JsonSchema;
 use serde_json::{Map, Value, json};
 
 use super::{dialect_record, env, env_or, parse_output, post_json, record, scratch, send};
+use allama_http::http::HeaderValue;
 
 const CHECK: &str = "anthropic";
 
@@ -30,7 +31,7 @@ fn request(body: &Value) -> HttpRequest {
         ("x-api-key", env("ANTHROPIC_API_KEY")),
         body,
     )
-    .header("anthropic-version", "2023-06-01")
+    .header("anthropic-version", HeaderValue::from_static("2023-06-01"))
 }
 
 fn model() -> String {

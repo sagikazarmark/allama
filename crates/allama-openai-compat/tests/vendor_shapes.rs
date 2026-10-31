@@ -17,6 +17,7 @@ use allama::{
 use allama_conformance::{
     FixtureDir, assert_response_fixture_eq, assert_stream_fixture_eq, load_text_fixture,
 };
+use allama_http::http::{HeaderMap, StatusCode};
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::{CompatQuirks, Provider, ReasoningReplayField};
 use serde_json::{Value, json};
@@ -57,7 +58,10 @@ async fn streamed(name: &str) -> allama::Result<ChatResponse> {
 }
 
 async fn unary(name: &str) -> allama::Result<ChatResponse> {
-    let (provider, _) = provider(quirks(), vec![ReplayResponse::json(200, fixture(name))]);
+    let (provider, _) = provider(
+        quirks(),
+        vec![ReplayResponse::json(StatusCode::OK, fixture(name))],
+    );
     provider.chat(&ChatRequest::new("m").user("q")).await
 }
 
@@ -186,7 +190,7 @@ async fn thought_signatures_round_trip_and_stop_with_calls_is_tool_calls() {
     let (provider, transport) = provider(
         quirks(),
         vec![ReplayResponse::json(
-            200,
+            StatusCode::OK,
             r#"{"choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"#,
         )],
     );
@@ -277,7 +281,7 @@ async fn reasoning_details_are_kept_and_replayed() {
     let (provider, transport) = provider(
         replay,
         vec![ReplayResponse::json(
-            200,
+            StatusCode::OK,
             r#"{"choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"#,
         )],
     );
@@ -361,7 +365,7 @@ async fn reasoning_text_and_signature_are_kept_and_replayed() {
     let (provider, transport) = provider(
         replay,
         vec![ReplayResponse::json(
-            200,
+            StatusCode::OK,
             r#"{"choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"#,
         )],
     );
@@ -572,7 +576,7 @@ async fn error_bodies_with_a_success_status_are_typed() {
     let (provider, _) = provider(
         quirks(),
         vec![ReplayResponse::json(
-            200,
+            StatusCode::OK,
             r#"{"error":{"message":"Provider returned error","code":502,"metadata":{"provider_name":"X"}},"user_id":"u"}"#,
         )],
     );
@@ -585,8 +589,8 @@ async fn error_bodies_with_a_success_status_are_typed() {
     assert_eq!(err.upstream_message(), Some("Provider returned error"));
 
     let gemini = quirks().map_http_error(
-        429,
-        &allama_http::Headers::new(),
+        StatusCode::TOO_MANY_REQUESTS,
+        &HeaderMap::new(),
         r#"[{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}]"#,
     );
     assert_eq!(
@@ -602,7 +606,7 @@ async fn array_error_envelopes_on_error_statuses_are_typed() {
     let (provider, _) = provider(
         quirks(),
         vec![ReplayResponse::json(
-            400,
+            StatusCode::BAD_REQUEST,
             r#"[{"error":{"code":400,"message":"Invalid JSON payload received.","status":"INVALID_ARGUMENT"}}]"#,
         )],
     );

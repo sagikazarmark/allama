@@ -13,7 +13,8 @@ use allama_conformance::{
     AdapterUnderTest, Contract, EmbeddingAdapterUnderTest, ResponseCapture, TransportOutcome,
     assert_chat_adapter, assert_embedding_adapter,
 };
-use allama_http::{CredentialPlacement, CredentialSlot, Headers, ReplayResponse, ReplayTransport};
+use allama_http::http::{HeaderValue, StatusCode};
+use allama_http::{CredentialPlacement, CredentialSlot, ReplayResponse, ReplayTransport};
 use allama_openai::{Provider, ResponsesProvider};
 use allama_openai_compat::CompatQuirks;
 use serde_json::{Value, json};
@@ -31,7 +32,7 @@ const EMBEDDING_MODELS: &[&str] = &[
 
 fn chat_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "chatcmpl-1", "object": "chat.completion", "model": "gpt-4.1",
             "choices": [{"index": 0, "finish_reason": "stop",
@@ -44,7 +45,7 @@ fn chat_ok() -> ReplayResponse {
 
 fn responses_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "resp_1", "object": "response", "status": "completed", "model": "gpt-4.1",
             "output": [{"type": "message", "id": "msg_1", "role": "assistant", "status": "completed",
@@ -59,7 +60,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }
@@ -118,7 +119,7 @@ async fn embed_probe(request: EmbeddingRequest) -> ProbeOutcome<EmbeddingRespons
         .collect();
     let body = json!({"object": "list", "model": "text-embedding-3-small", "data": data,
                       "usage": {"prompt_tokens": 1, "total_tokens": 1}});
-    let transport = ReplayTransport::new([ReplayResponse::json(200, body.to_string())]);
+    let transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, body.to_string())]);
     let result = provider(&transport).embed(&request).await;
     ProbeOutcome::new(result, bodies(&transport))
 }
@@ -219,15 +220,17 @@ fn responses_envelope(kind: ErrorKindProbe, upstream: &str) -> Option<String> {
 /// Chat Completions' error mapping: the compat toolkit's, with OpenAI's
 /// quirks.
 fn chat_error(status: u16, headers: &[(&str, &str)], body: String) -> allama::Error {
-    let headers: Headers = headers.iter().copied().collect();
-    CompatQuirks::openai().map_http_error(status, &headers, &body)
+    allama_conformance::error_kinds::http_error_mapping(|status, headers, body| {
+        CompatQuirks::openai().map_http_error(status, headers, body)
+    })(status, headers, body)
 }
 
 /// Responses' error mapping: the compat toolkit's built-in classification
 /// (no extra quota codes).
 fn responses_error(status: u16, headers: &[(&str, &str)], body: String) -> allama::Error {
-    let headers: Headers = headers.iter().copied().collect();
-    CompatQuirks::default().map_http_error(status, &headers, &body)
+    allama_conformance::error_kinds::http_error_mapping(|status, headers, body| {
+        CompatQuirks::default().map_http_error(status, headers, body)
+    })(status, headers, body)
 }
 
 fn slot() -> CredentialSlot {
@@ -308,7 +311,8 @@ async fn redirect_call(base_url: String, responses: bool, streaming: bool) -> al
 
 /// A `200` with `body` and a request id.
 fn malformed(body: String) -> ReplayTransport {
-    ReplayTransport::new([ReplayResponse::new(200, body).header("x-request-id", "req_1")])
+    ReplayTransport::new([ReplayResponse::new(StatusCode::OK, body)
+        .header("x-request-id", HeaderValue::from_static("req_1"))])
 }
 
 /// Chat Completions: `[DONE]` is the stream's terminal marker.
@@ -362,9 +366,12 @@ async fn chat_completions_pass_every_contract() {
         Some("req_1"),
     )
     .unary_replay(|body| async move {
-        provider(&ReplayTransport::new([ReplayResponse::json(200, body)]))
-            .chat(&ChatRequest::new("gpt-4.1").user("hi"))
-            .await
+        provider(&ReplayTransport::new([ReplayResponse::json(
+            StatusCode::OK,
+            body,
+        )]))
+        .chat(&ChatRequest::new("gpt-4.1").user("hi"))
+        .await
     })
     .response_captures([capture("agree/agree_text")])
     .tool_call_capture(capture("agree/agree_tool_calls").wire_tool_call_ids(CHAT_TOOL_CALL_IDS))
@@ -441,9 +448,12 @@ async fn responses_pass_every_contract() {
         Some("req_1"),
     )
     .unary_replay(|body| async move {
-        responses_provider(&ReplayTransport::new([ReplayResponse::json(200, body)]))
-            .chat(&ChatRequest::new("gpt-4.1").user("hi"))
-            .await
+        responses_provider(&ReplayTransport::new([ReplayResponse::json(
+            StatusCode::OK,
+            body,
+        )]))
+        .chat(&ChatRequest::new("gpt-4.1").user("hi"))
+        .await
     })
     .response_captures([capture("responses/agree_text")])
     .tool_call_capture(
@@ -488,7 +498,7 @@ async fn embeddings_pass_every_contract() {
             .map(|vector| json!({"object": "embedding", "index": vector.index, "embedding": vector.values}))
             .collect();
         let body = json!({"object": "list", "model": request.model, "data": data});
-        provider(&ReplayTransport::new([ReplayResponse::json(200, body.to_string())]))
+        provider(&ReplayTransport::new([ReplayResponse::json(StatusCode::OK, body.to_string())]))
             .embed(&request)
             .await
     })

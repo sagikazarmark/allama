@@ -8,6 +8,7 @@ use allama::{
 };
 use allama_conformance::probe::ProbeOutcome;
 use allama_conformance::{assert_embedding_validation_agrees, assert_validation_agrees};
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai::{Provider, ResponsesProvider};
 use futures_util::StreamExt;
@@ -15,7 +16,7 @@ use serde_json::{Value, json};
 
 fn chat_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "chatcmpl-1", "object": "chat.completion", "model": "gpt-4.1",
             "choices": [{"index": 0, "finish_reason": "stop",
@@ -28,7 +29,7 @@ fn chat_ok() -> ReplayResponse {
 
 fn responses_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "resp_1", "object": "response", "status": "completed", "model": "gpt-4.1",
             "output": [{"type": "message", "id": "msg_1", "role": "assistant", "status": "completed",
@@ -44,7 +45,7 @@ fn embeddings_ok(count: usize) -> ReplayResponse {
         .map(|i| json!({"object": "embedding", "index": i, "embedding": [0.1, 0.2]}))
         .collect();
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({"object": "list", "model": "text-embedding-3-small", "data": data,
                "usage": {"prompt_tokens": count, "total_tokens": count}})
         .to_string(),
@@ -55,7 +56,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }
@@ -518,7 +519,7 @@ async fn sampling_and_tools_are_sent_whatever_the_model() {
 
     // OpenAI's refusal names the field.
     let refusal = ReplayResponse::json(
-        400,
+        StatusCode::BAD_REQUEST,
         json!({"error": {
             "message": "Unsupported parameter: 'temperature' is not supported with this model.",
             "type": "invalid_request_error",
@@ -541,7 +542,7 @@ async fn sampling_and_tools_are_sent_whatever_the_model() {
     // Responses sends the same refusal with `code: null`: the message
     // prefix stands in for the code.
     let refusal = ReplayResponse::json(
-        400,
+        StatusCode::BAD_REQUEST,
         json!({"error": {
             "message": "Unsupported parameter: 'temperature' is not supported with this model.",
             "type": "invalid_request_error",

@@ -2,6 +2,36 @@
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use http::HeaderMap;
+
+use crate::header_text;
+
+/// How long the server asks the client to wait before retrying: the `name`
+/// header of `headers` (usually `retry-after`) or `retry-after-ms`, parsed
+/// with [`parse_retry_after`] relative to the current time.
+///
+/// Unlike passing `SystemTime::now()` yourself, this also works on
+/// `wasm32-unknown-unknown`.
+///
+/// ```
+/// use std::time::Duration;
+/// use allama_http::http::{HeaderMap, HeaderValue};
+/// use allama_http::retry_after;
+///
+/// let mut headers = HeaderMap::new();
+/// headers.insert("x-retry", HeaderValue::from_static("3"));
+/// assert_eq!(retry_after(&headers, "x-retry"), Some(Duration::from_secs(3)));
+/// assert_eq!(retry_after(&headers, "retry-after"), None);
+/// ```
+#[must_use]
+pub fn retry_after(headers: &HeaderMap, name: &str) -> Option<Duration> {
+    parse_retry_after(
+        header_text(headers, name).as_deref(),
+        header_text(headers, "retry-after-ms").as_deref(),
+        crate::now(),
+    )
+}
+
 /// Parse a retry-after hint from header values.
 ///
 /// Understands:
@@ -23,8 +53,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// malformed or out of range give `None`, so a hostile or buggy upstream
 /// cannot crash the caller.
 ///
-/// [`Headers::retry_after`](crate::Headers::retry_after) calls this with the
-/// current time and also works on `wasm32-unknown-unknown`.
+/// [`retry_after`] calls this with the current time and also works on
+/// `wasm32-unknown-unknown`.
 ///
 /// ```
 /// use std::time::{Duration, UNIX_EPOCH};

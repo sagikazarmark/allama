@@ -19,6 +19,7 @@ use allama_conformance::{
 use serde_json::json;
 
 use crate::{ChatRequestOptions, Provider, SystemOptions};
+use allama_http::http::{HeaderValue, StatusCode};
 
 fn fixtures() -> FixtureDir {
     FixtureDir::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures"))
@@ -38,7 +39,8 @@ fn ok_response() -> serde_json::Value {
 
 #[tokio::test]
 async fn request_shape_matches_fixture() {
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &ok_response())]).await;
+    let server =
+        TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &ok_response())]).await;
     // A model the profile does not know, so every field is sent as asked:
     // a known reasoning model would drop the sampling fields.
     let request = ChatRequest::new("acme-reasoner")
@@ -87,7 +89,7 @@ async fn recorded_text_stream_collects_with_identity_and_usage() {
         &fixtures(),
         "recorded/stream_text.sse",
     ))
-    .header("x-request-id", "req_stream")])
+    .header("x-request-id", HeaderValue::from_static("req_stream"))])
     .await;
     let response = provider(&server)
         .chat_stream(&ChatRequest::new("gpt-4.1-nano").user("Count from 1 to 12 in words."))
@@ -145,9 +147,8 @@ async fn recorded_parallel_tool_stream() {
 #[tokio::test]
 async fn recorded_reasoning_model_response() {
     let raw = load_text_fixture(&fixtures(), "recorded/response_reasoning_model.json");
-    let server = TestHttpServer::spawn([
-        MockHttpResponse::text(200, raw).header("content-type", "application/json")
-    ])
+    let server = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::OK, raw)
+        .header("content-type", HeaderValue::from_static("application/json"))])
     .await;
     let response = provider(&server)
         .chat(&ChatRequest::new("gpt-5-nano").user("Say hello in three words."))
@@ -164,9 +165,8 @@ async fn recorded_reasoning_model_response() {
 #[tokio::test]
 async fn recorded_search_model_citations() {
     let raw = load_text_fixture(&fixtures(), "recorded/response_search_citations.json");
-    let server = TestHttpServer::spawn([
-        MockHttpResponse::text(200, raw).header("content-type", "application/json")
-    ])
+    let server = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::OK, raw)
+        .header("content-type", HeaderValue::from_static("application/json"))])
     .await;
     let response = provider(&server)
         .chat(&ChatRequest::new("gpt-5-search-api").user("Latest Rust release?"))
@@ -198,10 +198,10 @@ async fn recorded_search_model_citations() {
     // The Chat annotations never reach a Responses request, which
     // shares the `openai` namespace but takes another shape.
     let follow_up = TestHttpServer::spawn([MockHttpResponse::text(
-        200,
+        StatusCode::OK,
         load_text_fixture(&fixtures(), "responses/text.json"),
     )
-    .header("content-type", "application/json")])
+    .header("content-type", HeaderValue::from_static("application/json"))])
     .await;
     let responses =
         crate::ResponsesProvider::new_with_base_url("test-key", follow_up.url()).unwrap();
@@ -242,9 +242,9 @@ async fn error_mapping() {
     // The contracts call `chat` and then `chat_stream`, so their failures
     // (all but the rate limit and the missing model) answer twice.
     let responses = cases.iter().enumerate().flat_map(|(i, (status, body))| {
-        let response = MockHttpResponse::json_value(*status, body)
-            .header("x-request-id", "req_err")
-            .header("retry-after-ms", "1500");
+        let response = MockHttpResponse::json_value(StatusCode::from_u16(*status).unwrap(), body)
+            .header("x-request-id", HeaderValue::from_static("req_err"))
+            .header("retry-after-ms", HeaderValue::from_static("1500"));
         let times = if matches!(i, 1 | 3) { 1 } else { 2 };
         std::iter::repeat_n(response, times)
     });
@@ -294,7 +294,7 @@ async fn strict_policy_and_option_typos_fail_before_sending() {
 #[tokio::test]
 async fn embeddings_request_and_response() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({"data": [{"embedding": [0.1, 0.2], "index": 0}], "model": "text-embedding-3-small",
                 "usage": {"prompt_tokens": 2, "total_tokens": 2}}),
     )])
@@ -333,9 +333,8 @@ async fn embeddings_request_and_response() {
 #[tokio::test]
 async fn recorded_citation_offsets_are_code_points() {
     let raw = load_text_fixture(&fixtures(), "recorded/response_search_citations_emoji.json");
-    let server = TestHttpServer::spawn([
-        MockHttpResponse::text(200, raw).header("content-type", "application/json")
-    ])
+    let server = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::OK, raw)
+        .header("content-type", HeaderValue::from_static("application/json"))])
     .await;
     let response = provider(&server)
         .chat(&ChatRequest::new("gpt-5-search-api").user("Latest Rust release?"))
@@ -405,10 +404,10 @@ async fn custom_tool_calls_round_trip() {
 
     let server = TestHttpServer::spawn([
         MockHttpResponse::json_value(
-            200,
+            StatusCode::OK,
             &allama_conformance::load_json_fixture(&fixtures(), "hand_written/custom_tool.json"),
         ),
-        MockHttpResponse::json_value(200, &ok_response()),
+        MockHttpResponse::json_value(StatusCode::OK, &ok_response()),
     ])
     .await;
     let provider = provider(&server);
@@ -518,7 +517,7 @@ async fn refusals_fail_extraction_once() {
     };
     let transport = ReplayTransport::new([
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             json!({
                 "id": "chatcmpl-1", "model": "gpt-5-mini",
                 "choices": [{"index": 0, "finish_reason": "stop",

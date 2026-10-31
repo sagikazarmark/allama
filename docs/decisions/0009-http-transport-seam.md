@@ -21,6 +21,7 @@ an HTTP client.
 - `HttpTransport::send` takes an `HttpRequest` (plain data: method, URL,
   headers, body, optional timeout) and returns an `HttpResponse` (status,
   headers, streamed body). An error status is a response, not an error.
+  ADR 0019 makes that data the `http` crate's types.
   Only a missing response is a `TransportError`, classified once by kind
   and mapped to a portable error by `TransportError::into_error`.
 - Provider builders take a transport through `http_transport(..)` and

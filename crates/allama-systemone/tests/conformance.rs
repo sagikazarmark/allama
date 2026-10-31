@@ -9,7 +9,8 @@ use allama_conformance::capabilities::UNKNOWN_MODEL;
 use allama_conformance::probe::ProbeOutcome;
 use allama_conformance::stream_errors::ErrorKindProbe;
 use allama_conformance::{DecisionAdapterUnderTest, TransportOutcome, assert_decision_adapter};
-use allama_http::{CredentialPlacement, CredentialSlot, Headers, ReplayResponse, ReplayTransport};
+use allama_http::http::StatusCode;
+use allama_http::{CredentialPlacement, CredentialSlot, ReplayResponse, ReplayTransport};
 use allama_systemone::providers::{Cloudflare, TypeSafe};
 use allama_systemone::{Provider, map_http_error};
 use serde_json::{Map, Value, json};
@@ -76,8 +77,10 @@ fn answers(request: &DecisionRequest) -> Value {
 
 /// `decide` over a transport that answers the request's questions.
 async fn probe(request: DecisionRequest) -> ProbeOutcome<DecisionResponse> {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, answers(&request).to_string())]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        answers(&request).to_string(),
+    )]);
     let result = typesafe(&transport).decide(&request).await;
     ProbeOutcome::new(result, bodies(&transport))
 }
@@ -130,9 +133,9 @@ async fn typesafe_passes_every_contract() {
         CredentialPlacement::Bearer,
     );
     let under_test = DecisionAdapterUnderTest::new(["jev-latest"], probe)
-        .error_mapping(|status, pairs, body| {
-            map_http_error(status, &pairs.iter().copied().collect::<Headers>(), &body)
-        })
+        .error_mapping(allama_conformance::error_kinds::http_error_mapping(
+            map_http_error,
+        ))
         .error_envelope(envelope)
         .transport_options(slot, |options: RequestOptions| async move {
             let transport = ReplayTransport::default();
@@ -149,7 +152,7 @@ async fn typesafe_passes_every_contract() {
 /// Cloudflare's `{"result": ..}` envelope.
 async fn cloudflare_probe(request: DecisionRequest) -> ProbeOutcome<DecisionResponse> {
     let body = json!({"result": answers(&request), "success": true, "errors": [], "messages": []});
-    let transport = ReplayTransport::new([ReplayResponse::json(200, body.to_string())]);
+    let transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, body.to_string())]);
     let result = cloudflare(&transport).decide(&request).await;
     ProbeOutcome::new(result, bodies(&transport))
 }
@@ -195,9 +198,9 @@ async fn cloudflare_passes_every_contract() {
         ["@cf/cloudflare/clef", "@cf/cloudflare/clef-flash"],
         cloudflare_probe,
     )
-    .error_mapping(|status, pairs, body| {
-        map_http_error(status, &pairs.iter().copied().collect::<Headers>(), &body)
-    })
+    .error_mapping(allama_conformance::error_kinds::http_error_mapping(
+        map_http_error,
+    ))
     .error_envelope(cloudflare_envelope)
     .transport_options(slot, |options: RequestOptions| async move {
         let transport = ReplayTransport::default();

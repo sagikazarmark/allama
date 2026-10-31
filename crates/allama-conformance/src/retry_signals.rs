@@ -171,14 +171,28 @@ fn bodies() -> [String; 3] {
 mod tests {
     use super::*;
 
+    /// `pairs` as the `http` headers `allama_http` reads.
+    fn header_map(pairs: &[(&str, &str)]) -> allama_http::http::HeaderMap {
+        pairs
+            .iter()
+            .map(|(name, value)| {
+                (
+                    allama_http::http::HeaderName::try_from(*name).unwrap(),
+                    allama_http::http::HeaderValue::try_from(*value).unwrap(),
+                )
+            })
+            .collect()
+    }
+
     /// Reads headers through `allama_http`, and a `retryDelay` from the body
     /// when `body_hints` is set.
     fn map(body_hints: bool) -> impl FnMut(u16, &[(&str, &str)], String) -> Error {
         move |status, headers, body| {
-            let headers: allama_http::Headers = headers.iter().copied().collect();
+            let headers = header_map(headers);
+            let status_code = allama_http::http::StatusCode::from_u16(status).unwrap();
             let mut error = Error::provider(format!("HTTP {status}"))
                 .authored()
-                .with_context(allama_http::error_context(status, &headers));
+                .with_context(allama_http::error_context(status_code, &headers));
             if body_hints
                 && error.retry_after().is_none()
                 && let Some(seconds) = body

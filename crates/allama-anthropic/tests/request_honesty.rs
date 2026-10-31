@@ -8,13 +8,14 @@ use allama::{CapabilitySupport, ChatCapability};
 use allama_anthropic::Provider;
 use allama_conformance::assert_validation_agrees;
 use allama_conformance::probe::ProbeOutcome;
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use futures_util::StreamExt;
 use serde_json::{Value, json};
 
 fn ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-haiku-4-5",
             "content": [{"type": "text", "text": "ok"}],
@@ -37,7 +38,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice::<Value>(body).expect("JSON request body"))
         .collect()
 }
@@ -80,8 +81,8 @@ async fn preflight_applies_capability_answers() {
         "{:?}",
         response.warnings
     );
-    let body: Value = serde_json::from_slice(transport.requests()[0].body.as_ref().unwrap())
-        .expect("JSON request body");
+    let body: Value =
+        serde_json::from_slice(transport.requests()[0].body.as_ref()).expect("JSON request body");
     assert!(body.get("thinking").is_none(), "{body}");
     assert!(body.get("output_config").is_none(), "{body}");
 
