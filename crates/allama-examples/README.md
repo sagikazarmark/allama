@@ -132,6 +132,16 @@ Observability:
   test -p allama-examples --example trace_context`); `main` replays canned
   wire data, so it needs no credentials
 
+Transports:
+
+- `tower_transport`: a `tower` stack between the providers and the HTTP
+  client (`TowerTransport`): a concurrency limit over the default
+  transport's client (`ReqwestTransport::into_service`), and over a
+  `reqwest` client of your own through `tower-reqwest`. It starts a
+  stand-in OpenAI-compatible server, so it needs no credentials; its tests
+  check both stacks, the stream idle bound, redirects and transport
+  options (`cargo test -p allama-examples --example tower_transport`)
+
 Writing a provider:
 
 - `text_gateway`: the shortest complete native adapter, for a text-only

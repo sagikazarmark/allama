@@ -28,7 +28,7 @@ examples:
     #!/usr/bin/env bash
     set -euo pipefail
     cargo metadata --no-deps --format-version 1 --locked \
-      | jq -r '["middleware", "text_gateway", "trace_context"] as $credential_free | .packages[] as $package | $package.targets[] | select(.kind[] == "example") | select($package.name != "allama-examples" or (.name | IN($credential_free[]))) | [$package.name, .name] | @tsv' \
+      | jq -r '["middleware", "text_gateway", "tower_transport", "trace_context"] as $credential_free | .packages[] as $package | $package.targets[] | select(.kind[] == "example") | select($package.name != "allama-examples" or (.name | IN($credential_free[]))) | [$package.name, .name] | @tsv' \
       | while IFS=$'\t' read -r package example; do
           cargo run -p "$package" --all-features --example "$example" --locked
         done
@@ -67,11 +67,21 @@ provider-features:
 
 # With default features off, a provider crate must not depend on reqwest, and
 # must work over an injected transport (the tests use ReplayTransport; the
-# ones that need reqwest are gated on it).
-# Check the provider crates without reqwest.
+# ones that need reqwest are gated on it). allama-http's `tower` feature is
+# off by default and must add no dependency then.
+# Check the provider crates without reqwest, and allama-http without tower.
 footprint:
     #!/usr/bin/env bash
     set -euo pipefail
+    echo "==> allama-http"
+    if cargo tree -p allama-http --no-default-features -e normal --target all --locked --prefix none | grep -E "^(http-body|http-body-util|tower-service) "; then
+      echo "allama-http depends on the tower feature's crates with it off"
+      exit 1
+    fi
+    if cargo tree -p allama-http -e normal --depth 1 --target all --locked --prefix none | grep -E "^(http-body|http-body-util|tower-service) "; then
+      echo "allama-http depends on the tower feature's crates directly with it off"
+      exit 1
+    fi
     for crate in allama-anthropic allama-cloudflare allama-gemini allama-openai allama-openai-compat allama-systemone; do
       echo "==> $crate"
       if cargo tree -p "$crate" --no-default-features -e normal --locked | grep reqwest; then

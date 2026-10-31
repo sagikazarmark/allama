@@ -9,9 +9,13 @@
 //! stay the same program.
 
 /// The examples the applications guide quotes, by file name.
-const APPLICATIONS_QUOTED: [(&str, &str); 2] = [
+const APPLICATIONS_QUOTED: [(&str, &str); 3] = [
     ("axum_sse.rs", include_str!("../examples/axum_sse.rs")),
     ("chat_repl.rs", include_str!("../examples/chat_repl.rs")),
+    (
+        "tower_transport.rs",
+        include_str!("../examples/tower_transport.rs"),
+    ),
 ];
 
 const APPLICATIONS_GUIDE: &str = include_str!("../../../docs/guides/applications.md");

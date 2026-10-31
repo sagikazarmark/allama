@@ -79,7 +79,7 @@ The bounds on a streaming call: the setup bound (until the response starts: head
 _Avoid_: Read timeout (a client-wide socket setting), stream deadline
 
 <a id="request-timeout"></a>**Request timeout**:
-The bound on a whole non-streaming call, set with a provider builder's `timeout(Option<Duration>)`. One rule on every HTTP provider builder: left unset, it is `allama_http::DEFAULT_REQUEST_TIMEOUT` (120 s) whatever the transport, a `ReqwestTransport` over a client of your own included; only `timeout(None)` removes it, and once set it replaces a client's own total timeout. Streams have stream timeouts instead.
+The bound on a whole non-streaming call, set with a provider builder's `timeout(Option<Duration>)`. One rule on every HTTP provider builder: left unset, it is `allama_http::DEFAULT_REQUEST_TIMEOUT` (120 s) whatever the transport, a `ReqwestTransport` over a client of your own or a `TowerTransport` over a `tower` stack included; only `timeout(None)` removes it. Once set, `ReqwestTransport` sends it in place of its client's own total timeout; a timeout a `tower` stack or the client under it applies still holds, and the shorter bound fires first. It bounds the whole exchange, the response body included. Streams have stream timeouts instead.
 _Avoid_: Read timeout, client timeout (the reqwest client's own setting)
 
 <a id="attempt-timeout-vs-deadline"></a>**Attempt timeout vs deadline**:

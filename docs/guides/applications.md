@@ -5,7 +5,7 @@ streams answers to a browser, runs tools, and has to say something useful
 when a provider fails, or a terminal chat that does the same for one
 person. It collects the patterns and the traps in one place.
 
-Three runnable examples back it:
+Four runnable examples back it:
 
 - [`axum_sse`](../../crates/allama-examples/examples/axum_sse.rs): a
   streaming chat endpoint with axum and server-sent events (SSE). The
@@ -20,6 +20,10 @@ Three runnable examples back it:
   chat in the terminal, one line per turn
   ([Chat in a terminal](#chat-in-a-terminal)). The terminal excerpts and
   the smoke call are quoted from it.
+- [`tower_transport`](../../crates/allama-examples/examples/tower_transport.rs):
+  a `tower` stack between the providers and the HTTP client
+  ([A tower stack as the transport](#a-tower-stack-as-the-transport)),
+  against a stand-in server it starts itself.
 
 Run the axum one against a local Ollama, which needs no credentials:
 
@@ -61,6 +65,7 @@ queue, starts at [Unary and job-queue backends](#unary-and-job-queue-backends).
 13. [Rendering history](#rendering-history)
 14. [Per-tenant API keys](#per-tenant-api-keys) *(server)*
 15. [Building providers from your own configuration](#building-providers-from-your-own-configuration)
+    - [A tower stack as the transport](#a-tower-stack-as-the-transport)
 16. [Handling errors](#handling-errors)
 17. [Capabilities, warnings and policy](#capabilities-warnings-and-policy)
     - [Checking requests at startup](#checking-requests-at-startup)
@@ -1873,6 +1878,62 @@ settings, with `Error::Configuration`: set the scope on the adapter
 instead (`credential_scope` on its builder, or `with_credential_scope` on
 a built provider), and the overrides with its `with_chat_capabilities`. Do not
 wrap the result in another `RetryingProvider`: it already retries.
+
+### A tower stack as the transport
+
+An application with a `tower` stack (a concurrency limit, a rate limit,
+its own instrumentation) puts it between its providers and the HTTP
+client, with `allama-http`'s `tower` feature: `TowerTransport` makes the
+stack a transport that any builder's `http_transport` takes. At the bottom
+goes the default transport's client, which keeps its guarantees (no
+redirects, URL redaction, failure classification):
+
+```rust,ignore
+fn transport() -> impl HttpTransport {
+    let stack = ServiceBuilder::new()
+        .concurrency_limit(4)
+        .service(ReqwestTransport::new().into_service());
+    TowerTransport::new(stack)
+}
+```
+
+Or a `reqwest` client of your own, through `tower-reqwest`, behind a layer
+that converts the request body:
+
+```rust,ignore
+fn tower_reqwest_transport() -> reqwest::Result<impl HttpTransport> {
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(10))
+        .build()?;
+    let stack = ServiceBuilder::new()
+        .concurrency_limit(4)
+        .map_request(|request: http::Request<RequestBody>| request.map(reqwest::Body::wrap))
+        .service(HttpClientService::new(client));
+    Ok(TowerTransport::new(stack))
+}
+```
+
+- **The provider's timeouts still apply.** `TowerTransport` bounds every
+  non-streaming call with the provider's
+  [request timeout](../../CONTEXT.md#request-timeout), the wait for the
+  stack and the body included, and streams keep their stream timeouts. A
+  `tower` timeout layer bounds only the wait for the response headers;
+  whichever bound is shorter fires first.
+- **No redirects.** The client at the bottom keeps its policy: build it
+  with `Policy::none()`, as above. `reqwest::Client::new()` follows
+  redirects and re-sends the provider's key header to the new host.
+- **No retry layer.** Retries belong to `RetryingProvider` (the
+  registry's stacks have one): it honours the provider's retry signals and
+  never replays a stream the caller has started reading. A `tower` retry
+  layer under it would multiply the attempts.
+- **A concurrency limit bounds requests being set up, not open streams.**
+  Its permit is released when the response headers arrive.
+- **Classify the stack's own failures.** Errors from the default client
+  keep their kind through the stack; a `map_err` layer that returns an
+  `allama_http::TransportError` classifies the rest (a `tower` timeout's
+  `Elapsed` as a timeout, say), which otherwise count as transport
+  failures.
 
 ## Handling errors
 

@@ -70,7 +70,9 @@ trait of their own and make its vocabulary `http`-shaped; we do the same.
 
 - A `tower` service, a Workers `fetch` or `hyper` plugs in as a
   transport by converting through `http::Request<Bytes>` and
-  `http::Response<Body>`, with no mapping of its own.
+  `http::Response<Body>`, with no mapping of its own. ADR 0020 refines
+  this for `tower`: an adapter still picks a request body every client
+  takes and keeps the seam's timeout, failure classes and redaction.
 - A malformed builder setting fails at `build()`, and a request fails
   before it is sent only on what it adds itself, with the same error
   whatever the transport.

@@ -253,7 +253,10 @@ pub fn redact_url(url: &str) -> Cow<'_, str> {
 
 /// Redact every URL in `text`, as [`redact_url`] does: for an HTTP
 /// client's error message, which can quote the request URL.
-#[cfg_attr(not(feature = "reqwest-middleware"), allow(dead_code))]
+#[cfg_attr(
+    not(any(feature = "reqwest-middleware", feature = "tower")),
+    allow(dead_code)
+)]
 pub(crate) fn redact_urls_in(text: &str) -> Cow<'_, str> {
     if !text.contains("://") {
         return Cow::Borrowed(text);

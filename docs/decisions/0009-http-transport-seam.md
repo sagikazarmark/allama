@@ -124,7 +124,8 @@ should have served.
 - `allama_http::DEFAULT_REQUEST_TIMEOUT` (120 s) bounds every unary HTTP
   call, whatever the transport. Only an explicit `timeout(None)` removes
   it; handing in a client, for a proxy say, must not quietly remove the
-  bound. A set timeout replaces a client's own total timeout.
+  bound. A set timeout replaces a client's own total timeout. A `tower`
+  stack keeps its own, next to it (ADR 0020).
 - The rule is for every HTTP adapter, not just the bundled builders: an
   adapter that sends without a timeout waits forever on a server that
   accepts the connection and never answers.
@@ -211,9 +212,10 @@ takes no transport, a chat wrapper that adds the header to
   `ring` as the process default unless the application installed one.
 - Provider crates forward `http-tracing` but not `reqwest-middleware`.
   Its only use is `ReqwestTransport::from_middleware`, an `allama-http`
-  type, so its caller already depends on `allama-http`. `http-tracing`
-  is the only way to get HTTP spans for a registry provider, and a version
-  split there is a compile error rather than a silent failure.
+  type, so its caller already depends on `allama-http`; the same holds
+  for `tower` (ADR 0020). `http-tracing` is the only way to get HTTP
+  spans for a registry provider, and a version split there is a compile
+  error rather than a silent failure.
 
 ## Consequences
 

@@ -62,6 +62,7 @@ Runnable examples are in [`crates/allama/examples`](../crates/allama/examples)
 | [0017](decisions/0017-conformance-contract-lifecycle.md) | Conformance contracts are added in minor releases, and required only when adapters pass them |
 | [0018](decisions/0018-extraction-models.md) | Extraction models are a sibling trait, unstable until a second provider; chat extraction takes its name |
 | [0019](decisions/0019-http-vocabulary.md) | The transport seam speaks the `http` crate's vocabulary |
+| [0020](decisions/0020-tower-services-as-transports.md) | A `tower` service is a transport through an adapter that keeps the seam's guarantees |
 
 ## Research notes
 
