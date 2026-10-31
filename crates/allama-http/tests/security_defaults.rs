@@ -140,6 +140,11 @@ async fn a_tower_stack_over_the_default_client_never_follows_a_redirect() {
             matches!(err, Error::UnexpectedResponse { .. }),
             "{status}: {err:?}"
         );
+        assert!(
+            err.as_log().to_string().contains("`localhost`"),
+            "{}",
+            err.as_log()
+        );
     }
 }
 

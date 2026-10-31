@@ -137,8 +137,9 @@ With the `tower` feature, `TowerTransport` makes any `tower` service that
 takes an `http::Request<RequestBody>` (`RequestBody` is
 `http_body_util::Full<Bytes>`) and returns an `http::Response` with a
 streaming body a transport. Put your layers on top of the default
-transport's client, which keeps its guarantees (no redirects, URL
-redaction, failure classification):
+transport's client, which keeps its guarantees (no redirects on native
+targets, URL redaction, failure classification; on `wasm32`, the host
+`fetch` applies its own redirect policy):
 
 ```rust
 use allama_http::{ReqwestTransport, TowerTransport};
@@ -179,8 +180,9 @@ What holds whatever the stack:
   requests prints them redacted.
 
 The service is cloned for each request, so every layer must be `Clone`
-(`tower`'s `RateLimit` needs a `Buffer`), and must be `Send` and `Sync`
-(`BoxCloneSyncService` for a type-erased stack). A concurrency limit
+(`tower`'s `RateLimit` needs a `Buffer`), and must be `Send` and `Sync`:
+type-erase a stack with `BoxCloneSyncService`, not `BoxCloneService`, and
+put a stack that is not `Sync` behind a `Buffer`, which is. A concurrency limit
 releases its permit when the response headers arrive, so it bounds
 requests being set up, not open streams. Do not add a retry layer:
 `RetryingProvider` retries whole calls, honouring the provider's retry

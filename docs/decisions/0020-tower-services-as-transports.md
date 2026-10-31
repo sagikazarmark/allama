@@ -36,8 +36,10 @@ sits under the seam, carrying bytes.
   services generic over their body.
 - **The service is `Clone + Send + Sync`**, cloned for each request and
   driven once (`poll_ready`, then `call`), as `tower` expects. A shared
-  instance would lose wakers between concurrent requests; a stack that is
-  not `Sync` uses `BoxCloneSyncService`.
+  instance would lose wakers between concurrent requests. A type-erased
+  stack uses `BoxCloneSyncService` rather than `BoxCloneService`, which is
+  not `Sync`; a stack that is not `Sync` goes behind a `Buffer` layer,
+  which is.
 - **The adapter enforces the request timeout** over the whole exchange
   (readiness, headers, body), checked before every body poll, as
   `reqwest`'s total timeout is. It still sets the `RequestTimeout`
@@ -59,7 +61,8 @@ sits under the seam, carrying bytes.
 - **`ReqwestTransport::into_service()`** returns `ReqwestService`, the
   default transport's client as a `tower` service over the same request
   body, whose errors are `TransportError`s. It is the recommended bottom
-  of a stack: no redirects, URL redaction and classification survive the
+  of a stack: no redirects (on native targets; on `wasm32` the host
+  `fetch`'s policy applies), URL redaction and classification survive the
   layers, and it runs on `wasm32`.
 - **Redirects stay the client's.** The adapter cannot stop a service from
   following one; the docs say to build the client with
@@ -97,8 +100,9 @@ sits under the seam, carrying bytes.
   (`FetchService`, `hyper-util`), and the body type leaks into every
   stored transport's type.
 - **Holding the service in a `Mutex`** to accept stacks that are not
-  `Sync`. It rules out `get_ref`, and `BoxCloneSyncService` covers the
-  case.
+  `Sync`, such as a `BoxCloneService`. It rules out `get_ref`, and the
+  cases have `tower` answers: `BoxCloneSyncService` to type-erase a `Sync`
+  stack, a `Buffer` layer to make one that is not `Sync`.
 - **Leaving the timeout to the service.** Nothing reads allama's
   extension, so a unary call over `tower-reqwest` would have no bound.
 - **`impl Service for Arc<dyn HttpTransport>`**, or a generic adapter from

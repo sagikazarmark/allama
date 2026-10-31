@@ -30,8 +30,9 @@ use crate::{
 /// boxable. At the bottom of the stack:
 ///
 /// - [`ReqwestTransport::into_service`] (with the `reqwest` feature): the
-///   default transport's client, with its guarantees (no redirects, URL
-///   redaction, failure classification), on `wasm32` too.
+///   default transport's client, with its guarantees (no redirects on native
+///   targets, URL redaction, failure classification), on `wasm32` too, where
+///   the host's `fetch` applies its own redirect policy.
 /// - `tower-reqwest`'s `HttpClientService`, behind a `map_request` layer
 ///   that converts the body (`|request| request.map(reqwest::Body::wrap)`).
 ///   Native only: `reqwest`'s futures are not `Send` on `wasm32`.
@@ -115,7 +116,8 @@ use crate::{
 /// bundled providers report it ([`redirect_error`](crate::redirect_error)).
 /// Configure the service not to follow them, or a key in `x-api-key` (and
 /// the prompt, on a `307` or `308`) reaches the redirect's host:
-/// [`ReqwestTransport::into_service`] never follows one; a `reqwest` client
+/// [`ReqwestTransport::into_service`] never follows one on native targets
+/// (on `wasm32`, the host `fetch`'s policy applies); a `reqwest` client
 /// you build for `tower-reqwest` needs
 /// `.redirect(reqwest::redirect::Policy::none())` (`reqwest::Client::new()`
 /// follows up to 10); `tower-worker-fetch` needs its `Redirect::Manual`
@@ -133,8 +135,9 @@ use crate::{
 /// started to read.
 ///
 /// The service, its future and the response body must be `Send`, and the
-/// service `Sync`; for a type-erased stack, `tower`'s `BoxCloneSyncService`
-/// is.
+/// service `Sync`. Type-erase a stack with `tower`'s `BoxCloneSyncService`,
+/// not `BoxCloneService`, which is not `Sync`; a stack that is not `Sync`
+/// goes behind a `Buffer` layer, which is.
 ///
 #[cfg_attr(
     feature = "reqwest",
@@ -394,6 +397,16 @@ fn from_service(error: BoxError, stage: Stage, secrets: &UriSecrets) -> Transpor
             source: None,
         };
     }
+    // A `reqwest` error inside a layer's own error is a request that got no
+    // response, as it is on its own.
+    #[cfg(feature = "reqwest")]
+    let fallback = if fallback == TransportErrorKind::Other
+        && sources(&*error).any(|e| e.is::<::reqwest::Error>())
+    {
+        TransportErrorKind::Connect
+    } else {
+        fallback
+    };
     let kind = crate::error_kind(&*error, fallback);
     let mut message = secrets.redact(&chain_text(&*error));
     if stage == Stage::Ready {

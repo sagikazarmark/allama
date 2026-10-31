@@ -9,8 +9,8 @@
 //! At the bottom of the stack goes the HTTP client:
 //!
 //! - [`ReqwestTransport::into_service`]: the default transport's client,
-//!   with its guarantees (no redirects, URL redaction, failure
-//!   classification). It needs the `reqwest` feature too.
+//!   with its guarantees (no redirects on native targets, URL redaction,
+//!   failure classification). It needs the `reqwest` feature too.
 //! - `tower-reqwest`'s `HttpClientService`, for a `reqwest` client the
 //!   application builds itself, behind a `map_request` layer that converts
 //!   the body. The client must not follow redirects:

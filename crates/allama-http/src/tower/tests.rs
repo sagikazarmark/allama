@@ -259,6 +259,51 @@ mod native {
         assert_eq!(chunks(response).await.unwrap(), ["x"]);
     }
 
+    /// One poll of a body that sends only empty frames reads at most
+    /// `MAX_SKIPPED_FRAMES` of them, then yields, asking to be polled again.
+    #[test]
+    fn a_poll_skips_a_bounded_number_of_empty_frames() {
+        struct EmptyForever(Arc<AtomicUsize>);
+
+        impl http_body::Body for EmptyForever {
+            type Data = Bytes;
+            type Error = BoxError;
+
+            fn poll_frame(
+                self: Pin<&mut Self>,
+                _cx: &mut Context<'_>,
+            ) -> Poll<Option<Result<Frame<Bytes>, BoxError>>> {
+                let polls = self.0.fetch_add(1, Ordering::SeqCst) + 1;
+                assert!(
+                    polls <= MAX_SKIPPED_FRAMES,
+                    "polled {polls} frames in one poll"
+                );
+                Poll::Ready(Some(Ok(Frame::data(Bytes::new()))))
+            }
+        }
+
+        struct CountWakes(AtomicUsize);
+
+        impl std::task::Wake for CountWakes {
+            fn wake(self: Arc<Self>) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        let frames = Arc::new(AtomicUsize::new(0));
+        let mut stream = BodyStream {
+            body: Some(Box::pin(EmptyForever(frames.clone()))),
+            deadline: None,
+            secrets: UriSecrets::of(&Uri::from_static("https://x")),
+        };
+        let wakes = Arc::new(CountWakes(AtomicUsize::new(0)));
+        let waker = std::task::Waker::from(wakes.clone());
+        let mut cx = Context::from_waker(&waker);
+        assert!(Pin::new(&mut stream).poll_next(&mut cx).is_pending());
+        assert_eq!(frames.load(Ordering::SeqCst), MAX_SKIPPED_FRAMES);
+        assert_eq!(wakes.0.load(Ordering::SeqCst), 1);
+    }
+
     /// Data in a `Buf` of several pieces arrives whole.
     #[tokio::test]
     async fn non_contiguous_data_is_copied_whole() {
@@ -533,22 +578,13 @@ mod native {
     #[cfg(feature = "reqwest")]
     #[tokio::test]
     async fn a_reqwest_error_is_classified_and_kept() {
-        let client = ::reqwest::Client::new();
-        let service = ::tower::service_fn(move |request: http::Request<RequestBody>| {
-            let request =
-                ::reqwest::Request::try_from(request.map(|_| ::reqwest::Body::from(""))).unwrap();
-            let response = client.execute(request);
-            async move {
-                response
-                    .await
-                    .map(|_| http::Response::new(TestBody::new([])))
-            }
-        });
-        let request = HttpRequest::get(Uri::from_static(
-            "http://user:pw@127.0.0.1:1/v1beta/models?key=SECRET",
-        ));
-        let err = TowerTransport::new(service)
-            .send(request)
+        let request = || {
+            HttpRequest::get(Uri::from_static(
+                "http://user:pw@127.0.0.1:1/v1beta/models?key=SECRET",
+            ))
+        };
+        let err = TowerTransport::new(reqwest_service())
+            .send(request())
             .await
             .unwrap_err();
         assert_eq!(err.kind(), TransportErrorKind::Connect);
@@ -559,6 +595,61 @@ mod native {
         }
         let source = std::error::Error::source(&err).expect("the cause is attached");
         assert!(source.downcast_ref::<::reqwest::Error>().is_some());
+
+        // Wrapped in a layer's own error, it is still a request that got no
+        // response, and its URL is still redacted.
+        #[derive(Debug)]
+        struct Wrapped(::reqwest::Error);
+
+        impl fmt::Display for Wrapped {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("the layer failed")
+            }
+        }
+
+        impl StdError for Wrapped {
+            fn source(&self) -> Option<&(dyn StdError + 'static)> {
+                Some(&self.0)
+            }
+        }
+
+        let wrapped = ::tower::ServiceBuilder::new()
+            .map_err(Wrapped)
+            .service(reqwest_service());
+        let err = TowerTransport::new(wrapped)
+            .send(request())
+            .await
+            .unwrap_err();
+        assert_eq!(err.kind(), TransportErrorKind::Connect);
+        let text = err.to_string();
+        assert!(text.starts_with("the layer failed: "), "{text}");
+        assert!(!text.contains("SECRET"), "{text}");
+        assert!(!text.contains("pw"), "{text}");
+    }
+
+    /// A `reqwest` client as a `tower` service, as `tower-reqwest` makes
+    /// one.
+    #[cfg(feature = "reqwest")]
+    fn reqwest_service() -> impl Service<
+        http::Request<RequestBody>,
+        Response = http::Response<TestBody>,
+        Error = ::reqwest::Error,
+        Future = impl Send,
+    > + Clone
+    + Send
+    + Sync
+    + 'static {
+        let client = ::reqwest::Client::new();
+        ::tower::service_fn(move |request: http::Request<RequestBody>| {
+            let request =
+                ::reqwest::Request::try_from(request.map(|_| ::reqwest::Body::from(""))).unwrap();
+            let response = client.execute(request);
+            async move {
+                response
+                    .await
+                    .map(|_| http::Response::new(TestBody::new([])))
+            }
+        })
     }
 
     /// A failed body read is a `Body` error (or the `TransportError` the

@@ -1886,7 +1886,7 @@ its own instrumentation) puts it between its providers and the HTTP
 client, with `allama-http`'s `tower` feature: `TowerTransport` makes the
 stack a transport that any builder's `http_transport` takes. At the bottom
 goes the default transport's client, which keeps its guarantees (no
-redirects, URL redaction, failure classification):
+redirects on native targets, URL redaction, failure classification):
 
 ```rust,ignore
 fn transport() -> impl HttpTransport {

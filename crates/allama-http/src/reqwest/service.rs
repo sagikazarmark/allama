@@ -18,11 +18,13 @@ use crate::{HttpRequest, HttpTransport, RequestBody, TransportError};
 /// the default transport's client, with your layers on top.
 ///
 /// It keeps what the transport guarantees: a client from
-/// [`ReqwestTransport::new`] follows no redirect, errors are
-/// [`TransportError`]s, classified and with URLs redacted, which
+/// [`ReqwestTransport::new`] follows no redirect on native targets, errors
+/// are [`TransportError`]s, classified and with URLs redacted, which
 /// `TowerTransport` passes through unchanged, and the request's
 /// [`RequestTimeout`](crate::RequestTimeout) is honoured. It runs on
-/// `wasm32` too, where `reqwest` sends through the host's `fetch`.
+/// `wasm32` too, where `reqwest` sends through the host's `fetch`, whose
+/// redirect policy applies instead (see
+/// [`ReqwestTransport`'s redirects](ReqwestTransport#redirects)).
 ///
 /// ```
 /// use allama_http::{ReqwestTransport, TowerTransport};
