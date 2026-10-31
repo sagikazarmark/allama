@@ -4,7 +4,8 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use allama::{Error, RequestField, Result, Subject};
-use allama_http::{Bytes, Headers, HttpResponse};
+use allama_http::http::{HeaderMap, StatusCode};
+use allama_http::{Bytes, HttpResponse};
 use serde::de::DeserializeOwned;
 
 use crate::wire::ApiError;
@@ -251,7 +252,7 @@ pub(crate) async fn read_body(
     limit: usize,
     provider: &str,
     request_id: Option<&str>,
-) -> Result<(u16, Bytes)> {
+) -> Result<(StatusCode, Bytes)> {
     let status = response.status;
     let bytes = response.bytes_limited(limit).await.map_err(|err| {
         err.into_error()
@@ -265,7 +266,7 @@ pub(crate) async fn read_body(
 /// [`allama_http::malformed_response`], attributed to `provider` and
 /// `request_id`.
 pub(crate) fn decode_body<T: DeserializeOwned>(
-    status: u16,
+    status: StatusCode,
     bytes: &[u8],
     provider: &str,
     request_id: Option<&str>,
@@ -399,7 +400,10 @@ fn classify(error: &ApiError, status: Option<u16>, quota_codes: &[Cow<'static, s
                 Error::context_length_exceeded(message, context_limit(text))
             }
             // What the status means on its own, shared by every adapter.
-            Some(status) => allama_http::status_error(status, message),
+            Some(status) => match StatusCode::from_u16(status) {
+                Ok(status) => allama_http::status_error(status, message),
+                Err(_) => Error::provider(message).with_status(status),
+            },
             // In-band errors (no HTTP status): streams and response bodies.
             None if is(&["timeout", "vector_store_timeout"]) => Error::timeout(message),
             None if is(INPUT_ERROR_CODES) => Error::invalid_request(message),
@@ -431,19 +435,20 @@ fn classify(error: &ApiError, status: Option<u16>, quota_codes: &[Cow<'static, s
 /// [`quota_error_codes`](crate::CompatQuirks::quota_error_codes), use
 /// [`CompatQuirks::map_http_error`](crate::CompatQuirks::map_http_error).
 #[must_use]
-pub(crate) fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
+pub(crate) fn map_http_error(status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
     classify_http_error(status, headers, body, &[])
 }
 
 /// [`map_http_error`] with extra codes (or types) that mean quota or billing
 /// exhaustion.
 pub(crate) fn classify_http_error(
-    status: u16,
-    headers: &Headers,
+    status: StatusCode,
+    headers: &HeaderMap,
     body: &str,
     quota_codes: &[Cow<'static, str>],
 ) -> Error {
     let context = allama_http::error_context(status, headers);
+    let status = status.as_u16();
     let mapped = match envelope_error(body) {
         Some(error) => with_api_error(
             classify(&error, Some(status), quota_codes)
@@ -515,13 +520,21 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn headers(pairs: &[(&str, &str)]) -> Headers {
-        pairs.iter().copied().collect()
+    fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+        pairs
+            .iter()
+            .map(|(name, value)| {
+                (
+                    allama_http::http::HeaderName::try_from(*name).unwrap(),
+                    allama_http::http::HeaderValue::try_from(*value).unwrap(),
+                )
+            })
+            .collect()
     }
 
     fn http(status: u16, body: serde_json::Value) -> Error {
         map_http_error(
-            status,
+            StatusCode::from_u16(status).unwrap(),
             &headers(&[("x-request-id", "req")]),
             &body.to_string(),
         )
@@ -546,12 +559,16 @@ mod tests {
         let body = json!({"error": {"message": "monthly quota used", "code": "quota_exceeded"}})
             .to_string();
         // Unknown to the built-in classification: a retryable rate limit.
-        let default = map_http_error(429, &Headers::new(), &body);
+        let default = map_http_error(StatusCode::TOO_MANY_REQUESTS, &HeaderMap::new(), &body);
         assert!(matches!(default, Error::RateLimited { .. }), "{default:?}");
 
         let mut quirks = crate::CompatQuirks::new("openai-compat:vendor");
         quirks.quota_error_codes.push("quota_exceeded".into());
-        let mapped = quirks.map_http_error(429, &headers(&[("x-request-id", "req")]), &body);
+        let mapped = quirks.map_http_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            &headers(&[("x-request-id", "req")]),
+            &body,
+        );
         assert!(matches!(mapped, Error::QuotaExhausted { .. }), "{mapped:?}");
         assert!(!mapped.is_retryable());
         assert_eq!(mapped.request_id(), Some("req"));
@@ -738,7 +755,11 @@ mod tests {
             (529, "overloaded"),
             (499, "provider"),
         ] {
-            let err = map_http_error(status, &Headers::new(), "<html>gateway</html>");
+            let err = map_http_error(
+                StatusCode::from_u16(status).unwrap(),
+                &HeaderMap::new(),
+                "<html>gateway</html>",
+            );
             assert_eq!(err.kind_name(), kind, "HTTP {status}");
             assert_eq!(err.status(), Some(status));
         }
@@ -751,7 +772,11 @@ mod tests {
 
     #[test]
     fn non_json_bodies_are_kept_out_of_the_message() {
-        let err = map_http_error(502, &Headers::new(), "<html>my SSN is 123-45-6789</html>");
+        let err = map_http_error(
+            StatusCode::BAD_GATEWAY,
+            &HeaderMap::new(),
+            "<html>my SSN is 123-45-6789</html>",
+        );
         assert_eq!(err.message(), "HTTP 502");
         assert_eq!(err.upstream_message(), None);
         assert_eq!(
@@ -765,7 +790,11 @@ mod tests {
         );
 
         // The body still informs the category.
-        let err = map_http_error(404, &Headers::new(), "<p>model gpt-x not found</p>");
+        let err = map_http_error(
+            StatusCode::NOT_FOUND,
+            &HeaderMap::new(),
+            "<p>model gpt-x not found</p>",
+        );
         assert!(matches!(err, Error::ModelNotFound { .. }), "{err:?}");
     }
 
@@ -829,9 +858,10 @@ mod tests {
             let message = format!("{message} {upstream}");
             Some(json!({"errors": [{"message": message.trim_end(), "code": code}]}).to_string())
         };
-        allama_conformance::assert_error_log_excludes_body(cloudflare, |status, headers, body| {
-            map_http_error(status, &headers.iter().copied().collect(), &body)
-        });
+        allama_conformance::assert_error_log_excludes_body(
+            cloudflare,
+            allama_conformance::error_kinds::http_error_mapping(map_http_error),
+        );
     }
 
     fn openai_error(message: &str, param: &str, code: &str) -> String {
@@ -852,8 +882,8 @@ mod tests {
     #[test]
     fn refused_parameters_are_unsupported_by_the_provider() {
         let parameter = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &openai_error(
                 "Unsupported parameter: 'temperature' is not supported with this model.",
                 "temperature",
@@ -880,8 +910,8 @@ mod tests {
         );
 
         let value = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &openai_error(
                 "Unsupported value: 'temperature' does not support 0.2 with this model. Only the \
                  default (1) value is supported.",
@@ -897,8 +927,8 @@ mod tests {
 
         // Responses spells nested parameters with dots.
         let effort = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &openai_error(
                 "Unsupported parameter: 'reasoning.effort' is not supported with this model.",
                 "reasoning.effort",
@@ -909,8 +939,8 @@ mod tests {
 
         // Ollama refuses tools for a model without tool support.
         let ollama = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &json!({"error": "registry.ollama.ai/library/gemma2:latest does not support tools"})
                 .to_string(),
         );
@@ -931,8 +961,8 @@ mod tests {
         use allama::UnsupportedStage::Provider;
 
         let level = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             r#"{"error":{"message":"reasoning_effort \"none\" is not supported by model claude-sonnet-5; supported values: [low medium high xhigh max]","code":"invalid_reasoning_effort"}}"#,
         );
         assert!(matches!(level, Error::Unsupported { .. }), "{level:?}");
@@ -944,8 +974,8 @@ mod tests {
         );
 
         let none = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             r#"{"error":{"message":"reasoning_effort \"medium\" was provided, but model claude-haiku-4.5 does not support reasoning effort","code":"invalid_reasoning_effort"}}"#,
         );
         assert_eq!(none.unsupported_field(), Some(RequestField::Reasoning));
@@ -955,8 +985,8 @@ mod tests {
         );
 
         let api = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             r#"{"error":{"message":"model \"gpt-5.6-luna\" is not accessible via the /chat/completions endpoint","code":"unsupported_api_for_model"}}"#,
         );
         assert!(matches!(api, Error::Unsupported { .. }), "{api:?}");
@@ -978,7 +1008,7 @@ mod tests {
     #[test]
     fn ollama_multimodal_refusal_is_unsupported() {
         let body = r#"{"error":{"message":"{\"error\":{\"code\":400,\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\"}}","type":"invalid_request_error","param":null,"code":null}}"#;
-        let err = map_http_error(400, &Headers::new(), body);
+        let err = map_http_error(StatusCode::BAD_REQUEST, &HeaderMap::new(), body);
         assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
         assert_eq!(
             err.unsupported_stage(),
@@ -999,8 +1029,8 @@ mod tests {
         // Another 400 with no recognisable text stays an invalid request
         // (the PDF case: "invalid message format").
         let other = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             r#"{"error":{"message":"invalid message format","type":"invalid_request_error","param":null,"code":null}}"#,
         );
         assert!(matches!(other, Error::InvalidRequest { .. }), "{other:?}");
@@ -1020,8 +1050,8 @@ mod tests {
     fn parameters_a_reasoning_model_refuses_name_their_subject() {
         let refused = |param: &str, code: &str| {
             map_http_error(
-                400,
-                &Headers::new(),
+                StatusCode::BAD_REQUEST,
+                &HeaderMap::new(),
                 &openai_error(
                     &format!("Unsupported parameter: '{param}' is not supported with this model."),
                     param,
@@ -1097,7 +1127,7 @@ mod tests {
             .to_string(),
         ];
         for body in cases {
-            let err = map_http_error(400, &Headers::new(), &body);
+            let err = map_http_error(StatusCode::BAD_REQUEST, &HeaderMap::new(), &body);
             assert!(
                 matches!(err, Error::InvalidRequest { .. }),
                 "{body}: {err:?}"
@@ -1105,8 +1135,8 @@ mod tests {
         }
         // A server error is never a refusal.
         let err = map_http_error(
-            500,
-            &Headers::new(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &HeaderMap::new(),
             &openai_error("x", "temperature", "unsupported_parameter"),
         );
         assert!(!matches!(err, Error::Unsupported { .. }), "{err:?}");
@@ -1129,8 +1159,8 @@ mod tests {
         let parameter = "Unsupported parameter: 'temperature' is not supported with this model.";
 
         let typed = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &codeless(
                 parameter,
                 Some("invalid_request_error"),
@@ -1155,8 +1185,8 @@ mod tests {
         // Open Responses spelling of the type counts too.
         for error_type in [None, Some("invalid_request")] {
             let err = map_http_error(
-                400,
-                &Headers::new(),
+                StatusCode::BAD_REQUEST,
+                &HeaderMap::new(),
                 &codeless(parameter, error_type, Some("temperature")),
             );
             assert_eq!(
@@ -1175,8 +1205,8 @@ mod tests {
 
         // "Unsupported value:" keeps its meaning.
         let value = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &codeless(
                 "Unsupported value: 'reasoning.effort' does not support 'minimal' with this \
                  model.",
@@ -1206,7 +1236,7 @@ mod tests {
                 Some("temperature"),
             ),
         ] {
-            let err = map_http_error(400, &Headers::new(), &body);
+            let err = map_http_error(StatusCode::BAD_REQUEST, &HeaderMap::new(), &body);
             assert!(
                 matches!(err, Error::InvalidRequest { .. }),
                 "{body}: {err:?}"
@@ -1215,14 +1245,14 @@ mod tests {
 
         // A code, when present, decides; a server error is never a refusal.
         let coded = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &openai_error(parameter, "temperature", "invalid_value"),
         );
         assert!(matches!(coded, Error::InvalidRequest { .. }), "{coded:?}");
         let server = map_http_error(
-            500,
-            &Headers::new(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &HeaderMap::new(),
             &codeless(
                 parameter,
                 Some("invalid_request_error"),
@@ -1247,7 +1277,7 @@ mod tests {
                 "code": "invalid_value"
             }})
             .to_string();
-            let err = map_http_error(400, &Headers::new(), &body);
+            let err = map_http_error(StatusCode::BAD_REQUEST, &HeaderMap::new(), &body);
             assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
             assert_eq!(
                 err.unsupported_stage(),
@@ -1281,7 +1311,7 @@ mod tests {
             ),
         ] {
             let body = openai_error(message, param, "invalid_value");
-            let err = map_http_error(400, &Headers::new(), &body);
+            let err = map_http_error(StatusCode::BAD_REQUEST, &HeaderMap::new(), &body);
             assert!(
                 matches!(err, Error::InvalidRequest { .. }),
                 "{param}: {err:?}"
@@ -1305,7 +1335,7 @@ mod tests {
             "code": null
         }})
         .to_string();
-        let err = map_http_error(400, &Headers::new(), &recorded);
+        let err = map_http_error(StatusCode::BAD_REQUEST, &HeaderMap::new(), &recorded);
         assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
         assert_eq!(err.unsupported_field(), Some(RequestField::Reasoning));
         assert_eq!(
@@ -1323,8 +1353,8 @@ mod tests {
         // Another refusal worded differently on the same parameter keeps its
         // own reading, and the wording on another parameter is not this one.
         let other = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &json!({"error": {
                 "message": "Invalid value for reasoning_effort.",
                 "type": "invalid_request_error",
@@ -1335,8 +1365,8 @@ mod tests {
         );
         assert!(matches!(other, Error::InvalidRequest { .. }), "{other:?}");
         let elsewhere = map_http_error(
-            400,
-            &Headers::new(),
+            StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
             &json!({"error": {
                 "message": upstream,
                 "type": "invalid_request_error",
@@ -1413,8 +1443,11 @@ mod tests {
     fn retry_signals_are_surfaced_with_vendor_quota_codes() {
         let mut quirks = crate::CompatQuirks::new("openai-compat:vendor");
         quirks.quota_error_codes.push("quota_exceeded".into());
-        allama_conformance::assert_retry_signals_surfaced(None, |status, headers, body| {
-            quirks.map_http_error(status, &headers.iter().copied().collect(), &body)
-        });
+        allama_conformance::assert_retry_signals_surfaced(
+            None,
+            allama_conformance::error_kinds::http_error_mapping(|status, headers, body| {
+                quirks.map_http_error(status, headers, body)
+            }),
+        );
     }
 }

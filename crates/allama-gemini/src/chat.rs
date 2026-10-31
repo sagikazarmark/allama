@@ -3,8 +3,10 @@ use allama::{
     CapabilitySupport, ChatCapability, ChatProvider, ChatRequest, ChatResponse, ChatStream,
     ChatValidation, ProviderIdentity, RequestOptions, Result, ValidationCoverage,
 };
+use allama_http::http::HeaderValue;
+use allama_http::http::header::CONTENT_TYPE;
 use allama_http::sse::SseStream;
-use allama_http::{HttpRequest, HttpResponse};
+use allama_http::{HttpRequest, HttpResponse, request_uri};
 
 use crate::decode::decode_response;
 use crate::error::{SuccessBody, map_http_error, map_transport_error, name_refused_penalty};
@@ -57,12 +59,13 @@ impl Provider {
         body: String,
         options: &RequestOptions,
     ) -> Result<HttpRequest> {
-        let mut request = HttpRequest::post(url, body);
+        let uri = request_uri(url).map_err(|err| err.with_provider(PROVIDER_NAME))?;
+        let mut request = HttpRequest::post(uri, body);
         if let Some(api_key) = &self.inner.api_key {
-            request = request.header(crate::API_KEY_HEADER, api_key);
+            request = request.header(crate::API_KEY_HEADER, api_key.clone());
         }
         request
-            .header("content-type", "application/json")
+            .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
             .with_headers(&self.inner.headers)
             .apply_options(options, &self.inner.credential_slot)
             .map_err(|err| err.with_provider(PROVIDER_NAME))

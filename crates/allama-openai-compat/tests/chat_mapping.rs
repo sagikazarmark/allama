@@ -8,6 +8,7 @@ use allama::{
     ReasoningConfig, ReasoningEffort, ReasoningOutput, ToolDefinition, UnsupportedPolicy,
     WarningKind,
 };
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::providers::{DeepSeek, Mistral, OpenRouter};
 use allama_openai_compat::{ChatModelRules, ChatRequestOptions, CompatQuirks, Provider};
@@ -17,7 +18,7 @@ const NAMESPACE: &str = "openai-compat:vendor";
 
 fn ok_body() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         r#"{"choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"#,
     )
 }

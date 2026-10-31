@@ -59,10 +59,12 @@ use allama::{
 };
 
 use allama_http::config::redact_url;
+use allama_http::http::header::CONTENT_TYPE;
+use allama_http::http::{HeaderMap, HeaderName, HeaderValue, Method};
 use allama_http::sse::{SseChatStream, SseDecoder, SseStream};
 use allama_http::{
-    Bytes, CredentialPlacement, CredentialSlot, Headers, HttpRequest, HttpResponse, HttpTransport,
-    Method, StreamTimeouts,
+    CredentialPlacement, CredentialSlot, HttpRequest, HttpResponse, HttpTransport, StreamTimeouts,
+    request_uri,
 };
 
 use crate::error::{decode_body, read_body};
@@ -111,10 +113,10 @@ struct Inner {
     http: Arc<dyn HttpTransport>,
     base_url: String,
     responses_path: String,
-    auth: Option<(String, String)>,
+    auth: Option<(HeaderName, HeaderValue)>,
     /// The headers sent with every request: the `User-Agent`, the
     /// organization and project headers, and the builder's own.
-    headers: Headers,
+    headers: HeaderMap,
     request_id_header_name: String,
     retry_after_header_name: String,
     timeout: Option<Duration>,
@@ -256,8 +258,8 @@ impl ResponsesProvider {
         // Into the same helper, so warnings name the caller's blocks.
         degradations.extend(encoded.warnings);
         let body = serde_json::to_vec(&encoded.body)?;
-        let http = HttpRequest::post(self.responses_url(), body)
-            .header("content-type", "application/json");
+        let http = HttpRequest::post(self.uri(self.responses_url())?, body)
+            .header(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         self.authorize(http, &request.options)
     }
 
@@ -309,7 +311,7 @@ impl ResponsesProvider {
     /// Transport, HTTP (an unknown or unstored id is an HTTP error), and
     /// decoding errors.
     pub async fn retrieve_response(&self, id: &str) -> Result<ChatResponse> {
-        self.response_by_id(Method::Get, id, "").await
+        self.response_by_id(Method::GET, id, "").await
     }
 
     /// Cancel a background response (`POST {responses_url}/{id}/cancel`)
@@ -319,7 +321,7 @@ impl ResponsesProvider {
     ///
     /// Transport, HTTP, and decoding errors.
     pub async fn cancel_response(&self, id: &str) -> Result<ChatResponse> {
-        self.response_by_id(Method::Post, id, "/cancel").await
+        self.response_by_id(Method::POST, id, "/cancel").await
     }
 
     /// Stream a background response by id
@@ -365,7 +367,11 @@ impl ResponsesProvider {
         }
         let url = format!("{}/{response_id}?stream=true", self.responses_url());
         let (response, context) = self
-            .execute(HttpRequest::get(url), &RequestOptions::new(), true)
+            .execute(
+                HttpRequest::get(self.uri(url)?),
+                &RequestOptions::new(),
+                true,
+            )
             .await?;
         let state = streaming::SseState::new(context).skip_through(after_sequence);
         // No `finish_stream` here: hold what arrives before the start as it
@@ -386,10 +392,7 @@ impl ResponsesProvider {
             );
         }
         let url = format!("{}/{id}{suffix}", self.responses_url());
-        let request = match method {
-            Method::Get => HttpRequest::get(url),
-            _ => HttpRequest::post(url, Bytes::new()),
-        };
+        let request = HttpRequest::new(method, self.uri(url)?);
         let (response, context) = self.execute(request, &RequestOptions::new(), false).await?;
         self.read_response(response, context, false).await
     }
@@ -408,11 +411,16 @@ impl ResponsesProvider {
         self.send(request, stream).await
     }
 
+    /// The URI of `url`, a request URL built on the base URL.
+    fn uri(&self, url: String) -> Result<allama_http::http::Uri> {
+        request_uri(url).map_err(|err| err.with_provider(self.inner.provider_name.as_ref()))
+    }
+
     /// Add the endpoint's auth headers and the caller's transport `options`.
     fn authorize(&self, mut request: HttpRequest, options: &RequestOptions) -> Result<HttpRequest> {
         let inner = &self.inner;
         if let Some((name, value)) = &inner.auth {
-            request = request.header(name, value);
+            request = request.header(name.clone(), value.clone());
         }
         request
             .with_headers(&inner.headers)
@@ -1050,6 +1058,7 @@ impl ResponsesProviderBuilder {
 #[cfg(test)]
 mod tests {
     use allama::ReasoningEffort;
+    use allama_http::http::{HeaderValue, StatusCode};
     use serde_json::json;
 
     use super::*;
@@ -1086,8 +1095,10 @@ mod tests {
     /// credentials, and the builder's headers reach every request.
     #[tokio::test]
     async fn debug_is_redacted_and_headers_are_sent() {
-        let transport =
-            allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+        let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "",
+        )]);
         let builder = ResponsesProvider::builder()
             .base_url("https://user:PASSWORD@gw.example/v1")
             .bearer_token("sk-SECRET")
@@ -1106,10 +1117,13 @@ mod tests {
             .chat(&allama::ChatRequest::new("m").user("hi"))
             .await;
         let sent = &transport.requests()[0];
-        assert_eq!(sent.headers.get("x-route"), Some("ROUTE-VALUE"));
+        assert_eq!(
+            sent.headers.get("x-route"),
+            Some(&HeaderValue::from_static("ROUTE-VALUE"))
+        );
         assert_eq!(
             sent.headers.get("user-agent"),
-            Some(allama_http::DEFAULT_USER_AGENT)
+            Some(&HeaderValue::try_from(allama_http::DEFAULT_USER_AGENT).unwrap())
         );
     }
 

@@ -27,6 +27,7 @@ use allama::{
     CapabilitySupport, ChatCapability, RequestField, UnsupportedPolicy, UnsupportedStage,
     WarningKind,
 };
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::providers::{
     Azure, Cloudflare, DeepInfra, DeepSeek, Fireworks, Groq, Mistral, Ollama, OpenRouter, Together,
@@ -70,7 +71,7 @@ fn provider(name: &str, transport: &ReplayTransport) -> Provider {
 
 fn text() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "c1", "object": "chat.completion", "model": "m",
             "choices": [{"index": 0, "finish_reason": "stop",
@@ -82,7 +83,7 @@ fn text() -> ReplayResponse {
 
 fn tool_call() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "c1", "object": "chat.completion", "model": "m",
             "choices": [{"index": 0, "finish_reason": "tool_calls",
@@ -460,7 +461,7 @@ async fn deepseek_answers_structured_output_for_json_schema_only() {
 #[tokio::test]
 async fn cloudflare_auto_extraction_falls_back_on_a_refused_response_format() {
     let refusal = ReplayResponse::json(
-        400,
+        StatusCode::BAD_REQUEST,
         json!({"error": {
             "message": "Unsupported parameter: 'response_format' is not supported with this model.",
             "type": "invalid_request_error",
@@ -486,7 +487,7 @@ async fn cloudflare_auto_extraction_falls_back_on_a_refused_response_format() {
 #[tokio::test]
 async fn responses_auto_extraction_falls_back_on_a_codeless_refusal() {
     let refusal = ReplayResponse::json(
-        400,
+        StatusCode::BAD_REQUEST,
         json!({"error": {
             "message": "Unsupported parameter: 'text.format' is not supported with this model.",
             "type": "invalid_request_error",
@@ -498,7 +499,7 @@ async fn responses_auto_extraction_falls_back_on_a_codeless_refusal() {
     let call = json!({"type": "function_call", "id": "fc_1", "call_id": "call_1",
         "name": "submit_structured_output", "arguments": "{\"name\":\"Ada\"}", "status": "completed"});
     let tool_call = ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({"id": "resp_1", "object": "response", "status": "completed", "model": "m",
                "output": [call]})
         .to_string(),
@@ -518,6 +519,6 @@ async fn responses_auto_extraction_falls_back_on_a_codeless_refusal() {
     assert!(extracted.metadata.auto_fallback.is_some());
     let requests = transport.requests();
     assert_eq!(requests.len(), 2);
-    let first: Value = serde_json::from_slice(requests[0].body.as_ref().unwrap()).unwrap();
+    let first: Value = serde_json::from_slice(requests[0].body.as_ref()).unwrap();
     assert_eq!(first["text"]["format"]["type"], "json_schema");
 }

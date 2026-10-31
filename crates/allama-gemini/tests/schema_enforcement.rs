@@ -14,6 +14,7 @@ use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama::{RequestField, Subject, WarningKind};
 use allama_gemini::Provider;
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -41,7 +42,7 @@ impl Target {
 
     fn text(self, text: &str) -> ReplayResponse {
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             json!({
                 "candidates": [{"content": {"role": "model", "parts": [{"text": text}]},
                                 "finishReason": "STOP", "index": 0}],
@@ -55,7 +56,7 @@ impl Target {
     fn tool_call(self, arguments: &str) -> ReplayResponse {
         let args: Value = serde_json::from_str(arguments).unwrap();
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             json!({
                 "candidates": [{"content": {"role": "model", "parts": [
                                     {"functionCall": {"name": "submit_structured_output", "args": args}}]},
@@ -205,7 +206,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }

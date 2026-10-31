@@ -15,6 +15,7 @@ use allama_http::{
     HttpRequest, HttpResponse, HttpTransport, ReqwestTransport, TransportError, TransportErrorKind,
     status_error,
 };
+use http::{HeaderMap, HeaderValue, StatusCode, Uri};
 
 /// Spawn a target server and an origin that redirects every request to it
 /// with `status`, run `send` against the origin's URL, and assert that the
@@ -24,7 +25,8 @@ where
     F: FnOnce(String) -> Fut,
     Fut: Future<Output = T>,
 {
-    let target = TestHttpServer::spawn([MockHttpResponse::json(200, r#"{"stolen":true}"#)]).await;
+    let target =
+        TestHttpServer::spawn([MockHttpResponse::json(StatusCode::OK, r#"{"stolen":true}"#)]).await;
     // `localhost` rather than `127.0.0.1`: another host as far as the
     // client can tell, so a followed redirect would be cross-host.
     let location = format!(
@@ -32,8 +34,11 @@ where
         target.url().replace("127.0.0.1", "localhost")
     );
     let origin =
-        TestHttpServer::spawn([MockHttpResponse::text(status, "").header("location", location)])
-            .await;
+        TestHttpServer::spawn([
+            MockHttpResponse::text(StatusCode::from_u16(status).unwrap(), "")
+                .header("location", HeaderValue::try_from(location).unwrap()),
+        ])
+        .await;
     let result = send(origin.url().to_owned()).await;
     assert_eq!(origin.recorded_requests().await.len(), 1);
     let leaked = target.recorded_requests().await;
@@ -48,8 +53,8 @@ where
     result
 }
 
-fn map_http(status: u16, _: &allama_http::Headers, _: &str) -> Error {
-    status_error(status, format!("HTTP {status}")).authored()
+fn map_http(status: StatusCode, _: &HeaderMap, _: &str) -> Error {
+    status_error(status, format!("HTTP {}", status.as_u16())).authored()
 }
 
 /// The default transport returns the redirect instead of sending the
@@ -60,8 +65,11 @@ async fn the_default_transport_never_follows_a_redirect() {
         let response = assert_redirect_not_followed(status, |url| async move {
             ReqwestTransport::new()
                 .send(
-                    HttpRequest::post(format!("{url}/v1/messages"), r#"{"prompt":"secret"}"#)
-                        .header("x-api-key", "SECRET-KEY-123"),
+                    HttpRequest::post(
+                        Uri::try_from(format!("{url}/v1/messages")).unwrap(),
+                        r#"{"prompt":"secret"}"#,
+                    )
+                    .header("x-api-key", HeaderValue::from_static("SECRET-KEY-123")),
                 )
                 .await
                 .unwrap()
@@ -93,7 +101,7 @@ async fn a_client_without_redirects_keeps_the_guarantee() {
         .unwrap();
     let response = assert_redirect_not_followed(307, |url| async move {
         ReqwestTransport::from_client(client)
-            .send(HttpRequest::post(url, "{}"))
+            .send(HttpRequest::post(Uri::try_from(url).unwrap(), "{}"))
             .await
             .unwrap()
     })
@@ -106,12 +114,12 @@ async fn a_client_without_redirects_keeps_the_guarantee() {
 async fn success_bodies_are_read_under_a_limit() {
     let big = "x".repeat(1024 * 1024);
     let server = TestHttpServer::spawn([
-        MockHttpResponse::text(200, big.clone()),
-        MockHttpResponse::text(200, big),
+        MockHttpResponse::text(StatusCode::OK, big.clone()),
+        MockHttpResponse::text(StatusCode::OK, big),
     ])
     .await;
     let transport = ReqwestTransport::new();
-    let send = || transport.send(HttpRequest::get(server.url()));
+    let send = || transport.send(HttpRequest::get(Uri::try_from(server.url()).unwrap()));
     let err = send()
         .await
         .unwrap()
@@ -132,10 +140,13 @@ async fn success_bodies_are_read_under_a_limit() {
 /// An error body is read up to its cap, whatever its size.
 #[tokio::test]
 async fn error_bodies_are_capped() {
-    let server =
-        TestHttpServer::spawn([MockHttpResponse::text(500, "e".repeat(1024 * 1024))]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::text(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "e".repeat(1024 * 1024),
+    )])
+    .await;
     let response = ReqwestTransport::new()
-        .send(HttpRequest::get(server.url()))
+        .send(HttpRequest::get(Uri::try_from(server.url()).unwrap()))
         .await
         .unwrap();
     let mut seen = 0;
@@ -154,8 +165,8 @@ async fn error_bodies_are_capped() {
 #[tokio::test]
 async fn an_endless_error_body_ends_the_call() {
     let endless = HttpResponse::new(
-        503,
-        allama_http::Headers::new(),
+        StatusCode::SERVICE_UNAVAILABLE,
+        HeaderMap::new(),
         Box::pin(futures_util::stream::repeat_with(|| {
             Ok::<_, TransportError>(allama_http::Bytes::from(vec![b'x'; 64 * 1024]))
         })),

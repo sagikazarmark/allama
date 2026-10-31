@@ -12,6 +12,7 @@ use allama_http::{
     Credential, CredentialPlacement, CredentialSlot, HttpRequest, HttpRequestOptions,
     HttpTransport, ReqwestTransport,
 };
+use http::{HeaderValue, StatusCode, Uri};
 use tracing::field::{Field, Visit};
 use tracing::span::{Attributes, Id, Record};
 use tracing::{Event, Subscriber};
@@ -43,7 +44,7 @@ impl<S: Subscriber> Layer<S> for Capture {
 
 #[tokio::test]
 async fn spans_never_record_header_values() {
-    let server = TestHttpServer::spawn([MockHttpResponse::text(200, "ok")]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::OK, "ok")]).await;
     let capture = Capture::default();
     let _guard =
         tracing::subscriber::set_default(tracing_subscriber::registry().with(capture.clone()));
@@ -52,13 +53,19 @@ async fn spans_never_record_header_values() {
         HttpRequestOptions::new()
             .credential("gateway", Credential::api_key("TENANT-SECRET"))
             .credential("gateway", Credential::header("x-route-key", "ROUTE-SECRET"))
-            .header("x-gateway-tag", "TAG-VALUE"),
+            .header("x-gateway-tag", HeaderValue::from_static("TAG-VALUE")),
     );
     let slot = CredentialSlot::new("gateway", CredentialPlacement::Bearer);
-    let http = HttpRequest::post(format!("{}/v1/chat", server.url()), "{}")
-        .header("authorization", "Bearer provider-key")
-        .apply_options(&request.options, &slot)
-        .unwrap();
+    let http = HttpRequest::post(
+        Uri::try_from(format!("{}/v1/chat", server.url())).unwrap(),
+        "{}",
+    )
+    .header(
+        "authorization",
+        HeaderValue::from_static("Bearer provider-key"),
+    )
+    .apply_options(&request.options, &slot)
+    .unwrap();
     let response = ReqwestTransport::new().send(http).await.unwrap();
     assert_eq!(response.status, 200);
 

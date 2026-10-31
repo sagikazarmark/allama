@@ -64,10 +64,9 @@ use allama::{CapabilitySupport, ChatCapability, ChatCapabilityResolver, Error, R
 use allama_http::ReqwestTransport;
 pub use allama_http::StreamTimeouts;
 use allama_http::config::redact_url;
+use allama_http::http::{HeaderMap, HeaderValue};
 use allama_http::sse::SseDecoder;
-use allama_http::{
-    CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, Headers, HttpTransport,
-};
+use allama_http::{CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, HttpTransport};
 pub use decode::blocked_prompt_usage;
 
 mod chat;
@@ -153,9 +152,10 @@ pub(crate) struct Inner {
     pub(crate) max_response_size: usize,
     /// The headers sent with every request: the `User-Agent` and the
     /// builder's own.
-    pub(crate) headers: Headers,
-    /// The configured key; `None` when every request brings its own.
-    pub(crate) api_key: Option<String>,
+    pub(crate) headers: HeaderMap,
+    /// The configured key, marked sensitive; `None` when every request
+    /// brings its own.
+    pub(crate) api_key: Option<HeaderValue>,
     pub(crate) credential_slot: CredentialSlot,
     pub(crate) base_url: String,
     pub(crate) chat_capability_resolver: Option<Arc<dyn ChatCapabilityResolver>>,
@@ -514,7 +514,10 @@ impl ProviderBuilder {
         let api_key = match self.api_key {
             None if explicit => None,
             None => return Err(Error::configuration("api_key is required").authored()),
-            Some(key) => Some(allama_http::config::secret("api_key", &key)?),
+            Some(key) => {
+                let key = allama_http::config::secret("api_key", &key)?;
+                Some(allama_http::config::sensitive_value("api_key", &key)?)
+            }
         };
         let base_url = match self.base_url {
             Some(url) => allama_http::config::base_url("base_url", &url)?,
@@ -668,6 +671,7 @@ pub(crate) fn conformance_stream_from_sse_text(text: &str) -> allama::ChatStream
 mod tests {
     use super::*;
     use allama::{ChatCapability, ChatProvider};
+    use allama_http::http::{HeaderValue, StatusCode};
     #[cfg(feature = "reqwest")]
     use std::sync::{LazyLock, Mutex};
 
@@ -1067,12 +1071,24 @@ mod tests {
         let _google = EnvVarGuard::set("GOOGLE_API_KEY", Some("AIza-google\n"));
         let _base_url = EnvVarGuard::set("GEMINI_BASE_URL", None);
         assert_eq!(
-            Provider::from_env().unwrap().inner.api_key.as_deref(),
+            Provider::from_env()
+                .unwrap()
+                .inner
+                .api_key
+                .as_ref()
+                .map(|key| key.to_str().unwrap().to_owned())
+                .as_deref(),
             Some("AIza-google")
         );
         let _gemini = EnvVarGuard::set("GEMINI_API_KEY", Some(" AIza-gemini "));
         assert_eq!(
-            Provider::from_env().unwrap().inner.api_key.as_deref(),
+            Provider::from_env()
+                .unwrap()
+                .inner
+                .api_key
+                .as_ref()
+                .map(|key| key.to_str().unwrap().to_owned())
+                .as_deref(),
             Some("AIza-gemini")
         );
     }
@@ -1081,8 +1097,10 @@ mod tests {
     /// credentials, and the builder's headers reach every request.
     #[tokio::test]
     async fn debug_is_redacted_and_headers_are_sent() {
-        let transport =
-            allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+        let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "",
+        )]);
         let builder = Provider::builder()
             .api_key("AIza-SECRET")
             .base_url("https://user:PASSWORD@gw.example/v1beta")
@@ -1100,10 +1118,13 @@ mod tests {
             .chat(&allama::ChatRequest::new("gemini-2.5-flash").user("hi"))
             .await;
         let sent = &transport.requests()[0];
-        assert_eq!(sent.headers.get("x-goog-user-project"), Some("proj"));
+        assert_eq!(
+            sent.headers.get("x-goog-user-project"),
+            Some(&HeaderValue::from_static("proj"))
+        );
         assert_eq!(
             sent.headers.get("user-agent"),
-            Some(allama_http::DEFAULT_USER_AGENT)
+            Some(&HeaderValue::try_from(allama_http::DEFAULT_USER_AGENT).unwrap())
         );
         let Err(err) = Provider::builder()
             .api_key("k")
@@ -1129,7 +1150,7 @@ mod tests {
                 .api_key("k")
                 .max_response_size(cap)
                 .http_transport(allama_http::ReplayTransport::new([
-                    allama_http::ReplayResponse::json(200, body),
+                    allama_http::ReplayResponse::json(StatusCode::OK, body),
                 ]))
                 .build()
                 .unwrap()
@@ -1167,8 +1188,10 @@ mod tests {
             (Some(five), five),
             (Some(None), None),
         ] {
-            let transport =
-                allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+            let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "",
+            )]);
             let mut builder = Provider::builder()
                 .api_key("k")
                 .http_transport(transport.clone());

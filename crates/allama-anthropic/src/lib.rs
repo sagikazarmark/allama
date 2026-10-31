@@ -105,10 +105,9 @@ use allama::{CapabilitySupport, ChatCapability, ChatCapabilityResolver, Error, R
 use allama_http::ReqwestTransport;
 pub use allama_http::StreamTimeouts;
 use allama_http::config::redact_url;
+use allama_http::http::{HeaderMap, HeaderValue};
 use allama_http::sse::SseDecoder;
-use allama_http::{
-    CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, Headers, HttpTransport,
-};
+use allama_http::{CredentialPlacement, CredentialSlot, DEFAULT_REQUEST_TIMEOUT, HttpTransport};
 use std::borrow::Cow;
 use std::{sync::Arc, time::Duration};
 
@@ -201,9 +200,10 @@ pub(crate) struct Inner {
     pub(crate) max_response_size: usize,
     /// The headers sent with every request: the `User-Agent` and the
     /// builder's own.
-    pub(crate) headers: Headers,
-    /// The configured key; `None` when every request brings its own.
-    pub(crate) api_key: Option<String>,
+    pub(crate) headers: HeaderMap,
+    /// The configured key, marked sensitive; `None` when every request
+    /// brings its own.
+    pub(crate) api_key: Option<HeaderValue>,
     pub(crate) credential_slot: CredentialSlot,
     pub(crate) base_url: String,
     pub(crate) chat_capability_resolver: Option<Arc<dyn ChatCapabilityResolver>>,
@@ -571,7 +571,10 @@ impl ProviderBuilder {
         let api_key = match self.api_key {
             None if explicit => None,
             None => return Err(Error::configuration("api_key is required").authored()),
-            Some(key) => Some(allama_http::config::secret("api_key", &key)?),
+            Some(key) => {
+                let key = allama_http::config::secret("api_key", &key)?;
+                Some(allama_http::config::sensitive_value("api_key", &key)?)
+            }
         };
         let base_url = match self.base_url {
             Some(url) => allama_http::config::base_url("base_url", &url)?,
@@ -663,6 +666,7 @@ pub(crate) fn conformance_stream_from_sse_text(text: &str) -> allama::ChatStream
 mod tests {
     use super::*;
     use allama::{ChatCapability, ChatProvider};
+    use allama_http::http::{HeaderValue, StatusCode};
     #[cfg(feature = "reqwest")]
     use std::sync::{LazyLock, Mutex};
 
@@ -965,7 +969,14 @@ mod tests {
             .http_transport(allama_http::ReplayTransport::default())
             .build()
             .unwrap();
-        assert_eq!(provider.inner.api_key.as_deref(), Some("sk-ant-x"));
+        assert_eq!(
+            provider
+                .inner
+                .api_key
+                .as_ref()
+                .map(|key| key.to_str().unwrap()),
+            Some("sk-ant-x")
+        );
         for (key, url) in [
             ("sk-ant\nx", "https://api.anthropic.com"),
             ("k", "localhost:8080"),
@@ -990,7 +1001,14 @@ mod tests {
         let _api_key = EnvVarGuard::set("ANTHROPIC_API_KEY", Some("sk-ant-x\n"));
         let _base_url = EnvVarGuard::set("ANTHROPIC_BASE_URL", None);
         let provider = Provider::from_env().unwrap();
-        assert_eq!(provider.inner.api_key.as_deref(), Some("sk-ant-x"));
+        assert_eq!(
+            provider
+                .inner
+                .api_key
+                .as_ref()
+                .map(|key| key.to_str().unwrap()),
+            Some("sk-ant-x")
+        );
 
         let _base_url = EnvVarGuard::set("ANTHROPIC_BASE_URL", Some("localhost:8080"));
         let err = Provider::from_env().unwrap_err();
@@ -1021,8 +1039,10 @@ mod tests {
     /// credential headers are refused.
     #[tokio::test]
     async fn builder_headers_are_sent_with_every_request() {
-        let transport =
-            allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+        let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "",
+        )]);
         let provider = Provider::builder()
             .api_key("k")
             .header("x-route", "eu")
@@ -1030,18 +1050,28 @@ mod tests {
             .http_transport(transport.clone())
             .build()
             .unwrap();
-        let request = allama::ChatRequest::new("m")
-            .user("hi")
-            .with_option(allama_http::HttpRequestOptions::new().header("x-tenant", "other"));
+        let request = allama::ChatRequest::new("m").user("hi").with_option(
+            allama_http::HttpRequestOptions::new()
+                .header("x-tenant", HeaderValue::from_static("other")),
+        );
         let _ = provider.chat(&request).await;
         let sent = &transport.requests()[0];
         assert_eq!(
             sent.headers.get("user-agent"),
-            Some(allama_http::DEFAULT_USER_AGENT)
+            Some(&HeaderValue::try_from(allama_http::DEFAULT_USER_AGENT).unwrap())
         );
-        assert_eq!(sent.headers.get("x-route"), Some("eu"));
-        assert_eq!(sent.headers.get("x-tenant"), Some("other"));
-        assert_eq!(sent.headers.get("x-api-key"), Some("k"));
+        assert_eq!(
+            sent.headers.get("x-route"),
+            Some(&HeaderValue::from_static("eu"))
+        );
+        assert_eq!(
+            sent.headers.get("x-tenant"),
+            Some(&HeaderValue::from_static("other"))
+        );
+        assert_eq!(
+            sent.headers.get("x-api-key"),
+            Some(&HeaderValue::from_static("k"))
+        );
 
         for name in ["x-api-key", "Authorization"] {
             let Err(err) = Provider::builder()
@@ -1066,7 +1096,7 @@ mod tests {
                 .api_key("k")
                 .max_response_size(cap)
                 .http_transport(allama_http::ReplayTransport::new([
-                    allama_http::ReplayResponse::json(200, body),
+                    allama_http::ReplayResponse::json(StatusCode::OK, body),
                 ]))
                 .build()
                 .unwrap()
@@ -1092,8 +1122,10 @@ mod tests {
             (Some(five), five),
             (Some(None), None),
         ] {
-            let transport =
-                allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+            let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "",
+            )]);
             let mut builder = Provider::builder()
                 .api_key("k")
                 .http_transport(transport.clone());

@@ -8,6 +8,7 @@ use allama::decision::{
     Choice, ChoiceSet, Decision, DecisionInput, Question, Scale, Score, YesNoAnswer,
 };
 use allama::{DecisionProvider, DecisionProviderExt, DecisionRequest, Error, Image};
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_systemone::providers::{Cloudflare, LiteLlm, Ollama, OpenRouter, TypeSafe};
 use allama_systemone::{Confidence, DecisionRequestOptions, Gateway, Provider, RawResponse};
@@ -77,12 +78,17 @@ fn triage_request() -> DecisionRequest {
 
 #[tokio::test]
 async fn ollama_triage_round_trip() {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, fixture("ollama/triage.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("ollama/triage.json"),
+    )]);
     let response = ollama(&transport).decide(&triage_request()).await.unwrap();
 
     let request = &transport.requests()[0];
-    assert_eq!(request.url, "http://localhost:11434/v1/systemone");
+    assert_eq!(
+        request.uri.to_string(),
+        "http://localhost:11434/v1/systemone"
+    );
     assert_eq!(request.headers.get("authorization"), None);
     assert_eq!(request.timeout, None);
     // The request of Ollama's decision guide, plus the label question.
@@ -152,7 +158,10 @@ async fn ollama_triage_round_trip() {
 
 #[tokio::test]
 async fn ollama_options_and_raw_response() {
-    let transport = ReplayTransport::new([ReplayResponse::json(200, fixture("ollama/label.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("ollama/label.json"),
+    )]);
     let request = DecisionRequest::new("nimble", "Our checkout has returned 500 errors since 9am.")
         .question(
             "label",
@@ -190,10 +199,10 @@ async fn ollama_options_and_raw_response() {
 #[tokio::test]
 async fn typesafe_answer_types() {
     let transport = ReplayTransport::new([
-        ReplayResponse::json(200, fixture("typesafe/department.json"))
-            .header("x-typesafe-request-id", "req_1"),
-        ReplayResponse::json(200, fixture("typesafe/frustration.json")),
-        ReplayResponse::json(200, fixture("typesafe/is_urgent.json")),
+        ReplayResponse::json(StatusCode::OK, fixture("typesafe/department.json"))
+            .header("x-typesafe-request-id", HeaderValue::from_static("req_1")),
+        ReplayResponse::json(StatusCode::OK, fixture("typesafe/frustration.json")),
+        ReplayResponse::json(StatusCode::OK, fixture("typesafe/is_urgent.json")),
     ]);
     let provider = typesafe(&transport);
     let state = "Help! My payouts have been failing for 3 days.";
@@ -256,11 +265,17 @@ async fn typesafe_answer_types() {
 
     let requests = transport.requests();
     let request = &requests[0];
-    assert_eq!(request.url, "https://api.typesafe.ai/v1/systemone");
-    assert_eq!(request.headers.get("authorization"), Some("Bearer ts-key"));
+    assert_eq!(
+        request.uri.to_string(),
+        "https://api.typesafe.ai/v1/systemone"
+    );
+    assert_eq!(
+        request.headers.get("authorization"),
+        Some(&HeaderValue::from_static("Bearer ts-key"))
+    );
     assert_eq!(
         request.headers.get("content-type"),
-        Some("application/json")
+        Some(&HeaderValue::from_static("application/json"))
     );
     // TypeSafe's own example request for a score question.
     assert_eq!(
@@ -305,13 +320,14 @@ async fn typesafe_recorded_response() {
             .bare_level("Soon")
             .bare_level("Immediate"),
     );
-    let transport =
-        ReplayTransport::new([
-            ReplayResponse::json(200, fixture("typesafe/recorded_triage.json")).header(
-                "x-typesafe-request-id",
-                "req_01a0fde849f77561881e25028b09ad5a",
-            ),
-        ]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("typesafe/recorded_triage.json"),
+    )
+    .header(
+        "x-typesafe-request-id",
+        HeaderValue::from_static("req_01a0fde849f77561881e25028b09ad5a"),
+    )]);
     let response = typesafe(&transport).decide(&request).await.unwrap();
 
     assert_eq!(
@@ -342,7 +358,7 @@ async fn typesafe_recorded_response() {
 #[tokio::test]
 async fn gateway_fields_are_provider_data() {
     let transport = ReplayTransport::new([ReplayResponse::json(
-        200,
+        StatusCode::OK,
         r#"{"id":"gen-123","provider":"TypeSafe","model":"typesafe/jev-1.13","answers":{"spam":{"type":"noul","noul":0.02}},"usage":{"input_tokens":40,"output_tokens":1,"cost":0.0000017}}"#,
     )]);
     let provider = OpenRouter::builder("or-key")
@@ -358,7 +374,7 @@ async fn gateway_fields_are_provider_data() {
         .await
         .unwrap();
     assert_eq!(
-        transport.requests()[0].url,
+        transport.requests()[0].uri.to_string(),
         "https://openrouter.ai/api/v1/systemone"
     );
     assert_eq!(response.id.as_deref(), Some("gen-123"));
@@ -371,15 +387,15 @@ async fn gateway_fields_are_provider_data() {
 async fn error_bodies_with_a_success_status_are_errors() {
     let transport = ReplayTransport::new([
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             r#"{"error":{"message":"Upstream provider unavailable","code":502}}"#,
         ),
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             r#"{"error":{"message":"Rate limit exceeded","code":429}}"#,
         ),
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             r#"{"error":{"message":"Something odd","code":"weird"}}"#,
         ),
     ]);
@@ -413,10 +429,10 @@ async fn error_bodies_with_a_success_status_are_errors() {
 #[tokio::test]
 async fn malformed_success_bodies_are_unexpected_responses() {
     let transport = ReplayTransport::new([ReplayResponse::new(
-        200,
+        StatusCode::OK,
         "<html><body>502 Bad Gateway SENTINEL</body></html>",
     )
-    .header("x-typesafe-request-id", "req_1")]);
+    .header("x-typesafe-request-id", HeaderValue::from_static("req_1"))]);
     let provider = typesafe(&transport);
     let request = DecisionRequest::new("m", "x").question("q", Question::yes_no("?"));
 
@@ -459,7 +475,10 @@ async fn invalid_requests_fail_before_sending() {
 
 #[tokio::test]
 async fn answers_that_do_not_match_the_request_are_rejected() {
-    let transport = ReplayTransport::new([ReplayResponse::json(200, fixture("ollama/label.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("ollama/label.json"),
+    )]);
     // The fixture answers "label" with keys billing/bug/account; ask for others.
     let request = DecisionRequest::new("nimble", "x").question(
         "label",
@@ -476,18 +495,18 @@ async fn answers_that_do_not_match_the_request_are_rejected() {
 async fn http_errors_are_mapped() {
     let transport = ReplayTransport::new([
         ReplayResponse::json(
-            403,
+            StatusCode::FORBIDDEN,
             r#"{"detail":{"error_type":"authentication_error","message":"Must supply an API key! Check your request and try again."}}"#,
         )
-        .header("x-typesafe-request-id", "req_403")
+        .header("x-typesafe-request-id", HeaderValue::from_static("req_403"))
         // The configured request id header takes precedence.
-        .header("x-request-id", "req_common"),
-        ReplayResponse::json(429, r#"{"detail":"Too many requests"}"#)
-            .header("retry-after", "2")
-            .header("x-should-retry", "false"),
-        ReplayResponse::json(529, r#"{"detail":"Overloaded"}"#)
-            .header("retry-after", "2")
-            .header("retry-after-ms", "1500"),
+        .header("x-request-id", HeaderValue::from_static("req_common")),
+        ReplayResponse::json(StatusCode::TOO_MANY_REQUESTS, r#"{"detail":"Too many requests"}"#)
+            .header("retry-after", HeaderValue::from_static("2"))
+            .header("x-should-retry", HeaderValue::from_static("false")),
+        ReplayResponse::json(StatusCode::from_u16(529).unwrap(), r#"{"detail":"Overloaded"}"#)
+            .header("retry-after", HeaderValue::from_static("2"))
+            .header("retry-after-ms", HeaderValue::from_static("1500")),
     ]);
     let provider = typesafe(&transport);
     let request = DecisionRequest::new("jev-latest", "x").question("q", Question::yes_no("?"));
@@ -512,7 +531,7 @@ async fn http_errors_are_mapped() {
 async fn ollama_chat_model_is_unsupported() {
     // What Ollama answers when the model lacks the decision capability.
     let transport = ReplayTransport::new([ReplayResponse::json(
-        400,
+        StatusCode::BAD_REQUEST,
         r#"{"error":"qwen3:1.7b does not support decision"}"#,
     )]);
     let request = DecisionRequest::new("qwen3:1.7b", "x").question("q", Question::yes_no("?"));
@@ -558,8 +577,8 @@ struct Triage {
 #[tokio::test]
 async fn typed_decision_round_trip() {
     let transport = ReplayTransport::new([
-        ReplayResponse::json(200, fixture("ollama/triage.json")),
-        ReplayResponse::json(200, fixture("ollama/triage.json")),
+        ReplayResponse::json(StatusCode::OK, fixture("ollama/triage.json")),
+        ReplayResponse::json(StatusCode::OK, fixture("ollama/triage.json")),
     ]);
     let provider = ollama(&transport);
     provider.decide(&triage_request()).await.unwrap();
@@ -583,7 +602,7 @@ async fn typed_decision_round_trip() {
 /// pull, and the generic provider's says only that the endpoint is missing.
 #[tokio::test]
 async fn a_missing_endpoint_names_the_ollama_version_on_the_ollama_preset() {
-    let missing = || ReplayResponse::new(404, "404 page not found");
+    let missing = || ReplayResponse::new(StatusCode::NOT_FOUND, "404 page not found");
 
     let transport = ReplayTransport::new([missing()]);
     let err = ollama(&transport)
@@ -615,7 +634,10 @@ async fn a_missing_endpoint_names_the_ollama_version_on_the_ollama_preset() {
 /// `404`: the LiteLLM preset's refusal says what the proxy needs.
 #[tokio::test]
 async fn a_missing_endpoint_names_the_pass_through_on_the_litellm_preset() {
-    let transport = ReplayTransport::new([ReplayResponse::json(404, r#"{"detail": "Not Found"}"#)]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::NOT_FOUND,
+        r#"{"detail": "Not Found"}"#,
+    )]);
     let litellm = LiteLlm::builder("http://127.0.0.1:4000", Some("sk-litellm"))
         .unwrap()
         .http_transport(transport.clone())
@@ -640,10 +662,10 @@ async fn a_missing_endpoint_names_the_pass_through_on_the_litellm_preset() {
 #[tokio::test]
 async fn success_status_errors_keep_their_headers() {
     let transport = ReplayTransport::new([ReplayResponse::json(
-        200,
+        StatusCode::OK,
         r#"{"error":{"message":"Rate limit exceeded","code":429}}"#,
     )
-    .header("retry-after", "7")]);
+    .header("retry-after", HeaderValue::from_static("7"))]);
     let err = typesafe(&transport)
         .decide(&DecisionRequest::new("m", "x").question("q", Question::yes_no("?")))
         .await
@@ -663,8 +685,8 @@ async fn ollama_options_go_to_ollama_only() {
 
     let answer = r#"{"model":"nimble","answers":{"q":{"type":"noul","noul":0.1}}}"#;
     let transport = ReplayTransport::new([
-        ReplayResponse::json(200, answer),
-        ReplayResponse::json(200, answer),
+        ReplayResponse::json(StatusCode::OK, answer),
+        ReplayResponse::json(StatusCode::OK, answer),
     ]);
     let provider = ollama(&transport);
     provider
@@ -680,7 +702,7 @@ async fn ollama_options_go_to_ollama_only() {
     assert_eq!(bodies[0]["keep_alive"], "10m");
     assert_eq!(bodies[1]["images"], json!(["aGVsbG8="]));
 
-    let transport = ReplayTransport::new([ReplayResponse::json(200, answer)]);
+    let transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, answer)]);
     let provider = typesafe(&transport);
     let response = provider
         .decide(&request().with_option(keep_alive))
@@ -700,7 +722,8 @@ async fn ollama_options_go_to_ollama_only() {
 /// a credential header is refused at `build()`.
 #[tokio::test]
 async fn builder_headers_are_sent_with_every_request() {
-    let transport = ReplayTransport::new([ReplayResponse::new(500, "")]);
+    let transport =
+        ReplayTransport::new([ReplayResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "")]);
     let provider = TypeSafe::builder("ts-key")
         .unwrap()
         .header("x-route", "eu")
@@ -708,19 +731,31 @@ async fn builder_headers_are_sent_with_every_request() {
         .http_transport(transport.clone())
         .build()
         .unwrap();
-    let request = triage_request()
-        .with_option(allama_http::HttpRequestOptions::new().header("x-tenant", "other"));
+    let request = triage_request().with_option(
+        allama_http::HttpRequestOptions::new()
+            .header("x-tenant", HeaderValue::from_static("other")),
+    );
     let _ = provider.decide(&request).await;
     let sent = &transport.requests()[0];
     assert_eq!(
         sent.headers.get("user-agent"),
-        Some(allama_http::DEFAULT_USER_AGENT)
+        Some(&HeaderValue::try_from(allama_http::DEFAULT_USER_AGENT).unwrap())
     );
-    assert_eq!(sent.headers.get("x-route"), Some("eu"));
-    assert_eq!(sent.headers.get("x-tenant"), Some("other"));
-    assert_eq!(sent.headers.get("authorization"), Some("Bearer ts-key"));
+    assert_eq!(
+        sent.headers.get("x-route"),
+        Some(&HeaderValue::from_static("eu"))
+    );
+    assert_eq!(
+        sent.headers.get("x-tenant"),
+        Some(&HeaderValue::from_static("other"))
+    );
+    assert_eq!(
+        sent.headers.get("authorization"),
+        Some(&HeaderValue::from_static("Bearer ts-key"))
+    );
 
-    let user_agent = ReplayTransport::new([ReplayResponse::new(500, "")]);
+    let user_agent =
+        ReplayTransport::new([ReplayResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "")]);
     let provider = ollama_builder()
         .header("User-Agent", "my-app/1.0")
         .http_transport(user_agent.clone())
@@ -729,7 +764,7 @@ async fn builder_headers_are_sent_with_every_request() {
     let _ = provider.decide(&triage_request()).await;
     assert_eq!(
         user_agent.requests()[0].headers.get("user-agent"),
-        Some("my-app/1.0")
+        Some(&HeaderValue::from_static("my-app/1.0"))
     );
 
     for name in ["Authorization", "x-api-key"] {
@@ -753,7 +788,7 @@ async fn the_response_size_is_capped() {
         ollama_builder()
             .max_response_size(cap)
             .http_transport(ReplayTransport::new([ReplayResponse::json(
-                200,
+                StatusCode::OK,
                 body.clone(),
             )]))
             .build()
@@ -803,8 +838,10 @@ fn clef_triage_request(model: &str) -> DecisionRequest {
 
 #[tokio::test]
 async fn cloudflare_recorded_response() {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, fixture("cloudflare/triage.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("cloudflare/triage.json"),
+    )]);
     let response = cloudflare(&transport)
         .decide(&clef_triage_request("@cf/cloudflare/clef"))
         .await
@@ -812,14 +849,14 @@ async fn cloudflare_recorded_response() {
 
     let request = &transport.requests()[0];
     assert_eq!(
-        request.url,
+        request.uri.to_string(),
         format!(
             "https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT}/ai/run/@cf/cloudflare/clef"
         )
     );
     assert_eq!(
         request.headers.get("authorization"),
-        Some("Bearer cf-token")
+        Some(&HeaderValue::from_static("Bearer cf-token"))
     );
     // The body of Cloudflare's own example, with its model selector.
     assert_eq!(
@@ -866,14 +903,17 @@ async fn cloudflare_recorded_response() {
 
 #[tokio::test]
 async fn cloudflare_selects_clef_flash_by_name() {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, fixture("cloudflare/flash.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("cloudflare/flash.json"),
+    )]);
     let request = DecisionRequest::new("@cf/cloudflare/clef-flash", "Checkout fails for everyone.")
         .question("q", Question::yes_no("Is this an outage?"));
     let response = cloudflare(&transport).decide(&request).await.unwrap();
     assert!(
         transport.requests()[0]
-            .url
+            .uri
+            .to_string()
             .ends_with("/ai/run/@cf/cloudflare/clef-flash")
     );
     assert_eq!(sent_body(&transport)["model"], "clef-flash");
@@ -883,8 +923,10 @@ async fn cloudflare_selects_clef_flash_by_name() {
 
 #[tokio::test]
 async fn cloudflare_sends_images_with_their_media_type() {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, fixture("cloudflare/image.json"))]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        fixture("cloudflare/image.json"),
+    )]);
     let request = DecisionRequest::new("@cf/cloudflare/clef", "A product photo.")
         .image(Image::base64("image/png", "iVBORw0KGgo="))
         .question(
@@ -911,7 +953,7 @@ async fn cloudflare_errors() {
         (422, "mismatch", "invalid_request"),
     ] {
         let transport = ReplayTransport::new([ReplayResponse::json(
-            status,
+            StatusCode::from_u16(status).unwrap(),
             fixture(&format!("cloudflare/{file}.json")),
         )]);
         let err = cloudflare(&transport)
@@ -976,11 +1018,12 @@ async fn cloudflare_leaves_the_model_schema_to_the_model() {
             Question::score("?").levels((0..11).map(|i| format!("level {i}"))),
         ),
     ];
-    let transport = ReplayTransport::new(
-        requests
-            .iter()
-            .map(|_| ReplayResponse::json(422, fixture("cloudflare/bad_name.json"))),
-    );
+    let transport = ReplayTransport::new(requests.iter().map(|_| {
+        ReplayResponse::json(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            fixture("cloudflare/bad_name.json"),
+        )
+    }));
     let provider = cloudflare(&transport);
     for request in &requests {
         let err = provider.decide(request).await.unwrap_err();
@@ -1004,7 +1047,7 @@ async fn cloudflare_leaves_the_model_schema_to_the_model() {
 #[tokio::test]
 async fn cloudflare_error_envelope_with_a_success_status() {
     let transport = ReplayTransport::new([ReplayResponse::json(
-        200,
+        StatusCode::OK,
         r#"{"result":null,"success":false,"errors":[{"code":3040,"message":"Capacity temporarily exceeded"}],"messages":[]}"#,
     )]);
     let err = cloudflare(&transport)

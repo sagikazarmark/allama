@@ -14,6 +14,7 @@ use allama::chat::extract::{
 use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama::{RequestField, Subject, WarningKind};
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::providers::Groq;
 use allama_openai_compat::{CompatQuirks, Provider};
@@ -67,7 +68,7 @@ impl Target {
                          "message": {"role": "assistant", "content": text}}],
             "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
         });
-        ReplayResponse::json(200, body.to_string())
+        ReplayResponse::json(StatusCode::OK, body.to_string())
     }
 
     fn tool_call(self, arguments: &str) -> ReplayResponse {
@@ -80,7 +81,7 @@ impl Target {
                                                                   "arguments": arguments}}]}}],
             "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
         });
-        ReplayResponse::json(200, body.to_string())
+        ReplayResponse::json(StatusCode::OK, body.to_string())
     }
 }
 
@@ -221,7 +222,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }

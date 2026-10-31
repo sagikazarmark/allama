@@ -5,7 +5,8 @@
 //! (<https://developers.cloudflare.com/workers-ai/platform/errors/>).
 
 use allama::Error;
-use allama_http::{ErrorEnvelope, Headers};
+use allama_http::ErrorEnvelope;
+use allama_http::http::{HeaderMap, StatusCode};
 use serde_json::Value;
 
 /// Map an HTTP error response.
@@ -16,7 +17,8 @@ use serde_json::Value;
 /// constructor message is the adapter's own (`HTTP {status}`). A body that
 /// is no envelope is kept only as the body.
 #[must_use]
-pub fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
+pub fn map_http_error(http_status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
+    let status = http_status.as_u16();
     let envelope = error_in_body(body);
     let code = envelope
         .as_ref()
@@ -27,11 +29,11 @@ pub fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
         None => match status {
             // A structured 404 names a model the account cannot run.
             404 if envelope.is_some() => Error::model_not_found(message),
-            _ => allama_http::status_error(status, message),
+            _ => allama_http::status_error(http_status, message),
         },
     };
     let mapped = mapped
-        .with_context(allama_http::error_context(status, headers))
+        .with_context(allama_http::error_context(http_status, headers))
         .authored();
     let mapped = match envelope {
         Some(envelope) => envelope.apply(mapped),
@@ -86,36 +88,37 @@ fn text(value: Option<&Value>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use allama_http::http::StatusCode;
 
     #[test]
     fn cloudflare_codes_refine_the_status() {
-        let headers = Headers::default();
+        let headers = HeaderMap::default();
         let body = r#"{"result":null,"success":false,"errors":[{"code":7000,"message":"No route for that URI"}],"messages":[]}"#;
-        let err = map_http_error(400, &headers, body);
+        let err = map_http_error(StatusCode::BAD_REQUEST, &headers, body);
         assert!(matches!(err, Error::ModelNotFound { .. }), "{err:?}");
         assert_eq!(err.upstream_message(), Some("No route for that URI"));
         assert_eq!(err.provider_code(), Some("7000"));
         let body = r#"{"success":false,"errors":[{"code":3036,"message":"daily limit"}]}"#;
         assert!(matches!(
-            map_http_error(429, &headers, body),
+            map_http_error(StatusCode::TOO_MANY_REQUESTS, &headers, body),
             Error::QuotaExhausted { .. }
         ));
         let body = r#"{"success":false,"errors":[{"code":3040,"message":"capacity"}]}"#;
         assert!(matches!(
-            map_http_error(429, &headers, body),
+            map_http_error(StatusCode::TOO_MANY_REQUESTS, &headers, body),
             Error::Overloaded { .. }
         ));
         let body =
             r#"{"success":false,"errors":[{"code":10000,"message":"Authentication error"}]}"#;
         assert!(matches!(
-            map_http_error(401, &headers, body),
+            map_http_error(StatusCode::UNAUTHORIZED, &headers, body),
             Error::Auth { .. }
         ));
         let body = r#"{"success":false,"errors":[{"code":5012,"message":"field name invalid"}]}"#;
-        let err = map_http_error(422, &headers, body);
+        let err = map_http_error(StatusCode::UNPROCESSABLE_ENTITY, &headers, body);
         assert!(matches!(err, Error::InvalidRequest { .. }), "{err:?}");
         // No envelope: the status alone, the body kept.
-        let err = map_http_error(500, &headers, "boom");
+        let err = map_http_error(StatusCode::INTERNAL_SERVER_ERROR, &headers, "boom");
         assert!(matches!(err, Error::Provider { .. }), "{err:?}");
         assert_eq!(err.upstream_message(), None);
     }

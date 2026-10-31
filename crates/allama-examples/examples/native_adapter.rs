@@ -50,12 +50,14 @@ use allama::{
     StreamEvent, Subject, ToolChoice, ToolResultContent, Usage, UserContent, ValidationCoverage,
 };
 use allama_http::framing::{ChatFrameDecoder, FramedChatStream};
+use allama_http::http::header::{AUTHORIZATION, CONTENT_TYPE};
+use allama_http::http::{HeaderMap, HeaderValue, StatusCode, Uri};
 use allama_http::ndjson::NdjsonStream;
 use allama_http::sse::{SseChatStream, SseDecoder, SseEvent, SseStream, VendorFrames};
 use allama_http::{
     Body, CredentialPlacement, CredentialSlot, DEFAULT_MAX_RESPONSE_SIZE, DEFAULT_REQUEST_TIMEOUT,
-    Headers, HttpRequest, HttpResponse, HttpTransport, StreamTimeouts, TransportError,
-    error_context, error_envelope, malformed_response, status_error,
+    HttpRequest, HttpResponse, HttpTransport, StreamTimeouts, TransportError, config,
+    error_context, error_envelope, malformed_response, request_uri, status_error,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -92,8 +94,10 @@ const KNOWN_EVENTS: &[&str] = &["delta", "done", "error"];
 #[derive(Clone)]
 pub struct AcmeProvider {
     http: Arc<dyn HttpTransport>,
-    base_url: String,
-    api_key: String,
+    /// The chat endpoint, built from the base URL once.
+    chat_uri: Uri,
+    /// `Bearer <key>`, marked sensitive so `Debug` output redacts it.
+    authorization: HeaderValue,
     credential_slot: CredentialSlot,
     request_timeout: Option<Duration>,
     stream_timeouts: StreamTimeouts,
@@ -103,7 +107,7 @@ pub struct AcmeProvider {
 impl std::fmt::Debug for AcmeProvider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AcmeProvider")
-            .field("base_url", &self.base_url)
+            .field("chat_uri", &config::redact_url(&self.chat_uri.to_string()))
             .field("credential_scope", &self.credential_slot.scope)
             .field("api_key", &"<redacted>")
             .finish_non_exhaustive()
@@ -144,11 +148,9 @@ impl AcmeProvider {
         }
         let (request, degradations) = prepared.parts_mut();
         let body = encode_body(request, stream, degradations)?;
-        let url = format!("{}/chat", self.base_url);
-        let auth = format!("Bearer {}", self.api_key);
-        HttpRequest::post(url, body)
-            .header("content-type", "application/json")
-            .header("authorization", auth)
+        HttpRequest::post(self.chat_uri.clone(), body)
+            .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
+            .header(AUTHORIZATION, self.authorization.clone())
             // Last: the caller's headers, and the credentials addressed to
             // your scope, which replace your configured key.
             .apply_options(&request.options, &self.credential_slot)
@@ -380,6 +382,12 @@ impl AcmeProviderBuilder {
             .api_key
             .filter(|key| !key.trim().is_empty())
             .ok_or_else(|| Error::configuration(format!("{API_KEY_ENV} is not set")).authored())?;
+        // Checked once, here, so no request fails on the configuration: the
+        // base URL and the key become the `http` types every request uses.
+        let base_url = config::base_url("base_url", &self.base_url)?;
+        let chat_uri = request_uri(format!("{base_url}/chat"))?;
+        let api_key = config::secret("api_key", &api_key)?;
+        let authorization = config::sensitive_value("api_key", &format!("Bearer {api_key}"))?;
         // A provider crate puts this default behind an optional, default
         // `reqwest` feature, and without it requires a transport here.
         let http = self
@@ -390,8 +398,8 @@ impl AcmeProviderBuilder {
             CredentialSlot::new(self.credential_scope, CredentialPlacement::Bearer);
         Ok(AcmeProvider {
             http,
-            base_url: self.base_url.trim_end_matches('/').to_owned(),
-            api_key,
+            chat_uri,
+            authorization,
             credential_slot,
             request_timeout: self.request_timeout,
             stream_timeouts: self.stream_timeouts,
@@ -859,7 +867,11 @@ struct WireUsage {
     reasoning_tokens: Option<u64>,
 }
 
-fn decode_response(status: u16, body: &str, request_id: Option<String>) -> Result<ChatResponse> {
+fn decode_response(
+    status: StatusCode,
+    body: &str,
+    request_id: Option<String>,
+) -> Result<ChatResponse> {
     // A proxy's HTML page or a body of another shape: traceable to the
     // response, never retried.
     let wire: WireResponse = serde_json::from_str(body).map_err(|error| {
@@ -1248,7 +1260,7 @@ fn ndjson_stream(
 
 /// Map an Acme HTTP error response: a pure function of the status, the
 /// headers and the body, so the error contracts can call it.
-pub fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
+pub fn map_http_error(status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
     let envelope = error_envelope(body);
     let (kind, code, param, text) = match &envelope {
         Some(envelope) => (
@@ -1299,14 +1311,15 @@ fn map_stream_api_error(json: &Value, request_id: Option<&str>) -> Error {
 /// `text` (the upstream message, or an unrecognised body) only informs the
 /// choice; the message is always the adapter's own.
 fn classify(
-    status: Option<u16>,
+    status: Option<StatusCode>,
     kind: Option<&str>,
     code: Option<&str>,
     param: Option<&str>,
     text: &str,
 ) -> Error {
     let message = match status {
-        Some(status) => format!("HTTP {status}"),
+        // The code alone: a `StatusCode`'s `Display` adds the reason phrase.
+        Some(status) => format!("HTTP {}", status.as_u16()),
         None => "the Acme stream reported an error".to_owned(),
     };
     // Exhausted credit is not retryable, even when Acme answers 429.
@@ -1329,7 +1342,9 @@ fn classify(
             ),
             None => Error::invalid_request(message),
         },
-        (_, Some(404)) if text.contains("model") => Error::model_not_found(message),
+        (_, Some(StatusCode::NOT_FOUND)) if text.contains("model") => {
+            Error::model_not_found(message)
+        }
         (Some("invalid_request_error"), _) => Error::invalid_request(message),
         // What the status means on its own, the same on every adapter:
         // 408/504 time out, 529 is overload, a 499 is not retried.
@@ -1419,10 +1434,11 @@ async fn main() -> Result<()> {
     use allama_http::{ReplayResponse, ReplayTransport};
 
     let transport = ReplayTransport::new([
-        ReplayResponse::json(200, OK_BODY).header("x-request-id", "req_1"),
+        ReplayResponse::json(StatusCode::OK, OK_BODY)
+            .header("x-request-id", HeaderValue::from_static("req_1")),
         ReplayResponse::sse(OK_STREAM),
         ReplayResponse::json(
-            429,
+            StatusCode::TOO_MANY_REQUESTS,
             r#"{"error":{"type":"rate_limit_error","code":"credit_exhausted","message":"Out of credit for 'my prompt'"}}"#,
         ),
     ]);
@@ -1457,7 +1473,7 @@ async fn main() -> Result<()> {
         println!("  region: {}", served.region);
     }
 
-    let lines = HttpResponse::from_bytes(200, Headers::new(), OK_NDJSON);
+    let lines = HttpResponse::from_bytes(StatusCode::OK, HeaderMap::new(), OK_NDJSON);
     let max_line_size = allama_http::ndjson::NdjsonDecoder::DEFAULT_MAX_LINE_SIZE;
     let from_lines = ndjson_stream(lines, max_line_size, None)
         .collect_response()
@@ -1487,6 +1503,7 @@ mod tests {
         assert_strict_policy_rejects_stream, assert_unsupported_hint_warns,
         assert_unsupported_hint_warns_stream, collect_chat_stream,
     };
+    use allama_conformance::error_kinds::http_error_mapping;
     use allama_conformance::probe::ProbeOutcome;
     use allama_conformance::stream_end::StreamEnds;
     use allama_conformance::stream_errors::ErrorKindProbe;
@@ -1541,7 +1558,7 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
     }
 
     async fn probe(request: ChatRequest) -> ProbeOutcome<ChatResponse> {
-        let transport = ReplayTransport::new([ReplayResponse::json(200, OK_BODY)]);
+        let transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, OK_BODY)]);
         let result = provider(&transport).chat(&request).await;
         ProbeOutcome::new(result, bodies(&transport))
     }
@@ -1559,8 +1576,7 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
 
     /// Acme's HTTP error mapping, as the contracts call it.
     fn map(status: u16, headers: &[(&str, &str)], body: String) -> Error {
-        let headers: Headers = headers.iter().copied().collect();
-        map_http_error(status, &headers, &body)
+        http_error_mapping(map_http_error)(status, headers, body)
     }
 
     /// Acme's envelope for each kind, told apart by its type and code. The
@@ -1598,7 +1614,7 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
     /// `chat_stream`.
     async fn send(options: RequestOptions, streaming: bool) -> TransportOutcome {
         let transport = ReplayTransport::new([
-            ReplayResponse::json(200, OK_BODY),
+            ReplayResponse::json(StatusCode::OK, OK_BODY),
             ReplayResponse::sse(OK_STREAM),
         ]);
         let mut request = ChatRequest::new(MODEL).user("Hi!");
@@ -1649,7 +1665,8 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
             )
             .malformed_response(
                 |body| async move {
-                    let answer = ReplayResponse::new(200, body).header("x-request-id", "req_1");
+                    let answer = ReplayResponse::new(StatusCode::OK, body)
+                        .header("x-request-id", HeaderValue::from_static("req_1"));
                     provider(&ReplayTransport::new([answer]))
                         .chat(&ChatRequest::new(MODEL).user("Hi!"))
                         .await
@@ -1658,7 +1675,7 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
             )
             // The decoding contracts decode captured responses on both paths.
             .unary_replay(|body| async move {
-                let transport = ReplayTransport::new([ReplayResponse::json(200, body)]);
+                let transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, body)]);
                 provider(&transport)
                     .chat(&ChatRequest::new(MODEL).user("Hi!"))
                     .await
@@ -1692,7 +1709,7 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
         let request = ChatRequest::new(MODEL).user("Hi!").seed(7);
         let ok = || {
             ReplayTransport::new([
-                ReplayResponse::json(200, OK_BODY),
+                ReplayResponse::json(StatusCode::OK, OK_BODY),
                 ReplayResponse::sse(OK_STREAM),
             ])
         };
@@ -1712,34 +1729,34 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
     async fn error_kinds_hold_on_both_paths() {
         let request = ChatRequest::new(MODEL).user("Hi!");
         // Each failure answers `chat`, then `chat_stream`.
-        let failing = |status: u16, body: &'static str| {
+        let failing = |status: StatusCode, body: &'static str| {
             let answer = || ReplayResponse::json(status, body);
             provider(&ReplayTransport::new([answer(), answer()]))
         };
         let auth = failing(
-            401,
+            StatusCode::UNAUTHORIZED,
             r#"{"error":{"type":"authentication_error","message":"bad key"}}"#,
         );
         assert_auth_error_contract(&auth, &request, |r| collect_chat_stream(&auth, r)).await;
         let rate = failing(
-            429,
+            StatusCode::TOO_MANY_REQUESTS,
             r#"{"error":{"type":"rate_limit_error","message":"slow down"}}"#,
         );
         assert_rate_limited_error_contract(&rate, &request, |r| collect_chat_stream(&rate, r))
             .await;
         let busy = failing(
-            503,
+            StatusCode::SERVICE_UNAVAILABLE,
             r#"{"error":{"type":"overloaded_error","message":"busy"}}"#,
         );
         assert_overloaded_error_contract(&busy, &request, |r| collect_chat_stream(&busy, r)).await;
         let long = failing(
-            400,
+            StatusCode::BAD_REQUEST,
             r#"{"error":{"type":"context_length_exceeded","message":"too long"}}"#,
         );
         assert_context_length_exceeded_contract(&long, &request, |r| collect_chat_stream(&long, r))
             .await;
         let credit = failing(
-            429,
+            StatusCode::TOO_MANY_REQUESTS,
             r#"{"error":{"type":"rate_limit_error","code":"credit_exhausted","message":"no credit"}}"#,
         );
         assert_quota_exhausted_contract(&credit, &request, |r| collect_chat_stream(&credit, r))
@@ -1748,22 +1765,30 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
 
     #[test]
     fn error_mapping_classifies() {
-        let headers: Headers = [("x-request-id", "req_9"), ("retry-after", "3")]
-            .into_iter()
-            .collect();
+        let mut headers = HeaderMap::new();
+        headers.insert("x-request-id", HeaderValue::from_static("req_9"));
+        headers.insert("retry-after", HeaderValue::from_static("3"));
         let quota = r#"{"error":{"type":"rate_limit_error","code":"credit_exhausted","message":"no credit"}}"#;
-        let error = map_http_error(429, &headers, quota);
+        let error = map_http_error(StatusCode::TOO_MANY_REQUESTS, &headers, quota);
         assert!(matches!(error, Error::QuotaExhausted { .. }), "{error:?}");
         assert!(!error.is_retryable());
 
-        let error = map_http_error(429, &headers, r#"{"error":{"message":"slow down"}}"#);
+        let error = map_http_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            &headers,
+            r#"{"error":{"message":"slow down"}}"#,
+        );
         assert!(matches!(error, Error::RateLimited { .. }), "{error:?}");
         assert_eq!(error.retry_after(), Some(Duration::from_secs(3)));
         assert_eq!(error.request_id(), Some("req_9"));
         assert_eq!(error.upstream_message(), Some("slow down"));
         assert!(error.as_log().to_string().contains("provider=acme"));
 
-        let error = map_http_error(502, &Headers::new(), "<html>bad gateway</html>");
+        let error = map_http_error(
+            StatusCode::BAD_GATEWAY,
+            &HeaderMap::new(),
+            "<html>bad gateway</html>",
+        );
         assert_eq!(error.to_string(), "acme: provider error (502): HTTP 502");
     }
 
@@ -1771,15 +1796,18 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
     /// text is marked authored.
     #[test]
     fn authored_messages_never_carry_upstream_text() {
-        let (status, body) = (400, r#"{"error":{"message":"Invalid value"}}"#);
-        let headers = Headers::new();
+        let (status, body) = (
+            StatusCode::BAD_REQUEST,
+            r#"{"error":{"message":"Invalid value"}}"#,
+        );
+        let headers = HeaderMap::new();
         let upstream = "Invalid value: 'my SSN is 123-45-6789'";
 
         // Bad: the upstream text reaches every log line and FallbackAttempt.
         let bad = Error::invalid_request(format!("rejected: {upstream}")).authored();
 
         // Good: authored message, upstream text in its own slot.
-        let good = Error::invalid_request(format!("HTTP {status}"))
+        let good = Error::invalid_request(format!("HTTP {}", status.as_u16()))
             .with_context(error_context(status, &headers))
             .authored()
             .with_upstream_message(upstream.to_owned())
@@ -1793,7 +1821,7 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
     #[tokio::test]
     async fn stream_and_unary_agree() {
         let transport = ReplayTransport::new([
-            ReplayResponse::json(200, OK_BODY),
+            ReplayResponse::json(StatusCode::OK, OK_BODY),
             ReplayResponse::sse(OK_STREAM),
         ]);
         let provider = provider(&transport);
@@ -1839,8 +1867,8 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
     #[tokio::test]
     async fn reasoning_round_trips_and_foreign_reasoning_is_dropped() {
         let transport = ReplayTransport::new([
-            ReplayResponse::json(200, OK_BODY),
-            ReplayResponse::json(200, OK_BODY),
+            ReplayResponse::json(StatusCode::OK, OK_BODY),
+            ReplayResponse::json(StatusCode::OK, OK_BODY),
         ]);
         let provider = provider(&transport);
         let first = provider
@@ -1885,9 +1913,9 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
     #[tokio::test]
     async fn tool_calls_round_trip_on_both_paths() {
         let transport = ReplayTransport::new([
-            ReplayResponse::json(200, TOOL_BODY),
+            ReplayResponse::json(StatusCode::OK, TOOL_BODY),
             ReplayResponse::sse(TOOL_STREAM),
-            ReplayResponse::json(200, OK_BODY),
+            ReplayResponse::json(StatusCode::OK, OK_BODY),
         ]);
         let provider = provider(&transport);
         let weather = ToolDefinition::new("weather", json!({"type": "object"}));
@@ -1921,7 +1949,7 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
 
     #[tokio::test]
     async fn options_reach_the_wire() {
-        let transport = ReplayTransport::new([ReplayResponse::json(200, OK_BODY)]);
+        let transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, OK_BODY)]);
         let request = ChatRequest::new(MODEL).user("Hi!").with_option(
             ChatRequestOptions::new()
                 .safety_mode("strict")
@@ -2032,7 +2060,8 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
             }
         }
 
-        let body = HttpResponse::from_bytes(200, Headers::new(), "data: a\n\ndata: b\n\n");
+        let body =
+            HttpResponse::from_bytes(StatusCode::OK, HeaderMap::new(), "data: a\n\ndata: b\n\n");
         let events: Vec<_> =
             SseChatStream::new(SseStream::new(body.into_body()), Silent { ended: false })
                 .collect()
@@ -2067,7 +2096,10 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
         let first = OK_STREAM.split_inclusive("\n\n").next().unwrap();
         let mut body = first.as_bytes().to_vec();
         body.extend_from_slice(b"event: delta\ndata: {\"text\":\"caf\xC3\"}\n\n");
-        let response = ReplayResponse::new(200, body).header("content-type", "text/event-stream");
+        let response = ReplayResponse::new(StatusCode::OK, body).header(
+            "content-type",
+            HeaderValue::from_static("text/event-stream"),
+        );
         let transport = ReplayTransport::new([response]);
         let mut stream = provider(&transport)
             .chat_stream(&ChatRequest::new(MODEL).user("Hi!"))
@@ -2099,17 +2131,18 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
     /// however the network splits its lines.
     #[tokio::test]
     async fn the_ndjson_stream_collects_to_the_sse_response() {
-        let sse = HttpResponse::from_bytes(200, Headers::new(), OK_STREAM);
+        let sse = HttpResponse::from_bytes(StatusCode::OK, HeaderMap::new(), OK_STREAM);
         let expected =
             SseChatStream::new(SseStream::new(sse.into_body()), StreamDecoder::new(None))
                 .collect_response()
                 .await
                 .unwrap();
         for size in [1, 7, OK_NDJSON.len()] {
-            let transport =
-                ReplayTransport::new([ReplayResponse::new(200, OK_NDJSON).split_every(size)]);
+            let transport = ReplayTransport::new([
+                ReplayResponse::new(StatusCode::OK, OK_NDJSON).split_every(size)
+            ]);
             let response = transport
-                .send(HttpRequest::get("https://acme.test"))
+                .send(HttpRequest::get(Uri::from_static("https://acme.test")))
                 .await
                 .unwrap();
             let collected = ndjson_stream(response, 1 << 20, None)
@@ -2127,7 +2160,7 @@ data: {\"finish_reason\":\"length\",\"usage\":{\"input_tokens\":12,\"output_toke
         let ndjson =
             StreamFraming::ndjson(|event, data| json!({"event": event, "data": data}).to_string());
         assert_unknown_stream_frames_surfaced(OK_NDJSON, &ndjson, |body| async move {
-            let response = HttpResponse::from_bytes(200, Headers::new(), body);
+            let response = HttpResponse::from_bytes(StatusCode::OK, HeaderMap::new(), body);
             // `Prepared::finish_stream` holds what arrives before the start.
             Ok(allama::adapter::chat::start_first(ndjson_stream(
                 response,

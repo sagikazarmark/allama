@@ -7,6 +7,7 @@ use allama::prelude::*;
 use allama::wrappers::{ChatExchange, RecordingProvider};
 use allama_anthropic::{DEFAULT_CREDENTIAL_SCOPE, Provider};
 use allama_conformance::{TransportOutcome, assert_transport_options_applied};
+use allama_http::http::HeaderValue;
 use allama_http::{
     Credential, CredentialPlacement, CredentialSlot, HttpRequestOptions, ReplayTransport,
 };
@@ -29,9 +30,9 @@ fn sent_values(transport: &ReplayTransport, name: &str) -> Vec<String> {
     let request = requests.last().expect("the adapter sent a request");
     request
         .headers
+        .get_all(name)
         .iter()
-        .filter(|(key, _)| key.eq_ignore_ascii_case(name))
-        .map(|(_, value)| value.to_owned())
+        .map(|value| value.to_str().unwrap().to_owned())
         .collect()
 }
 
@@ -83,7 +84,7 @@ async fn a_tenant_key_replaces_the_provider_key() {
         HttpRequestOptions::new()
             .credential("anthropic", Credential::api_key("TENANT-SECRET"))
             .credential("openai", Credential::api_key("FOREIGN-SECRET"))
-            .header("Idempotency-Key", "idem-1"),
+            .header("Idempotency-Key", HeaderValue::from_static("idem-1")),
     );
 
     let exchanges = std::sync::Arc::new(std::sync::Mutex::new(Vec::<ChatExchange>::new()));
@@ -102,7 +103,7 @@ async fn a_tenant_key_replaces_the_provider_key() {
         !request
             .headers
             .iter()
-            .any(|(_, value)| value.contains("FOREIGN")),
+            .any(|(_, value)| value.to_str().unwrap().contains("FOREIGN")),
         "a credential for another scope was sent"
     );
     let exchanges = exchanges.lock().unwrap();
@@ -155,7 +156,7 @@ async fn a_plain_credential_header_is_refused_before_sending() {
         let transport = ReplayTransport::default();
         let err = provider(&transport)
             .chat(&with_transport(
-                HttpRequestOptions::new().header(name, "PLAIN-SECRET"),
+                HttpRequestOptions::new().header(name, HeaderValue::from_static("PLAIN-SECRET")),
             ))
             .await
             .unwrap_err();

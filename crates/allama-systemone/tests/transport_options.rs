@@ -5,6 +5,7 @@
 use allama::decision::Question;
 use allama::{DecisionProvider, DecisionRequest, Error, RequestOptions};
 use allama_conformance::{TransportOutcome, assert_transport_options_applied};
+use allama_http::http::HeaderValue;
 use allama_http::{
     Credential, CredentialPlacement, CredentialSlot, HttpRequestOptions, ReplayTransport,
 };
@@ -37,9 +38,9 @@ fn sent_values(transport: &ReplayTransport, name: &str) -> Vec<String> {
     let request = requests.last().expect("the adapter sent a request");
     request
         .headers
+        .get_all(name)
         .iter()
-        .filter(|(key, _)| key.eq_ignore_ascii_case(name))
-        .map(|(_, value)| value.to_owned())
+        .map(|value| value.to_str().unwrap().to_owned())
         .collect()
 }
 
@@ -112,7 +113,7 @@ async fn a_tenant_key_replaces_the_provider_key() {
                     Credential::header("cf-aig-authorization", "Bearer GATEWAY-SECRET"),
                 )
                 .credential("openai", Credential::header("x-other-gateway", "OTHER"))
-                .header("Idempotency-Key", "idem-1"),
+                .header("Idempotency-Key", HeaderValue::from_static("idem-1")),
         )))
         .await;
     assert_eq!(
@@ -130,7 +131,7 @@ async fn a_tenant_key_replaces_the_provider_key() {
         !sent
             .headers
             .iter()
-            .any(|(_, value)| value.contains("FOREIGN")),
+            .any(|(_, value)| value.to_str().unwrap().contains("FOREIGN")),
         "a credential for another scope was sent"
     );
     let debug = format!("{:?}", transport.requests());
@@ -143,7 +144,7 @@ async fn a_plain_credential_header_is_refused_before_sending() {
         let transport = ReplayTransport::default();
         let err = typesafe(&transport)
             .decide(&request(options(
-                HttpRequestOptions::new().header(name, "PLAIN-SECRET"),
+                HttpRequestOptions::new().header(name, HeaderValue::from_static("PLAIN-SECRET")),
             )))
             .await
             .unwrap_err();

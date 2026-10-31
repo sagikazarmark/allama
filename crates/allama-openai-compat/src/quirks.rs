@@ -4,10 +4,10 @@ use std::borrow::Cow;
 
 use allama::Error;
 use allama::adapter::chat::ToolCallIdFormat;
-use allama_http::Headers;
 
 use crate::error::classify_http_error;
 use crate::schema::SchemaDialect;
+use allama_http::http::{HeaderMap, StatusCode};
 
 /// Which request field carries the output token cap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -308,7 +308,7 @@ impl CompatQuirks {
     /// The provider's own classification; a provider crate built on this
     /// one, or a conformance test, maps a recorded failure with it.
     #[must_use]
-    pub fn map_http_error(&self, status: u16, headers: &Headers, body: &str) -> Error {
+    pub fn map_http_error(&self, status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
         classify_http_error(status, headers, body, &self.quota_error_codes)
     }
 }

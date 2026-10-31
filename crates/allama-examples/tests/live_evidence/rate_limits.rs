@@ -17,6 +17,7 @@ use futures_util::StreamExt;
 use serde_json::json;
 
 use super::{env, env_or, post_json, record, send, try_send};
+use allama_http::http::HeaderValue;
 
 const CHECK: &str = "rate_limits";
 
@@ -48,11 +49,12 @@ async fn capture(provider: &str, make: impl Fn() -> HttpRequest) {
             transport_errors += 1;
             continue;
         };
-        *statuses.entry(exchange.status).or_default() += 1;
-        if !exchange.accepted() && captured.insert(exchange.status) {
+        let status = exchange.status.as_u16();
+        *statuses.entry(status).or_default() += 1;
+        if !exchange.accepted() && captured.insert(status) {
             record(
                 CHECK,
-                &format!("{provider}_status_{}", exchange.status),
+                &format!("{provider}_status_{status}"),
                 &json!({"after_requests": sent, "exchange": exchange.record()}),
             );
         }
@@ -114,7 +116,7 @@ async fn rate_limit_anthropic() {
             ("x-api-key", key.clone()),
             &body,
         )
-        .header("anthropic-version", "2023-06-01")
+        .header("anthropic-version", HeaderValue::from_static("2023-06-01"))
     })
     .await;
 }

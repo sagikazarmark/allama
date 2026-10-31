@@ -44,6 +44,7 @@ futures-executor = "0.3"
 futures-timer = "3"
 futures-util = "0.3"
 heck = "0.5"
+http = "1"
 js-sys = "0.3"
 opentelemetry = { version = "0.33.1", default-features = false }
 opentelemetry_sdk = { version = "0.33.1", default-features = false }

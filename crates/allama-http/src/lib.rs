@@ -32,7 +32,7 @@
 //!   [`error_envelope_value`] reads one already parsed.
 //! - [`malformed_response`] is the error for a success response whose body
 //!   cannot be decoded.
-//! - [`Headers::retry_after`] reads retry hints.
+//! - [`retry_after()`] reads retry hints.
 //! - [`TransportError::into_error`] maps a request that got no response,
 //!   and [`TransportError::into_stream_error`] a streamed response whose
 //!   body could not be read to the end.
@@ -87,10 +87,10 @@
 //!
 //! # Secrets
 //!
-//! The `Debug` output of [`Headers`] (and so of [`HttpRequest`] and
-//! [`HttpResponse`]) redacts credential headers (see
-//! [`is_sensitive_header`]) and every credential
-//! [`HttpRequest::apply_options`] placed. Transport errors drop the URL's
+//! The `Debug` output of [`HttpRequest`] and [`HttpResponse`] redacts
+//! credential headers (see [`is_sensitive_header`]) and every value marked
+//! [sensitive](http::HeaderValue::set_sensitive), which every credential
+//! [`HttpRequest::apply_options`] placed is. Transport errors drop the URL's
 //! user info, query and fragment, and the bundled providers' `Debug`
 //! output shows base URLs through [`config::redact_url`].
 //!
@@ -127,6 +127,9 @@
 //! moving any of them to a new major (minor, before 1.0) version is a
 //! breaking release of `allama-http`:
 //!
+//! - `http` 1: [`http`], re-exported, is the vocabulary of
+//!   [`HttpRequest`] and [`HttpResponse`] (method, URI, headers, status)
+//!   and of the helpers that read them;
 //! - `bytes` 1: [`Bytes`], re-exported, carries request and response
 //!   bodies;
 //! - `futures-core` 0.3: the [`Body`] stream and the framers' stream
@@ -155,15 +158,16 @@
 //! version for every crate, the same mix is a compile error.
 //!
 //! ```
+//! use allama_http::http::{StatusCode, Uri};
 //! use allama_http::{HttpRequest, HttpTransport, ReplayResponse, ReplayTransport};
 //!
 //! # async fn example() -> Result<(), allama_http::TransportError> {
-//! let transport = ReplayTransport::new([ReplayResponse::json(200, r#"{"ok":true}"#)]);
+//! let transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, r#"{"ok":true}"#)]);
 //! let response = transport
-//!     .send(HttpRequest::post("https://api.example.com/v1/chat", "{}"))
+//!     .send(HttpRequest::post(Uri::from_static("https://api.example.com/v1/chat"), "{}"))
 //!     .await?;
-//! assert_eq!(response.status, 200);
-//! assert_eq!(transport.requests()[0].url, "https://api.example.com/v1/chat");
+//! assert_eq!(response.status, StatusCode::OK);
+//! assert_eq!(transport.requests()[0].uri, "https://api.example.com/v1/chat");
 //! # Ok(()) }
 //! ```
 //!
@@ -179,6 +183,7 @@
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 
+use std::borrow::Cow;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
@@ -188,6 +193,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub use bytes::Bytes;
 use futures_core::Stream;
 use futures_util::StreamExt;
+/// The `http` crate whose types [`HttpRequest`] and [`HttpResponse`] are
+/// made of, re-exported so an adapter or transport names the same version.
+pub use http;
+use http::header::IntoHeaderName;
+use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri};
 
 pub mod config;
 mod credential;
@@ -213,7 +223,7 @@ pub use options::{HttpRequestOptions, OPTIONS_NAMESPACE};
 pub use replay::{ReplayResponse, ReplayTransport};
 #[cfg(feature = "reqwest")]
 pub use reqwest::{DEFAULT_CONNECT_TIMEOUT, ReqwestTransport};
-pub use retry_after::parse_retry_after;
+pub use retry_after::{parse_retry_after, retry_after};
 pub use timeout::StreamTimeouts;
 
 /// A boxed future returned by [`HttpTransport::send`].
@@ -246,75 +256,79 @@ impl<T: HttpTransport + ?Sized> HttpTransport for Box<T> {
     }
 }
 
-/// HTTP method.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum Method {
-    /// `GET`.
-    Get,
-    /// `POST`.
-    Post,
-}
-
-impl Method {
-    /// The method name.
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Get => "GET",
-            Self::Post => "POST",
-        }
-    }
-}
-
-/// An HTTP request built by a provider.
+/// An HTTP request built by a provider: the [`http`] crate's method, URI
+/// and headers, a body, and the bound on the whole exchange.
 ///
-/// `Debug` output redacts credential headers (see [`Headers`]).
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// It converts to and from `http::Request<Bytes>`, the timeout travelling
+/// as a [`RequestTimeout`] extension, so a transport over any `http`-based
+/// client (`hyper`, a `tower` service, a Workers `fetch`) maps it as it is.
+///
+/// `Debug` output redacts credential headers: values marked
+/// [sensitive](HeaderValue::set_sensitive), and names
+/// [`is_sensitive_header`] matches.
+#[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct HttpRequest {
     /// Method.
     pub method: Method,
-    /// Absolute URL.
-    pub url: String,
-    /// Headers, in order.
-    pub headers: Headers,
-    /// Body, if any.
-    pub body: Option<Bytes>,
+    /// Absolute URI.
+    pub uri: Uri,
+    /// Headers.
+    pub headers: HeaderMap,
+    /// Body: empty when the request has none.
+    pub body: Bytes,
     /// Bound on the whole exchange, when the provider sets one. Streaming
     /// requests usually leave it unset.
     pub timeout: Option<Duration>,
 }
 
+impl fmt::Debug for HttpRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HttpRequest")
+            .field("method", &self.method)
+            .field("uri", &self.uri)
+            .field("headers", &RedactedHeaders(&self.headers))
+            .field("body", &self.body)
+            .field("timeout", &self.timeout)
+            .finish()
+    }
+}
+
 impl HttpRequest {
-    /// A `GET` request.
+    /// A `method` request to `uri`, without headers or body.
     #[must_use]
-    pub fn get(url: impl Into<String>) -> Self {
+    pub fn new(method: Method, uri: Uri) -> Self {
         Self {
-            method: Method::Get,
-            url: url.into(),
-            headers: Headers::new(),
-            body: None,
+            method,
+            uri,
+            headers: HeaderMap::new(),
+            body: Bytes::new(),
             timeout: None,
         }
+    }
+
+    /// A `GET` request.
+    #[must_use]
+    pub fn get(uri: Uri) -> Self {
+        Self::new(Method::GET, uri)
     }
 
     /// A `POST` request with `body`.
     #[must_use]
-    pub fn post(url: impl Into<String>, body: impl Into<Bytes>) -> Self {
+    pub fn post(uri: Uri, body: impl Into<Bytes>) -> Self {
         Self {
-            method: Method::Post,
-            url: url.into(),
-            headers: Headers::new(),
-            body: Some(body.into()),
-            timeout: None,
+            body: body.into(),
+            ..Self::new(Method::POST, uri)
         }
     }
 
-    /// Add a header.
+    /// Add a header, after the values of the same name already set.
+    ///
+    /// The name is a [`HeaderName`] or a `&'static str`, which panics when
+    /// it is not a valid header name, as in [`HeaderMap::append`].
     #[must_use]
-    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.insert(name, value);
+    pub fn header(mut self, name: impl IntoHeaderName, value: HeaderValue) -> Self {
+        self.headers.append(name, value);
         self
     }
 
@@ -328,44 +342,50 @@ impl HttpRequest {
     /// The body as UTF-8 text, if it is valid UTF-8.
     #[must_use]
     pub fn body_text(&self) -> Option<&str> {
-        std::str::from_utf8(self.body.as_deref()?).ok()
+        std::str::from_utf8(&self.body).ok()
     }
 
-    /// Add a header whose value is a secret: `Debug` output redacts it
-    /// whatever its name. For an adapter that places a credential itself
+    /// Add a header whose value is a secret: it is marked
+    /// [sensitive](HeaderValue::set_sensitive), so `Debug` output redacts
+    /// it whatever its name, here and in the `http` crate's own types. For
+    /// an adapter that places a credential itself
     /// ([`CredentialPlacement::Custom`]).
     #[must_use]
-    pub fn sensitive_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.insert_sensitive(name, value);
+    pub fn sensitive_header(mut self, name: impl IntoHeaderName, mut value: HeaderValue) -> Self {
+        value.set_sensitive(true);
+        self.headers.append(name, value);
         self
     }
 
     /// Set each of `headers`, replacing the request's headers of the same
-    /// name (ignoring case) and adding the others, in order. For the
-    /// headers a provider sends with every request: the bundled providers
-    /// set their [`DEFAULT_USER_AGENT`] and the builder's own headers
+    /// name and adding the others. For the headers a provider sends with
+    /// every request: the bundled providers set their
+    /// [`DEFAULT_USER_AGENT`] and the builder's own headers
     /// (`header(name, value)`, validated by [`config::static_headers`])
     /// with it, after their protocol headers and before
     /// [`apply_options`](Self::apply_options), so a request's own headers
     /// still win.
     ///
     /// ```
-    /// use allama_http::{Headers, HttpRequest};
+    /// use allama_http::HttpRequest;
+    /// use allama_http::http::{HeaderMap, HeaderValue, Uri};
     ///
-    /// let defaults: Headers = [("user-agent", "my-app/1.0"), ("x-route", "eu")].into_iter().collect();
-    /// let request = HttpRequest::post("https://api.example.com/v1/chat", "{}")
-    ///     .header("User-Agent", "allama/0.1.0")
+    /// let mut defaults = HeaderMap::new();
+    /// defaults.insert("user-agent", HeaderValue::from_static("my-app/1.0"));
+    /// defaults.insert("x-route", HeaderValue::from_static("eu"));
+    /// let request = HttpRequest::post(Uri::from_static("https://api.example.com/v1/chat"), "{}")
+    ///     .header("user-agent", HeaderValue::from_static("allama/0.1.0"))
     ///     .with_headers(&defaults);
-    /// assert_eq!(request.headers.get("user-agent"), Some("my-app/1.0"));
-    /// assert_eq!(request.headers.iter().count(), 2);
+    /// assert_eq!(request.headers["user-agent"], "my-app/1.0");
+    /// assert_eq!(request.headers.len(), 2);
     /// ```
     #[must_use]
-    pub fn with_headers(mut self, headers: &Headers) -> Self {
-        for (name, _) in headers.iter() {
+    pub fn with_headers(mut self, headers: &HeaderMap) -> Self {
+        for name in headers.keys() {
             self.headers.remove(name);
         }
-        for header in &headers.0 {
-            self.headers.0.push(header.clone());
+        for (name, value) in headers {
+            self.headers.append(name, value.clone());
         }
         self
     }
@@ -394,10 +414,12 @@ impl HttpRequest {
     ///    each replacing the headers of the same name.
     ///
     /// Credentials addressed to other scopes are never sent. Placed
-    /// credentials are redacted from `Debug` whatever the header name.
+    /// credentials are marked [sensitive](HeaderValue::set_sensitive), so
+    /// `Debug` redacts them whatever the header name.
     ///
     /// ```
     /// use allama::ChatRequest;
+    /// use allama_http::http::{HeaderValue, Uri};
     /// use allama_http::{Credential, CredentialPlacement, CredentialSlot, HttpRequest, HttpRequestOptions};
     ///
     /// let slot = CredentialSlot::new("anthropic", CredentialPlacement::Header("x-api-key".into()));
@@ -405,13 +427,13 @@ impl HttpRequest {
     ///     HttpRequestOptions::new()
     ///         .credential("anthropic", Credential::api_key("tenant-key"))
     ///         .credential("openai", Credential::api_key("other-account"))
-    ///         .header("x-tenant-id", "acme"),
+    ///         .header("x-tenant-id", HeaderValue::from_static("acme")),
     /// );
-    /// let http = HttpRequest::post("https://api.example.com/v1/messages", "{}")
-    ///     .header("x-api-key", "provider-key")
+    /// let http = HttpRequest::post(Uri::from_static("https://api.example.com/v1/messages"), "{}")
+    ///     .header("x-api-key", HeaderValue::from_static("provider-key"))
     ///     .apply_options(&request.options, &slot)?;
-    /// assert_eq!(http.headers.get("x-api-key"), Some("tenant-key"));
-    /// assert_eq!(http.headers.get("x-tenant-id"), Some("acme"));
+    /// assert_eq!(http.headers["x-api-key"], "tenant-key");
+    /// assert_eq!(http.headers["x-tenant-id"], "acme");
     /// assert!(!format!("{http:?}").contains("other-account"));
     /// # Ok::<(), allama::Error>(())
     /// ```
@@ -419,16 +441,18 @@ impl HttpRequest {
     /// # Errors
     ///
     /// - [`allama::Error::InvalidRequest`] when the JSON form of the options
-    ///   is malformed, names a header on the exact credential list
-    ///   ([`is_credential_header`]), or sets credentials.
+    ///   is malformed, names a header that is not valid or is on the exact
+    ///   credential list ([`is_credential_header`]), or sets credentials.
     /// - An authored [`allama::Error::Configuration`], before anything is
     ///   sent, when a plain header is named on the exact credential list
     ///   ([`is_credential_header`]) or is one the slot writes or replaces,
-    ///   or when the slot is [required](CredentialSlot::required) and no
-    ///   credential is addressed to its scope. These are the application's
-    ///   bugs, not the end user's, so they are not retried, never fall over
-    ///   to another provider, and map to a server error. Error text names
-    ///   headers and scopes, never secrets.
+    ///   when the slot is [required](CredentialSlot::required) and no
+    ///   credential is addressed to its scope, or when a credential cannot
+    ///   be carried in its header (a name that is not a header name, a
+    ///   secret with characters a header cannot carry). These are the
+    ///   application's bugs, not the end user's, so they are not retried,
+    ///   never fall over to another provider, and map to a server error.
+    ///   Error text names headers and scopes, never secrets.
     pub fn apply_options(
         mut self,
         options: &allama::RequestOptions,
@@ -451,18 +475,15 @@ impl HttpRequest {
         let Some(transport) = transport else {
             return Ok(self);
         };
-        for (name, _) in transport.headers.iter() {
-            self.headers.remove(name);
-        }
-        for (name, value) in transport.headers.iter() {
-            self.headers.insert(name, value);
-        }
+        self = self.with_headers(&transport.headers);
         if let Some(credential) = credential {
             self.place(credential, slot)?;
         }
         for (name, secret) in transport.header_credentials_for(&slot.scope) {
-            self.headers.remove(name);
-            self.headers.insert_sensitive(name, secret);
+            let name = credential_header_name(name, &slot.scope)?;
+            let value = credential_value(secret, &name, &slot.scope)?;
+            self.headers.remove(&name);
+            self.headers.append(name, value);
         }
         Ok(self)
     }
@@ -472,21 +493,52 @@ impl HttpRequest {
         let (name, value) = match (&slot.placement, credential.kind()) {
             (CredentialPlacement::Custom, _) => return Ok(()),
             (CredentialPlacement::Bearer, CredentialKind::ApiKey) => (
-                "authorization",
+                http::header::AUTHORIZATION,
                 format!("Bearer {}", credential.expose_secret()),
             ),
-            (CredentialPlacement::Header(name), CredentialKind::ApiKey) => {
-                (name.as_ref(), credential.expose_secret().to_owned())
-            }
+            (CredentialPlacement::Header(name), CredentialKind::ApiKey) => (
+                credential_header_name(name, &slot.scope)?,
+                credential.expose_secret().to_owned(),
+            ),
             _ => return Err(credential.unsupported(&slot.scope)),
         };
-        self.headers.remove(name);
+        let value = credential_value(&value, &name, &slot.scope)?;
+        self.headers.remove(&name);
         for replaced in &slot.replaces {
-            self.headers.remove(replaced);
+            self.headers.remove(replaced.as_ref());
         }
-        self.headers.insert_sensitive(name, value);
+        self.headers.append(name, value);
         Ok(())
     }
+}
+
+/// The header name a credential addressed to `scope` goes in.
+fn credential_header_name(name: &str, scope: &str) -> allama::Result<HeaderName> {
+    HeaderName::try_from(name).map_err(|_| {
+        allama::Error::configuration(format!(
+            "a credential addressed to credential scope `{scope}` goes in a header whose name \
+             is not a valid HTTP header name"
+        ))
+        .authored()
+    })
+}
+
+/// `secret` as a sensitive header value: an authored configuration error,
+/// naming the header and never the secret, when no header can carry it.
+fn credential_value(secret: &str, name: &HeaderName, scope: &str) -> allama::Result<HeaderValue> {
+    let invalid = || {
+        allama::Error::configuration(format!(
+            "the `{name}` credential addressed to credential scope `{scope}` contains \
+             characters an HTTP header cannot carry"
+        ))
+        .authored()
+    };
+    if !config::is_header_value(secret) {
+        return Err(invalid());
+    }
+    let mut value = HeaderValue::try_from(secret).map_err(|_| invalid())?;
+    value.set_sensitive(true);
+    Ok(value)
 }
 
 /// Refuse the plain headers in `transport` that would carry a credential:
@@ -495,7 +547,8 @@ fn refuse_credential_headers(
     transport: &HttpRequestOptions,
     slot: &CredentialSlot,
 ) -> allama::Result<()> {
-    for (name, _) in transport.headers.iter() {
+    for name in transport.headers.keys() {
+        let name = name.as_str();
         if is_credential_header(name) {
             return Err(allama::Error::configuration(format!(
                 "the plain header `{name}` carries a credential: send it with \
@@ -515,104 +568,134 @@ fn refuse_credential_headers(
     Ok(())
 }
 
-/// HTTP headers, matched case-insensitively and kept in order.
+/// The URI of a request URL an adapter built (its base URL with a path and
+/// an id appended), for [`HttpRequest::new`].
 ///
-/// `Debug` output redacts the values of credential headers (see
-/// [`is_sensitive_header`]), so requests and responses can be logged.
-#[derive(Clone, Default, PartialEq, Eq)]
-pub struct Headers(Vec<Header>);
+/// The bundled providers check their base URL when they are built
+/// ([`config::base_url`]), so what fails here is the part a request added:
+/// a model or response id with characters a URI cannot carry.
+///
+/// ```
+/// use allama_http::request_uri;
+///
+/// let uri = request_uri(format!("{}/models/{}", "https://api.example.com/v1", "gpt-5"))?;
+/// assert_eq!(uri.path(), "/v1/models/gpt-5");
+/// let err = request_uri("https://api.example.com/v1/models/my model?key=SECRET").unwrap_err();
+/// assert!(matches!(err, allama::Error::InvalidRequest { .. }));
+/// assert!(!format!("{err} {err:?}").contains("SECRET"));
+/// # Ok::<(), allama::Error>(())
+/// ```
+///
+/// # Errors
+///
+/// An authored [`allama::Error::InvalidRequest`] when `url` is not a valid
+/// URI. It never quotes `url`, which may carry a key in its query.
+pub fn request_uri(url: impl Into<String>) -> allama::Result<Uri> {
+    Uri::try_from(url.into()).map_err(|_| {
+        allama::Error::invalid_request(
+            "the request URL is not a valid URI: an id in its path holds characters a URI \
+             cannot carry",
+        )
+        .authored()
+    })
+}
 
-impl Headers {
-    /// No headers.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
+/// The timeout of an [`HttpRequest`] as an extension of the
+/// `http::Request` it converts to (and from), for a transport over an
+/// `http`-based client to read.
+///
+/// ```
+/// use std::time::Duration;
+/// use allama_http::http::Uri;
+/// use allama_http::{Bytes, HttpRequest, RequestTimeout};
+///
+/// let request = HttpRequest::get(Uri::from_static("https://x")).timeout(Some(Duration::from_secs(5)));
+/// let http: allama_http::http::Request<Bytes> = request.clone().into();
+/// assert_eq!(http.extensions().get(), Some(&RequestTimeout(Duration::from_secs(5))));
+/// assert_eq!(HttpRequest::from(http), request);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RequestTimeout(pub Duration);
 
-    /// Append a header.
-    pub fn insert(&mut self, name: impl Into<String>, value: impl Into<String>) {
-        self.0.push(Header {
-            name: name.into(),
-            value: value.into(),
-            sensitive: false,
-        });
-    }
-
-    /// Append a header whose value is a secret, which `Debug` output
-    /// redacts whatever the header's name.
-    pub fn insert_sensitive(&mut self, name: impl Into<String>, value: impl Into<String>) {
-        self.0.push(Header {
-            name: name.into(),
-            value: value.into(),
-            sensitive: true,
-        });
-    }
-
-    /// Remove every value of `name`, ignoring case.
-    pub fn remove(&mut self, name: &str) {
-        self.0
-            .retain(|header| !header.name.eq_ignore_ascii_case(name));
-    }
-
-    /// The first value of `name`, ignoring case.
-    #[must_use]
-    pub fn get(&self, name: &str) -> Option<&str> {
-        self.0
-            .iter()
-            .find(|header| header.name.eq_ignore_ascii_case(name))
-            .map(|header| header.value.as_str())
-    }
-
-    /// Iterate over `(name, value)` pairs.
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.0
-            .iter()
-            .map(|header| (header.name.as_str(), header.value.as_str()))
-    }
-
-    /// How long the server asks the client to wait before retrying: the
-    /// `name` header (usually `retry-after`) or `retry-after-ms`, parsed
-    /// with [`parse_retry_after`] relative to the current time.
-    ///
-    /// Unlike passing `SystemTime::now()` yourself, this also works on
-    /// `wasm32-unknown-unknown`.
-    #[must_use]
-    pub fn retry_after(&self, name: &str) -> Option<Duration> {
-        parse_retry_after(self.get(name), self.get("retry-after-ms"), now())
+impl From<HttpRequest> for http::Request<Bytes> {
+    fn from(request: HttpRequest) -> Self {
+        let mut http = http::Request::new(request.body);
+        *http.method_mut() = request.method;
+        *http.uri_mut() = request.uri;
+        *http.headers_mut() = request.headers;
+        if let Some(timeout) = request.timeout {
+            http.extensions_mut().insert(RequestTimeout(timeout));
+        }
+        http
     }
 }
 
-impl fmt::Debug for Headers {
+/// Reads the timeout from a [`RequestTimeout`] extension; the version and
+/// other extensions are dropped.
+impl From<http::Request<Bytes>> for HttpRequest {
+    fn from(request: http::Request<Bytes>) -> Self {
+        let (parts, body) = request.into_parts();
+        Self {
+            method: parts.method,
+            uri: parts.uri,
+            headers: parts.headers,
+            body,
+            timeout: parts
+                .extensions
+                .get::<RequestTimeout>()
+                .map(|timeout| timeout.0),
+        }
+    }
+}
+
+/// `headers` as `Debug` output may show them: the values of credential
+/// headers redacted, those marked [sensitive](HeaderValue::set_sensitive)
+/// and those whose name [`is_sensitive_header`] matches.
+///
+/// [`HttpRequest`] and [`HttpResponse`] print their headers with it; a
+/// transport or test double of your own that logs headers can too.
+///
+/// ```
+/// use allama_http::http::{HeaderMap, HeaderValue};
+/// use allama_http::redacted_headers;
+///
+/// let mut headers = HeaderMap::new();
+/// headers.insert("x-api-key", HeaderValue::from_static("SECRET"));
+/// headers.insert("x-request-id", HeaderValue::from_static("req_1"));
+/// let debug = format!("{:?}", redacted_headers(&headers));
+/// assert!(!debug.contains("SECRET"));
+/// assert!(debug.contains("req_1"));
+/// ```
+#[must_use]
+pub fn redacted_headers(headers: &HeaderMap) -> impl fmt::Debug + '_ {
+    RedactedHeaders(headers)
+}
+
+/// Headers as `Debug` output shows them (see [`redacted_headers`]).
+pub(crate) struct RedactedHeaders<'a>(pub(crate) &'a HeaderMap);
+
+impl fmt::Debug for RedactedHeaders<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map()
-            .entries(self.0.iter().map(|header| (&header.name, header)))
+            .entries(
+                self.0
+                    .iter()
+                    .map(|(name, value)| (name, RedactedValue(name, value))),
+            )
             .finish()
     }
 }
 
-/// One header of [`Headers`].
-#[derive(Clone, PartialEq, Eq)]
-struct Header {
-    name: String,
-    value: String,
-    /// Set for a placed credential: redacted whatever the name.
-    sensitive: bool,
-}
+/// A header value as `Debug` shows it: redacted when it is marked
+/// sensitive or its name looks like a credential's.
+struct RedactedValue<'a>(&'a HeaderName, &'a HeaderValue);
 
-impl Header {
-    /// Whether `Debug` output redacts the value.
-    fn is_sensitive(&self) -> bool {
-        self.sensitive || is_sensitive_header(&self.name)
-    }
-}
-
-/// The value as `Debug` shows it: redacted when the header is sensitive.
-impl fmt::Debug for Header {
+impl fmt::Debug for RedactedValue<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_sensitive() {
+        if self.1.is_sensitive() || is_sensitive_header(self.0.as_str()) {
             f.write_str("<redacted>")
         } else {
-            fmt::Debug::fmt(&self.value, f)
+            fmt::Debug::fmt(self.1, f)
         }
     }
 }
@@ -643,6 +726,14 @@ pub fn is_sensitive_header(name: &str) -> bool {
         || FRAGMENTS.iter().any(|part| name.contains(part))
 }
 
+/// The value of the first `name` header as text, decoded lossily: a value
+/// that is not visible ASCII (obs-text) is kept, not dropped.
+pub(crate) fn header_text<'a>(headers: &'a HeaderMap, name: &str) -> Option<Cow<'a, str>> {
+    headers
+        .get(name)
+        .map(|value| String::from_utf8_lossy(value.as_bytes()))
+}
+
 /// The current time as a `std` `SystemTime`, read through `web-time`:
 /// `SystemTime::now` panics on `wasm32-unknown-unknown`.
 fn now() -> SystemTime {
@@ -652,23 +743,16 @@ fn now() -> SystemTime {
     UNIX_EPOCH + since_epoch
 }
 
-impl<K: Into<String>, V: Into<String>> FromIterator<(K, V)> for Headers {
-    fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
-        let mut headers = Self::new();
-        for (name, value) in iter {
-            headers.insert(name, value);
-        }
-        headers
-    }
-}
-
 /// An HTTP response: status and headers, then a streamed body.
+///
+/// It converts to and from `http::Response<Body>`. `Debug` output redacts
+/// credential headers, as [`HttpRequest`]'s does.
 #[non_exhaustive]
 pub struct HttpResponse {
     /// Status code.
-    pub status: u16,
+    pub status: StatusCode,
     /// Headers.
-    pub headers: Headers,
+    pub headers: HeaderMap,
     body: Body,
 }
 
@@ -676,15 +760,32 @@ impl fmt::Debug for HttpResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HttpResponse")
             .field("status", &self.status)
-            .field("headers", &self.headers)
+            .field("headers", &RedactedHeaders(&self.headers))
             .finish_non_exhaustive()
+    }
+}
+
+impl From<HttpResponse> for http::Response<Body> {
+    fn from(response: HttpResponse) -> Self {
+        let mut http = http::Response::new(response.body);
+        *http.status_mut() = response.status;
+        *http.headers_mut() = response.headers;
+        http
+    }
+}
+
+/// The version and extensions are dropped.
+impl From<http::Response<Body>> for HttpResponse {
+    fn from(response: http::Response<Body>) -> Self {
+        let (parts, body) = response.into_parts();
+        Self::new(parts.status, parts.headers, body)
     }
 }
 
 impl HttpResponse {
     /// A response with a streamed body.
     #[must_use]
-    pub fn new(status: u16, headers: Headers, body: Body) -> Self {
+    pub fn new(status: StatusCode, headers: HeaderMap, body: Body) -> Self {
         Self {
             status,
             headers,
@@ -694,7 +795,7 @@ impl HttpResponse {
 
     /// A response with the whole body at once.
     #[must_use]
-    pub fn from_bytes(status: u16, headers: Headers, body: impl Into<Bytes>) -> Self {
+    pub fn from_bytes(status: StatusCode, headers: HeaderMap, body: impl Into<Bytes>) -> Self {
         let body = body.into();
         Self::new(
             status,
@@ -706,9 +807,8 @@ impl HttpResponse {
     /// Returns `true` for 2xx statuses.
     #[must_use]
     pub fn is_success(&self) -> bool {
-        (200..300).contains(&self.status)
+        self.status.is_success()
     }
-
     /// Read the whole body, however large.
     ///
     /// For a response from a server you do not control, read with
@@ -742,10 +842,11 @@ impl HttpResponse {
     /// never read.
     ///
     /// ```
-    /// use allama_http::{Headers, HttpResponse, TransportErrorKind};
+    /// use allama_http::http::{HeaderMap, StatusCode};
+    /// use allama_http::{HttpResponse, TransportErrorKind};
     ///
     /// # futures_util::FutureExt::now_or_never(async {
-    /// let response = HttpResponse::from_bytes(200, Headers::new(), "0123456789");
+    /// let response = HttpResponse::from_bytes(StatusCode::OK, HeaderMap::new(), "0123456789");
     /// let err = response.bytes_limited(4).await.unwrap_err();
     /// assert_eq!(err.kind(), TransportErrorKind::TooLarge);
     /// assert!(matches!(err.into_error(), allama::Error::UnexpectedResponse { .. }));
@@ -817,23 +918,25 @@ impl HttpResponse {
     ///
     /// ```
     /// use allama::Error;
-    /// use allama_http::{HttpResponse, Headers, error_context, status_error};
+    /// use allama_http::http::{HeaderMap, HeaderValue, StatusCode, header};
+    /// use allama_http::{HttpResponse, error_context, status_error};
     ///
     /// # futures_util::FutureExt::now_or_never(async {
-    /// let map = |status: u16, headers: &Headers, body: &str| {
-    ///     status_error(status, format!("HTTP {status}"))
+    /// let map = |status: StatusCode, headers: &HeaderMap, body: &str| {
+    ///     status_error(status, format!("HTTP {}", status.as_u16()))
     ///         .with_context(error_context(status, headers))
     ///         .authored()
     ///         .with_body(body.to_owned())
     /// };
     ///
-    /// let response = HttpResponse::from_bytes(429, Headers::new(), "slow down");
+    /// let response = HttpResponse::from_bytes(StatusCode::TOO_MANY_REQUESTS, HeaderMap::new(), "slow down");
     /// let err = response.map_error(map).await;
     /// assert!(matches!(err, Error::RateLimited { .. }));
     /// assert_eq!(err.context().and_then(|c| c.capped_body()), Some("slow down"));
     ///
-    /// let headers = [("location", "https://elsewhere.example/v1/chat")].into_iter().collect();
-    /// let redirect = HttpResponse::from_bytes(307, headers, "");
+    /// let mut headers = HeaderMap::new();
+    /// headers.insert(header::LOCATION, HeaderValue::from_static("https://elsewhere.example/v1/chat"));
+    /// let redirect = HttpResponse::from_bytes(StatusCode::TEMPORARY_REDIRECT, headers, "");
     /// let err = redirect.map_error(map).await;
     /// assert!(matches!(err, Error::UnexpectedResponse { .. }));
     /// assert!(err.to_string().contains("elsewhere.example"));
@@ -841,9 +944,9 @@ impl HttpResponse {
     /// ```
     pub async fn map_error(
         self,
-        map: impl FnOnce(u16, &Headers, &str) -> allama::Error,
+        map: impl FnOnce(StatusCode, &HeaderMap, &str) -> allama::Error,
     ) -> allama::Error {
-        if (300..400).contains(&self.status) {
+        if self.status.is_redirection() {
             return redirect_error(self.status, &self.headers);
         }
         let (body, failure) =
@@ -917,10 +1020,12 @@ pub const DEFAULT_USER_AGENT: &str = concat!("allama/", env!("CARGO_PKG_VERSION"
 ///
 /// ```
 /// use allama::Error;
-/// use allama_http::{Headers, redirect_error};
+/// use allama_http::http::{HeaderMap, HeaderValue, StatusCode, header};
+/// use allama_http::redirect_error;
 ///
-/// let headers: Headers = [("location", "http://169.254.169.254/latest?token=x")].into_iter().collect();
-/// let err = redirect_error(307, &headers);
+/// let mut headers = HeaderMap::new();
+/// headers.insert(header::LOCATION, HeaderValue::from_static("http://169.254.169.254/latest?token=x"));
+/// let err = redirect_error(StatusCode::TEMPORARY_REDIRECT, &headers);
 /// assert!(matches!(err, Error::UnexpectedResponse { .. }));
 /// assert_eq!(err.status(), Some(307));
 /// assert!(!err.is_retryable());
@@ -932,14 +1037,16 @@ pub const DEFAULT_USER_AGENT: &str = concat!("allama/", env!("CARGO_PKG_VERSION"
 /// ```
 #[cfg_attr(not(feature = "reqwest"), doc = "[`ReqwestTransport::new`]: crate")]
 #[must_use]
-pub fn redirect_error(status: u16, headers: &Headers) -> allama::Error {
-    let target = match headers.get("location").map(config::url_host) {
+pub fn redirect_error(status: StatusCode, headers: &HeaderMap) -> allama::Error {
+    let target = match header_text(headers, "location").map(|location| config::url_host(&location))
+    {
         Some(Some(host)) => format!("to `{host}`"),
         Some(None) => "within the same host".to_owned(),
         None => "without a `Location`".to_owned(),
     };
     allama::Error::unexpected_response(format!(
-        "HTTP {status}: the server redirected the request {target}; redirects are not followed"
+        "HTTP {}: the server redirected the request {target}; redirects are not followed",
+        status.as_u16()
     ))
     .with_context(error_context(status, headers))
     .authored()
@@ -1211,41 +1318,57 @@ impl From<TransportError> for allama::Error {
 mod tests {
     use super::*;
 
+    fn uri() -> Uri {
+        Uri::from_static("https://x")
+    }
+
+    fn value(value: &str) -> HeaderValue {
+        HeaderValue::from_str(value).unwrap()
+    }
+
+    fn header_map(pairs: &[(&str, &str)]) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for (name, v) in pairs {
+            headers.append(HeaderName::try_from(*name).unwrap(), value(v));
+        }
+        headers
+    }
+
+    fn status(code: u16) -> StatusCode {
+        StatusCode::from_u16(code).unwrap()
+    }
+
     #[test]
     fn headers_are_case_insensitive() {
-        let headers: Headers = [("Request-Id", "req_1"), ("retry-after", "2")]
-            .into_iter()
-            .collect();
-        assert_eq!(headers.get("request-id"), Some("req_1"));
-        assert_eq!(headers.get("RETRY-AFTER"), Some("2"));
+        let headers = header_map(&[("Request-Id", "req_1"), ("retry-after", "2")]);
+        assert_eq!(headers["request-id"], "req_1");
+        assert_eq!(headers["RETRY-AFTER"], "2");
         assert_eq!(headers.get("missing"), None);
     }
 
     #[test]
     fn debug_output_redacts_credentials() {
-        let request = HttpRequest::post("https://x", "{}")
-            .header("Authorization", "Bearer sk-live-SECRET1")
-            .header("x-api-key", "SECRET2")
-            .header("x-goog-api-key", "SECRET3")
-            .header("Proxy-Authorization", "Basic SECRET4")
-            .header("cookie", "session=SECRET5")
-            .header("x-gateway-token", "SECRET6")
-            .header("X-Client-Secret", "SECRET7")
-            .header("api-key", "SECRET8")
-            .header("x-request-id", "req_1");
+        let request = HttpRequest::post(uri(), "{}")
+            .header("Authorization", value("Bearer sk-live-SECRET1"))
+            .header("x-api-key", value("SECRET2"))
+            .header("x-goog-api-key", value("SECRET3"))
+            .header("Proxy-Authorization", value("Basic SECRET4"))
+            .header("cookie", value("session=SECRET5"))
+            .header("x-gateway-token", value("SECRET6"))
+            .header("X-Client-Secret", value("SECRET7"))
+            .header("api-key", value("SECRET8"))
+            .header("x-request-id", value("req_1"));
         let debug = format!("{request:?}");
         assert!(!debug.contains("SECRET"), "{debug}");
         assert!(debug.contains(r#""x-request-id": "req_1""#), "{debug}");
-        assert!(debug.contains(r#""Authorization": <redacted>"#), "{debug}");
+        assert!(debug.contains(r#""authorization": <redacted>"#), "{debug}");
 
         let response = HttpResponse::from_bytes(
-            200,
-            [
+            StatusCode::OK,
+            header_map(&[
                 ("set-cookie", "session=SECRET9"),
                 ("content-type", "text/plain"),
-            ]
-            .into_iter()
-            .collect(),
+            ]),
             "",
         );
         let debug = format!("{response:?}");
@@ -1253,8 +1376,9 @@ mod tests {
         assert!(debug.contains("text/plain"), "{debug}");
 
         let signed =
-            HttpRequest::post("https://x", "{}").sensitive_header("x-signature", "SECRET10");
-        assert_eq!(signed.headers.get("x-signature"), Some("SECRET10"));
+            HttpRequest::post(uri(), "{}").sensitive_header("x-signature", value("SECRET10"));
+        assert_eq!(signed.headers["x-signature"], "SECRET10");
+        assert!(signed.headers["x-signature"].is_sensitive());
         assert!(!format!("{signed:?}").contains("SECRET"));
     }
 
@@ -1276,31 +1400,93 @@ mod tests {
 
     #[test]
     fn retry_after_reads_the_named_header_or_milliseconds() {
-        let headers: Headers = [("x-retry", "3")].into_iter().collect();
-        assert_eq!(headers.retry_after("x-retry"), Some(Duration::from_secs(3)));
-        assert_eq!(headers.retry_after("retry-after"), None);
-
-        let headers: Headers = [("retry-after-ms", "1500")].into_iter().collect();
+        let headers = header_map(&[("x-retry", "3")]);
         assert_eq!(
-            headers.retry_after("retry-after"),
+            retry_after(&headers, "x-retry"),
+            Some(Duration::from_secs(3))
+        );
+        assert_eq!(retry_after(&headers, "retry-after"), None);
+
+        let headers = header_map(&[("retry-after-ms", "1500")]);
+        assert_eq!(
+            retry_after(&headers, "retry-after"),
             Some(Duration::from_millis(1500))
         );
 
-        let past: Headers = [("retry-after", "Sun, 06 Nov 1994 08:49:37 GMT")]
-            .into_iter()
-            .collect();
-        assert_eq!(past.retry_after("retry-after"), Some(Duration::ZERO));
+        let past = header_map(&[("retry-after", "Sun, 06 Nov 1994 08:49:37 GMT")]);
+        assert_eq!(retry_after(&past, "retry-after"), Some(Duration::ZERO));
     }
 
     #[test]
     fn requests_build_fluently() {
-        let request = HttpRequest::post("https://x", "{}")
-            .header("authorization", "Bearer k")
+        let request = HttpRequest::post(uri(), "{}")
+            .header("authorization", value("Bearer k"))
             .timeout(Some(Duration::from_secs(5)));
-        assert_eq!(request.method.as_str(), "POST");
-        assert_eq!(request.headers.get("Authorization"), Some("Bearer k"));
+        assert_eq!(request.method, Method::POST);
+        assert_eq!(request.headers["Authorization"], "Bearer k");
         assert_eq!(request.body_text(), Some("{}"));
-        assert!(HttpRequest::get("https://x").body.is_none());
+        let get = HttpRequest::get(uri());
+        assert_eq!(get.method, Method::GET);
+        assert!(get.body.is_empty());
+    }
+
+    /// A request and a response convert to the `http` crate's types and
+    /// back without losing anything they model, the timeout included.
+    #[tokio::test]
+    async fn conversions_to_http_types_are_lossless() {
+        let request = HttpRequest::post(Uri::from_static("https://x/v1?q=1"), "{}")
+            .header("x-tag", value("a"))
+            .header("x-tag", value("b"))
+            .sensitive_header("x-signed", value("SECRET"))
+            .timeout(Some(Duration::from_secs(5)));
+        let http: http::Request<Bytes> = request.clone().into();
+        assert_eq!(http.method(), Method::POST);
+        assert_eq!(http.uri(), "https://x/v1?q=1");
+        assert_eq!(http.headers().get_all("x-tag").iter().count(), 2);
+        assert!(http.headers()["x-signed"].is_sensitive());
+        assert_eq!(http.body(), "{}");
+        assert_eq!(
+            http.extensions().get(),
+            Some(&RequestTimeout(Duration::from_secs(5)))
+        );
+        assert_eq!(HttpRequest::from(http), request);
+
+        let untimed = HttpRequest::get(uri());
+        let http: http::Request<Bytes> = untimed.clone().into();
+        assert!(http.extensions().get::<RequestTimeout>().is_none());
+        assert_eq!(HttpRequest::from(http), untimed);
+
+        let response = HttpResponse::from_bytes(
+            StatusCode::CREATED,
+            header_map(&[("x-request-id", "req_1")]),
+            "hello",
+        );
+        let http: http::Response<Body> = response.into();
+        assert_eq!(http.status(), StatusCode::CREATED);
+        let back = HttpResponse::from(http);
+        assert_eq!(back.status, StatusCode::CREATED);
+        assert_eq!(back.headers["x-request-id"], "req_1");
+        assert_eq!(back.text().await.unwrap(), "hello");
+    }
+
+    #[test]
+    fn request_uris_are_checked_without_quoting_the_url() {
+        assert_eq!(
+            request_uri("https://x.example/v1/models/m:generateContent")
+                .unwrap()
+                .path(),
+            "/v1/models/m:generateContent"
+        );
+        for url in ["https://x.example/v1/models/my model?key=SECRET", ""] {
+            let err = request_uri(url).unwrap_err();
+            assert!(
+                matches!(err, allama::Error::InvalidRequest { .. }),
+                "{err:?}"
+            );
+            assert!(!err.is_retryable());
+            let text = format!("{err} {err:?} {}", err.as_log());
+            assert!(!text.contains("SECRET"), "{text}");
+        }
     }
 
     fn bearer_slot() -> CredentialSlot {
@@ -1316,20 +1502,20 @@ mod tests {
     fn values<'a>(request: &'a HttpRequest, name: &str) -> Vec<&'a str> {
         request
             .headers
+            .get_all(name)
             .iter()
-            .filter(|(key, _)| key.eq_ignore_ascii_case(name))
-            .map(|(_, value)| value)
+            .map(|value| value.to_str().unwrap())
             .collect()
     }
 
     #[test]
     fn request_options_replace_same_named_headers_and_add_others() {
         let base = || {
-            HttpRequest::post("https://x", "{}")
-                .header("Authorization", "Bearer provider")
-                .header("x-tag", "one")
-                .header("x-tag", "two")
-                .header("content-type", "application/json")
+            HttpRequest::post(uri(), "{}")
+                .header("Authorization", value("Bearer provider"))
+                .header("x-tag", value("one"))
+                .header("x-tag", value("two"))
+                .header("content-type", value("application/json"))
         };
 
         let untouched = base()
@@ -1341,22 +1527,27 @@ mod tests {
             .apply_options(
                 &options(
                     HttpRequestOptions::new()
-                        .header("X-TAG", "three")
-                        .header("x-tenant-id", "acme")
-                        .header("Idempotency-Key", "idem-1"),
+                        .header("X-TAG", value("three"))
+                        .header("x-tenant-id", value("acme"))
+                        .header("Idempotency-Key", value("idem-1")),
                 ),
                 &bearer_slot(),
             )
             .unwrap();
-        let headers: Vec<_> = applied.headers.iter().collect();
+        let mut headers: Vec<_> = applied
+            .headers
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.to_str().unwrap()))
+            .collect();
+        headers.sort_unstable();
         assert_eq!(
             headers,
             [
-                ("Authorization", "Bearer provider"),
+                ("authorization", "Bearer provider"),
                 ("content-type", "application/json"),
-                ("X-TAG", "three"),
+                ("idempotency-key", "idem-1"),
+                ("x-tag", "three"),
                 ("x-tenant-id", "acme"),
-                ("Idempotency-Key", "idem-1"),
             ]
         );
 
@@ -1377,17 +1568,18 @@ mod tests {
             .credential("openai", Credential::api_key("TENANT-SECRET"))
             .credential("anthropic", Credential::api_key("FOREIGN-SECRET"));
 
-        let bearer = HttpRequest::post("https://x", "{}")
-            .header("authorization", "Bearer provider")
+        let bearer = HttpRequest::post(uri(), "{}")
+            .header("authorization", value("Bearer provider"))
             .apply_options(&options(transport.clone()), &bearer_slot())
             .unwrap();
         assert_eq!(values(&bearer, "authorization"), ["Bearer TENANT-SECRET"]);
+        assert!(bearer.headers["authorization"].is_sensitive());
 
         let azure = CredentialSlot::new("openai", CredentialPlacement::Header("api-key".into()))
             .replaces("authorization");
-        let header = HttpRequest::post("https://x", "{}")
-            .header("authorization", "Bearer entra-token")
-            .header("API-KEY", "configured")
+        let header = HttpRequest::post(uri(), "{}")
+            .header("authorization", value("Bearer entra-token"))
+            .header("API-KEY", value("configured"))
             .apply_options(&options(transport.clone()), &azure)
             .unwrap();
         assert_eq!(values(&header, "api-key"), ["TENANT-SECRET"]);
@@ -1397,7 +1589,10 @@ mod tests {
             let debug = format!("{request:?}");
             assert!(!debug.contains("SECRET"), "{debug}");
             assert!(
-                !request.headers.iter().any(|(_, v)| v.contains("FOREIGN")),
+                !request
+                    .headers
+                    .values()
+                    .any(|v| v.to_str().unwrap().contains("FOREIGN")),
                 "{request:?}"
             );
         }
@@ -1405,8 +1600,8 @@ mod tests {
         // A custom placement is the adapter's to sign; the configured
         // headers stay until it does.
         let custom = CredentialSlot::new("openai", CredentialPlacement::Custom);
-        let signed = HttpRequest::post("https://x", "{}")
-            .header("authorization", "configured")
+        let signed = HttpRequest::post(uri(), "{}")
+            .header("authorization", value("configured"))
             .apply_options(&options(transport.clone()), &custom)
             .unwrap();
         assert_eq!(values(&signed, "authorization"), ["configured"]);
@@ -1429,9 +1624,9 @@ mod tests {
                 "anthropic",
                 Credential::header("x-other-gw", "OTHER-SECRET"),
             );
-        let applied = HttpRequest::post("https://x", "{}")
-            .header("authorization", "Bearer provider")
-            .header("cf-aig-authorization", "Bearer configured-gateway")
+        let applied = HttpRequest::post(uri(), "{}")
+            .header("authorization", value("Bearer provider"))
+            .header("cf-aig-authorization", value("Bearer configured-gateway"))
             .apply_options(&options(transport), &bearer_slot())
             .unwrap();
         assert_eq!(
@@ -1444,7 +1639,7 @@ mod tests {
         assert!(!debug.contains("SECRET"), "{debug}");
 
         // Redacted whatever the name, once placed.
-        let custom_name = HttpRequest::post("https://x", "{}")
+        let custom_name = HttpRequest::post(uri(), "{}")
             .apply_options(
                 &options(
                     HttpRequestOptions::new()
@@ -1455,6 +1650,43 @@ mod tests {
             .unwrap();
         assert_eq!(values(&custom_name, "x-route"), ["ROUTE-SECRET"]);
         assert!(!format!("{custom_name:?}").contains("ROUTE-SECRET"));
+    }
+
+    /// A credential no header can carry fails as the application's
+    /// configuration error, naming the header and never the secret.
+    #[test]
+    fn credentials_that_fit_no_header_are_configuration_errors() {
+        for (transport, slot) in [
+            (
+                HttpRequestOptions::new()
+                    .credential("openai", Credential::api_key("SECRET\r\nx: 1")),
+                bearer_slot(),
+            ),
+            (
+                HttpRequestOptions::new()
+                    .credential("openai", Credential::header("x-gw", "SECRET\u{e9}")),
+                bearer_slot(),
+            ),
+            (
+                HttpRequestOptions::new()
+                    .credential("openai", Credential::header("bad name", "SECRET")),
+                bearer_slot(),
+            ),
+            (
+                HttpRequestOptions::new().credential("nimbus", Credential::api_key("SECRET")),
+                CredentialSlot::new("nimbus", CredentialPlacement::Header("bad name".into())),
+            ),
+        ] {
+            let err = HttpRequest::post(uri(), "{}")
+                .apply_options(&options(transport), &slot)
+                .unwrap_err();
+            assert!(
+                matches!(err, allama::Error::Configuration { .. }),
+                "{err:?}"
+            );
+            let text = format!("{err} {err:?} {}", err.as_log());
+            assert!(!text.contains("SECRET"), "{text}");
+        }
     }
 
     #[test]
@@ -1474,9 +1706,12 @@ mod tests {
             ("X-Nimbus-Session", &nimbus),
             ("x-nimbus-legacy", &nimbus),
         ] {
-            let err = HttpRequest::post("https://x", "{}")
+            let err = HttpRequest::post(uri(), "{}")
                 .apply_options(
-                    &options(HttpRequestOptions::new().header(name, "PLAIN-SECRET")),
+                    &options(
+                        HttpRequestOptions::new()
+                            .header(HeaderName::try_from(name).unwrap(), value("PLAIN-SECRET")),
+                    ),
                     slot,
                 )
                 .unwrap_err();
@@ -1487,13 +1722,13 @@ mod tests {
             assert!(!err.is_retryable(), "{name}");
             let text = format!("{err} {err:?} {}", err.as_log());
             assert!(!text.contains("PLAIN-SECRET"), "{text}");
-            assert!(text.contains(name), "{text}");
+            assert!(text.contains(&name.to_ascii_lowercase()), "{text}");
         }
         // Another adapter's own header is not this one's to refuse.
         assert!(
-            HttpRequest::post("https://x", "{}")
+            HttpRequest::post(uri(), "{}")
                 .apply_options(
-                    &options(HttpRequestOptions::new().header("x-nimbus-session", "v")),
+                    &options(HttpRequestOptions::new().header("x-nimbus-session", value("v"))),
                     &bearer_slot(),
                 )
                 .is_ok()
@@ -1512,7 +1747,7 @@ mod tests {
             ),
         ] {
             let options = transport.map(options).unwrap_or_default();
-            let err = HttpRequest::post("https://x", "{}")
+            let err = HttpRequest::post(uri(), "{}")
                 .apply_options(&options, &slot)
                 .unwrap_err();
             assert!(
@@ -1521,13 +1756,13 @@ mod tests {
             );
             assert!(err.to_string().contains("`openai`"), "{err}");
         }
-        let sent = HttpRequest::post("https://x", "{}")
+        let sent = HttpRequest::post(uri(), "{}")
             .apply_options(
                 &options(HttpRequestOptions::new().credential("openai", Credential::api_key("k"))),
                 &slot,
             )
             .unwrap();
-        assert_eq!(sent.headers.get("authorization"), Some("Bearer k"));
+        assert_eq!(sent.headers["authorization"], "Bearer k");
     }
 
     #[test]
@@ -1561,8 +1796,8 @@ mod tests {
     #[tokio::test]
     async fn bodies_are_read_whole_or_streamed() {
         let response = HttpResponse::new(
-            200,
-            Headers::new(),
+            StatusCode::OK,
+            HeaderMap::new(),
             Box::pin(futures_util::stream::iter([
                 Ok(Bytes::from_static(b"he")),
                 Ok(Bytes::from_static(b"llo")),
@@ -1572,8 +1807,8 @@ mod tests {
         assert_eq!(response.text().await.unwrap(), "hello");
 
         let failing = HttpResponse::new(
-            200,
-            Headers::new(),
+            StatusCode::OK,
+            HeaderMap::new(),
             Box::pin(futures_util::stream::iter([
                 Ok(Bytes::from_static(b"he")),
                 Err(TransportError::new(TransportErrorKind::Body, "reset")),
@@ -1598,7 +1833,9 @@ mod tests {
                 Ok(Bytes::from_static(b"89")),
             ])
         };
-        let read = |limit| HttpResponse::new(200, Headers::new(), body()).bytes_limited(limit);
+        let read = |limit| {
+            HttpResponse::new(StatusCode::OK, HeaderMap::new(), body()).bytes_limited(limit)
+        };
         assert_eq!(read(10).await.unwrap(), "0123456789");
         assert_eq!(read(usize::MAX).await.unwrap(), "0123456789");
         for limit in [0, 3, 4, 9] {
@@ -1618,7 +1855,7 @@ mod tests {
                 err.as_log()
             );
         }
-        let text = HttpResponse::from_bytes(200, Headers::new(), "héllo")
+        let text = HttpResponse::from_bytes(StatusCode::OK, HeaderMap::new(), "héllo")
             .text_limited(6)
             .await
             .unwrap();
@@ -1632,8 +1869,8 @@ mod tests {
         ));
     }
 
-    fn map_http(status: u16, _: &Headers, body: &str) -> allama::Error {
-        status_error(status, format!("HTTP {status}"))
+    fn map_http(status: StatusCode, _: &HeaderMap, body: &str) -> allama::Error {
+        status_error(status, format!("HTTP {}", status.as_u16()))
             .authored()
             .with_body(body.to_owned())
     }
@@ -1645,7 +1882,7 @@ mod tests {
         let endless: Body = Box::pin(futures_util::stream::repeat_with(|| {
             Ok(Bytes::from(vec![b'x'; 16 * 1024]))
         }));
-        let err = HttpResponse::new(503, Headers::new(), endless)
+        let err = HttpResponse::new(StatusCode::SERVICE_UNAVAILABLE, HeaderMap::new(), endless)
             .map_error(map_http)
             .await;
         assert!(matches!(err, allama::Error::Overloaded { .. }), "{err:?}");
@@ -1677,8 +1914,8 @@ mod tests {
         assert_eq!(failure.unwrap().kind(), TransportErrorKind::Timeout);
 
         let reset = HttpResponse::new(
-            500,
-            Headers::new(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            HeaderMap::new(),
             chunks(vec![
                 Ok(Bytes::from_static(b"partial")),
                 Err(TransportError::new(
@@ -1695,8 +1932,8 @@ mod tests {
         assert_eq!(err.context().and_then(|c| c.capped_body()), Some("partial"));
 
         let enveloped = HttpResponse::new(
-            500,
-            Headers::new(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            HeaderMap::new(),
             chunks(vec![Err(TransportError::new(
                 TransportErrorKind::Body,
                 "reset",
@@ -1715,16 +1952,14 @@ mod tests {
     #[tokio::test]
     async fn redirects_are_unexpected_responses_naming_the_host() {
         let mut called = false;
-        let headers: Headers = [
+        let headers = header_map(&[
             (
                 "location",
                 "https://u:pw@Other.Example:8443/v1/x?token=SECRET",
             ),
             ("x-request-id", "req_1"),
-        ]
-        .into_iter()
-        .collect();
-        let err = HttpResponse::from_bytes(308, headers, "")
+        ]);
+        let err = HttpResponse::from_bytes(StatusCode::PERMANENT_REDIRECT, headers, "")
             .map_error(|status, headers, body| {
                 called = true;
                 map_http(status, headers, body)
@@ -1739,35 +1974,43 @@ mod tests {
         assert_eq!(err.request_id(), Some("req_1"));
         let log = err.as_log().to_string();
         assert!(log.contains("`other.example`"), "{log}");
+        assert!(log.contains("HTTP 308:"), "{log}");
         for text in [log, err.to_string(), format!("{err:?}")] {
             assert!(!text.contains("SECRET") && !text.contains("pw"), "{text}");
         }
-        let relative = redirect_error(301, &[("location", "/v2/chat")].into_iter().collect());
+        let relative = redirect_error(
+            StatusCode::MOVED_PERMANENTLY,
+            &header_map(&[("location", "/v2/chat")]),
+        );
         assert!(
             relative.to_string().contains("within the same host"),
             "{relative}"
         );
-        let bare = redirect_error(302, &Headers::new());
+        let bare = redirect_error(status(302), &HeaderMap::new());
         assert!(bare.to_string().contains("without a `Location`"), "{bare}");
     }
 
     #[test]
     fn with_headers_replaces_same_named_headers() {
-        let defaults: Headers = [("User-Agent", "a/1"), ("x-route", "eu")]
-            .into_iter()
-            .collect();
-        let request = HttpRequest::post("https://x", "{}")
-            .header("content-type", "application/json")
-            .header("user-agent", "old")
-            .sensitive_header("x-signed", "SECRET")
+        let defaults = header_map(&[("User-Agent", "a/1"), ("x-route", "eu")]);
+        let request = HttpRequest::post(uri(), "{}")
+            .header("content-type", value("application/json"))
+            .header("user-agent", value("old"))
+            .sensitive_header("x-signed", value("SECRET"))
             .with_headers(&defaults);
+        let mut headers: Vec<_> = request
+            .headers
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.to_str().unwrap()))
+            .collect();
+        headers.sort_unstable();
         assert_eq!(
-            request.headers.iter().collect::<Vec<_>>(),
+            headers,
             [
                 ("content-type", "application/json"),
-                ("x-signed", "SECRET"),
-                ("User-Agent", "a/1"),
+                ("user-agent", "a/1"),
                 ("x-route", "eu"),
+                ("x-signed", "SECRET"),
             ]
         );
         assert!(!format!("{request:?}").contains("SECRET"));
@@ -1823,14 +2066,18 @@ mod wasm_tests {
 
     #[wasm_bindgen_test]
     fn retry_after_reads_the_clock() {
-        let past: Headers = [("retry-after", "Sun, 06 Nov 1994 08:49:37 GMT")]
-            .into_iter()
-            .collect();
-        assert_eq!(past.retry_after("retry-after"), Some(Duration::ZERO));
+        let mut past = HeaderMap::new();
+        past.insert(
+            "retry-after",
+            HeaderValue::from_static("Sun, 06 Nov 1994 08:49:37 GMT"),
+        );
+        assert_eq!(retry_after(&past, "retry-after"), Some(Duration::ZERO));
 
-        let future: Headers = [("retry-after", "Fri, 31 Dec 9999 23:59:59 GMT")]
-            .into_iter()
-            .collect();
-        assert!(future.retry_after("retry-after").unwrap() > Duration::ZERO);
+        let mut future = HeaderMap::new();
+        future.insert(
+            "retry-after",
+            HeaderValue::from_static("Fri, 31 Dec 9999 23:59:59 GMT"),
+        );
+        assert!(retry_after(&future, "retry-after").unwrap() > Duration::ZERO);
     }
 }

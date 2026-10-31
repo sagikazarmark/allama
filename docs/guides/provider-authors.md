@@ -1091,7 +1091,7 @@ pure function of the status, headers and body, so the error contracts can
 call it:
 
 ```rust
-pub fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
+pub fn map_http_error(status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
     let envelope = error_envelope(body);
     let (kind, code, param, text) = match &envelope {
         Some(envelope) => (
@@ -1219,7 +1219,7 @@ The log therefore shows the constructor message only when you mark it
 
 Each of these setters takes the value. A field the reply may lack also has
 an `_opt` twin that takes an `Option` and keeps the current value on
-`None` (`with_request_id_opt(headers.get("x-request-id"))`,
+`None` (`with_request_id_opt(context.request_id.as_deref())`,
 `with_provider_code_opt(envelope.code.as_deref())`), so parsed fields pass
 straight through. Text twins take an `Option<&str>`, so a bare `None`
 compiles. `MetadataBuilder` follows the same rule.
@@ -1231,7 +1231,7 @@ let upstream = "Invalid value: 'my SSN is 123-45-6789'";
 let bad = Error::invalid_request(format!("rejected: {upstream}")).authored();
 
 // Good: authored message, upstream text in its own slot.
-let good = Error::invalid_request(format!("HTTP {status}"))
+let good = Error::invalid_request(format!("HTTP {}", status.as_u16()))
     .with_context(error_context(status, &headers))
     .authored()
     .with_upstream_message(upstream.to_owned())
@@ -1252,13 +1252,15 @@ is upstream text too: it can contain the request URL or quote the body.
 
 Expose the mapping as a pure function of status, headers and body: the
 error contracts call it directly, through the adapter aggregate of
-[§6](#6-contracts-and-tests).
+[§6](#6-contracts-and-tests). They pass a plain status and header pairs,
+so a mapping need not be HTTP's; wrap an HTTP mapping, which takes the
+`http` types `map_error` passes, with
+`allama_conformance::error_kinds::http_error_mapping`:
 
 ```rust
 /// Acme's HTTP error mapping, as the contracts call it.
 fn map(status: u16, headers: &[(&str, &str)], body: String) -> Error {
-    let headers: Headers = headers.iter().copied().collect();
-    map_http_error(status, &headers, &body)
+    http_error_mapping(map_http_error)(status, headers, body)
 }
 ```
 
@@ -1368,9 +1370,9 @@ Building the request belongs to `encode` (a missing scoped credential is
 an error a dry run must report), sending to the call:
 
 ```rust
-HttpRequest::post(url, body)
-    .header("content-type", "application/json")
-    .header("authorization", auth)
+HttpRequest::post(self.chat_uri.clone(), body)
+    .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
+    .header(AUTHORIZATION, self.authorization.clone())
     // Last: the caller's headers, and the credentials addressed to
     // your scope, which replace your configured key.
     .apply_options(&request.options, &self.credential_slot)
@@ -1649,7 +1651,7 @@ payload as the line, so it is a line of fields your decoder does not know,
 Test that your stream decodes the same however the network splits it:
 [`ReplayResponse::ndjson(body)`](https://docs.rs/allama-http/latest/allama_http/struct.ReplayResponse.html#method.ndjson)
 delivers a stream one line per chunk,
-`ReplayResponse::new(200, body).split_every(1)` one byte at a time, and
+`ReplayResponse::new(StatusCode::OK, body).split_every(1)` one byte at a time, and
 `ReplayResponse::chunks(status, chunks)` in the chunks you choose.
 
 ### Event order
@@ -1791,12 +1793,12 @@ features = ["reqwest"] }`) and hands the provider an
 
    ```rust
    // Each failure answers `chat`, then `chat_stream`.
-   let failing = |status: u16, body: &'static str| {
+   let failing = |status: StatusCode, body: &'static str| {
        let answer = || ReplayResponse::json(status, body);
        provider(&ReplayTransport::new([answer(), answer()]))
    };
    let auth = failing(
-       401,
+       StatusCode::UNAUTHORIZED,
        r#"{"error":{"type":"authentication_error","message":"bad key"}}"#,
    );
    assert_auth_error_contract(&auth, &request, |r| collect_chat_stream(&auth, r)).await;
@@ -1842,7 +1844,7 @@ features = ["reqwest"] }`) and hands the provider an
 
    ```rust
    async fn probe(request: ChatRequest) -> ProbeOutcome<ChatResponse> {
-       let transport = ReplayTransport::new([ReplayResponse::json(200, OK_BODY)]);
+       let transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, OK_BODY)]);
        let result = provider(&transport).chat(&request).await;
        ProbeOutcome::new(result, bodies(&transport))
    }
@@ -1901,7 +1903,8 @@ features = ["reqwest"] }`) and hands the provider an
            )
            .malformed_response(
                |body| async move {
-                   let answer = ReplayResponse::new(200, body).header("x-request-id", "req_1");
+                   let answer = ReplayResponse::new(StatusCode::OK, body)
+                       .header("x-request-id", HeaderValue::from_static("req_1"));
                    provider(&ReplayTransport::new([answer]))
                        .chat(&ChatRequest::new(MODEL).user("Hi!"))
                        .await
@@ -1910,7 +1913,7 @@ features = ["reqwest"] }`) and hands the provider an
            )
            // The decoding contracts decode captured responses on both paths.
            .unary_replay(|body| async move {
-               let transport = ReplayTransport::new([ReplayResponse::json(200, body)]);
+               let transport = ReplayTransport::new([ReplayResponse::json(StatusCode::OK, body)]);
                provider(&transport)
                    .chat(&ChatRequest::new(MODEL).user("Hi!"))
                    .await
@@ -2111,7 +2114,7 @@ features = ["reqwest"] }`) and hands the provider an
      /// `chat_stream`.
      async fn send(options: RequestOptions, streaming: bool) -> TransportOutcome {
          let transport = ReplayTransport::new([
-             ReplayResponse::json(200, OK_BODY),
+             ReplayResponse::json(StatusCode::OK, OK_BODY),
              ReplayResponse::sse(OK_STREAM),
          ]);
          let mut request = ChatRequest::new(MODEL).user("Hi!");

@@ -32,6 +32,7 @@ use allama_http::{CredentialPlacement, CredentialSlot, ReplayResponse, ReplayTra
 use serde_json::{Value, json};
 
 use crate::ChatRequestOptions;
+use allama_http::http::{HeaderValue, StatusCode};
 
 fn fixtures() -> FixtureDir {
     FixtureDir::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures"))
@@ -628,9 +629,8 @@ async fn malformed_embedding_bodies_are_unexpected_responses() {
     use allama::{EmbeddingProvider, EmbeddingRequest, Error};
     use allama_conformance::contract::MALFORMED_BODY;
     // Gemini sends no request id; a proxy's is kept.
-    let malformed = ReplayTransport::new([
-        ReplayResponse::new(200, MALFORMED_BODY).header("x-request-id", "req_1")
-    ]);
+    let malformed = ReplayTransport::new([ReplayResponse::new(StatusCode::OK, MALFORMED_BODY)
+        .header("x-request-id", HeaderValue::from_static("req_1"))]);
     let err = provider(&malformed)
         .embed(&EmbeddingRequest::new("gemini-embedding-001").input("hi"))
         .await
@@ -668,14 +668,14 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }
 
 async fn chat_probe(request: ChatRequest) -> ProbeOutcome<ChatResponse> {
     let ok = ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "candidates": [{"content": {"role": "model", "parts": [{"text": "ok"}]},
                             "finishReason": "STOP", "index": 0}],
@@ -705,14 +705,19 @@ async fn embed_probe(request: EmbeddingRequest) -> ProbeOutcome<EmbeddingRespons
     let embeddings: Vec<Value> = (0..request.inputs.len())
         .map(|_| json!({"values": [0.1, 0.2]}))
         .collect();
-    let ok = ReplayResponse::json(200, json!({"embeddings": embeddings}).to_string());
+    let ok = ReplayResponse::json(
+        StatusCode::OK,
+        json!({"embeddings": embeddings}).to_string(),
+    );
     let transport = ReplayTransport::new([ok]);
     let result = provider(&transport).embed(&request).await;
     ProbeOutcome::new(result, bodies(&transport))
 }
 
 fn map_http_error(status: u16, headers: &[(&str, &str)], body: String) -> allama::Error {
-    crate::error::map_http_error(status, &headers.iter().copied().collect(), &body)
+    allama_conformance::error_kinds::http_error_mapping(crate::error::map_http_error)(
+        status, headers, body,
+    )
 }
 
 /// The slot every Gemini provider declares.
@@ -791,7 +796,8 @@ async fn the_chat_adapter_passes_every_contract() {
     // Gemini sends no request id; a proxy's is kept.
     .malformed_response(
         |body| async move {
-            let answer = ReplayResponse::new(200, body).header("x-request-id", "req_1");
+            let answer = ReplayResponse::new(StatusCode::OK, body)
+                .header("x-request-id", HeaderValue::from_static("req_1"));
             provider(&ReplayTransport::new([answer]))
                 .chat(&ChatRequest::new("gemini-2.5-flash").user("hi"))
                 .await
@@ -811,9 +817,12 @@ async fn the_chat_adapter_passes_every_contract() {
     // `generateContent` and `streamGenerateContent` send it. The tool calls
     // carry wire ids (`functionCall.id`), which the adapter keeps.
     .unary_replay(|body| async move {
-        provider(&ReplayTransport::new([ReplayResponse::json(200, body)]))
-            .chat(&ChatRequest::new("gemini-3.5-flash").user("hi"))
-            .await
+        provider(&ReplayTransport::new([ReplayResponse::json(
+            StatusCode::OK,
+            body,
+        )]))
+        .chat(&ChatRequest::new("gemini-3.5-flash").user("hi"))
+        .await
     })
     .response_captures([capture("agree_text")])
     .tool_call_capture(
@@ -890,9 +899,12 @@ async fn the_embedding_adapter_passes_every_contract() {
             .map(|vector| json!({"values": vector.values}))
             .collect();
         let body = json!({"embeddings": embeddings}).to_string();
-        provider(&ReplayTransport::new([ReplayResponse::json(200, body)]))
-            .embed(&request)
-            .await
+        provider(&ReplayTransport::new([ReplayResponse::json(
+            StatusCode::OK,
+            body,
+        )]))
+        .embed(&request)
+        .await
     })
     .error_mapping(map_http_error)
     .error_envelope(error_envelope)

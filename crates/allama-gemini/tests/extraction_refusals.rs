@@ -10,6 +10,7 @@ use allama::prelude::*;
 use allama::schemars::{self, JsonSchema};
 use allama::{Error, FinishReason};
 use allama_gemini::Provider;
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use serde::Deserialize;
 use serde_json::json;
@@ -53,7 +54,7 @@ fn assert_refused(error: Error, explanation: &str) {
 async fn a_safety_finish_fails_extraction_once() {
     let explanation = "The response was blocked for safety.";
     let (provider, transport) = provider(ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "candidates": [{"content": {"role": "model", "parts": []}, "finishReason": "SAFETY",
                 "finishMessage": explanation, "index": 0}],

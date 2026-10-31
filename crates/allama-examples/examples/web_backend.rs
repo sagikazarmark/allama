@@ -553,6 +553,7 @@ fn retry_after_seconds(delay: Duration) -> u64 {
 mod tests {
     use allama::history::TurnEnvelope;
     use allama::mock::{MockStreamEvent, MockStreamingProvider, TestProvider};
+    use allama_http::http::HeaderValue;
 
     use super::*;
 
@@ -644,9 +645,10 @@ mod tests {
         let provider = DynChatProvider::new(MapRequestProvider::new(
             openai,
             |request: &mut ChatRequest| {
-                request.options.insert(
-                    HttpRequestOptions::new().header("authorization", "Bearer TENANT-SECRET"),
-                );
+                request.options.insert(HttpRequestOptions::new().header(
+                    "authorization",
+                    HeaderValue::from_static("Bearer TENANT-SECRET"),
+                ));
             },
         ));
 

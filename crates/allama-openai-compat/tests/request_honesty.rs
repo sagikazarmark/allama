@@ -22,6 +22,7 @@ use allama_conformance::{
     assert_chat_adapter, assert_embedding_adapter, assert_embedding_validation_agrees,
     assert_validation_agrees, drift_requests,
 };
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::providers::{
     Azure, Cloudflare, DeepInfra, DeepSeek, Fireworks, Groq, Mistral, Ollama, OpenRouter, Together,
@@ -39,7 +40,7 @@ mod support;
 
 fn chat_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "c1", "object": "chat.completion", "model": "m",
             "choices": [{"index": 0, "finish_reason": "stop",
@@ -61,7 +62,7 @@ fn chat_sse() -> ReplayResponse {
 
 fn responses_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "resp_1", "object": "response", "status": "completed", "model": "m",
             "output": [{"type": "message", "id": "msg_1", "role": "assistant",
@@ -93,14 +94,17 @@ fn embeddings_ok(count: usize) -> ReplayResponse {
     let data: Vec<Value> = (0..count)
         .map(|i| json!({"index": i, "embedding": [0.1, 0.2]}))
         .collect();
-    ReplayResponse::json(200, json!({"data": data, "model": "m"}).to_string())
+    ReplayResponse::json(
+        StatusCode::OK,
+        json!({"data": data, "model": "m"}).to_string(),
+    )
 }
 
 fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }
@@ -241,7 +245,7 @@ async fn extraction_on_presets_without_strict_is_not_enforced() {
 
     let tool_call = || {
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             json!({
                 "id": "c1", "object": "chat.completion", "model": "m",
                 "choices": [{"index": 0, "finish_reason": "tool_calls",
@@ -255,7 +259,7 @@ async fn extraction_on_presets_without_strict_is_not_enforced() {
     };
     let text = || {
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             json!({
                 "id": "c1", "object": "chat.completion", "model": "m",
                 "choices": [{"index": 0, "finish_reason": "stop",
@@ -1002,9 +1006,9 @@ async fn redirect_call(base_url: String, responses: bool, streaming: bool) -> al
 /// A `200` whose body is `body`, with a request id in the header each
 /// dialect reads (Azure's is `apim-request-id`).
 fn malformed(body: String) -> ReplayTransport {
-    ReplayTransport::new([ReplayResponse::new(200, body)
-        .header("x-request-id", "req_1")
-        .header("apim-request-id", "req_1")])
+    ReplayTransport::new([ReplayResponse::new(StatusCode::OK, body)
+        .header("x-request-id", HeaderValue::from_static("req_1"))
+        .header("apim-request-id", HeaderValue::from_static("req_1"))])
 }
 
 /// Every chat contract, for the generic dialect and every preset. The
@@ -1029,9 +1033,9 @@ async fn every_dialect_passes_every_chat_contract() {
             |request| chat_probe(dialect(name), request),
             |request| chat_stream_probe(dialect(name), request),
         )
-        .error_mapping(move |status, pairs, body| {
-            quirks.map_http_error(status, &pairs.iter().copied().collect(), &body)
-        })
+        .error_mapping(allama_conformance::error_kinds::http_error_mapping(
+            move |status, headers, body| quirks.map_http_error(status, headers, body),
+        ))
         .error_envelope(chat_envelope)
         .stream_body({
             let started = started.clone();
@@ -1069,7 +1073,10 @@ async fn every_dialect_passes_every_chat_contract() {
         )
         .unary_replay(move |body| async move {
             dialect(name)
-                .http_transport(ReplayTransport::new([ReplayResponse::json(200, body)]))
+                .http_transport(ReplayTransport::new([ReplayResponse::json(
+                    StatusCode::OK,
+                    body,
+                )]))
                 .build()
                 .unwrap()
                 .chat(&ChatRequest::new("m").user("hi"))
@@ -1132,9 +1139,9 @@ async fn responses_pass_every_chat_contract() {
         |request| responses_probe(responses(), request),
         |request| responses_stream_probe(responses(), request),
     )
-    .error_mapping(|status, pairs, body| {
-        CompatQuirks::default().map_http_error(status, &pairs.iter().copied().collect(), &body)
-    })
+    .error_mapping(allama_conformance::error_kinds::http_error_mapping(
+        |status, headers, body| CompatQuirks::default().map_http_error(status, headers, body),
+    ))
     .error_envelope(chat_envelope)
     .stream_body({
         let started = started.clone();
@@ -1202,7 +1209,10 @@ async fn responses_pass_every_chat_contract() {
     )
     .unary_replay(|body| async move {
         responses()
-            .http_transport(ReplayTransport::new([ReplayResponse::json(200, body)]))
+            .http_transport(ReplayTransport::new([ReplayResponse::json(
+                StatusCode::OK,
+                body,
+            )]))
             .build()
             .unwrap()
             .chat(&ChatRequest::new("m").user("hi"))
@@ -1261,7 +1271,7 @@ async fn every_dialect_passes_every_embedding_contract() {
                 let body = json!({"data": data, "model": "m"});
                 dialect(name)
                     .http_transport(ReplayTransport::new([ReplayResponse::json(
-                        200,
+                        StatusCode::OK,
                         body.to_string(),
                     )]))
                     .build()
@@ -1269,9 +1279,9 @@ async fn every_dialect_passes_every_embedding_contract() {
                     .embed(&request)
                     .await
             })
-            .error_mapping(move |status, pairs, body| {
-                quirks.map_http_error(status, &pairs.iter().copied().collect(), &body)
-            })
+            .error_mapping(allama_conformance::error_kinds::http_error_mapping(
+                move |status, headers, body| quirks.map_http_error(status, headers, body),
+            ))
             .error_envelope(chat_envelope)
             .transport_options(
                 provider.credential_slot().clone(),
@@ -1301,13 +1311,11 @@ async fn declared_embedding_answers_pass_every_embedding_contract() {
     let provider = embedding_provider().build().unwrap();
     let under_test =
         EmbeddingAdapterUnderTest::new(["m"], provider.quirks().namespace.clone(), embed_probe)
-            .error_mapping(|status, pairs, body| {
-                CompatQuirks::default().map_http_error(
-                    status,
-                    &pairs.iter().copied().collect(),
-                    &body,
-                )
-            })
+            .error_mapping(allama_conformance::error_kinds::http_error_mapping(
+                |status, headers, body| {
+                    CompatQuirks::default().map_http_error(status, headers, body)
+                },
+            ))
             .error_envelope(chat_envelope)
             // Its batches are refused before the limit or an input's
             // provider data is checked (both are checked on the dialects, and

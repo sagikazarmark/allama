@@ -9,6 +9,7 @@ use allama_conformance::stream_frames::{StreamFraming, assert_unknown_stream_fra
 use allama_http::framing::{ChatFrameDecoder, FramedChatStream, VendorFrames};
 use allama_http::ndjson::NdjsonStream;
 use allama_http::{HttpRequest, HttpTransport, ReplayResponse, ReplayTransport};
+use http::{StatusCode, Uri};
 use serde_json::{Value, json};
 
 /// Text lines, then a `done` line.
@@ -52,9 +53,12 @@ async fn run(unknown: Unknown) {
         line.to_string()
     });
     assert_unknown_stream_frames_surfaced(BASE, &framing, |body| async move {
-        let transport = ReplayTransport::new([ReplayResponse::chunks(200, [body]).split_every(1)]);
+        let transport =
+            ReplayTransport::new([ReplayResponse::chunks(StatusCode::OK, [body]).split_every(1)]);
         let response = transport
-            .send(HttpRequest::get("https://acme.example/stream"))
+            .send(HttpRequest::get(Uri::from_static(
+                "https://acme.example/stream",
+            )))
             .await
             .unwrap();
         let lines = NdjsonStream::new(response.into_body());

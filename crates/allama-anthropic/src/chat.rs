@@ -4,8 +4,10 @@ use allama::{
     ChatValidation, Message, ProviderIdentity, Result, ValidationCoverage,
 };
 
+use allama_http::http::header::CONTENT_TYPE;
+use allama_http::http::{HeaderMap, HeaderValue};
 use allama_http::sse::{SseChatStream, SseStream};
-use allama_http::{Headers, HttpRequest, HttpResponse};
+use allama_http::{HttpRequest, HttpResponse, request_uri};
 
 use crate::Provider;
 use crate::encode::encode_request_for;
@@ -21,8 +23,10 @@ const ANTHROPIC_VERSION: &str = "2023-06-01";
 /// Anthropic's request id header (`req_...`).
 const REQUEST_ID_HEADER: &str = "request-id";
 
-fn header(headers: &Headers, name: &str) -> Option<String> {
-    headers.get(name).map(str::to_owned)
+fn header(headers: &HeaderMap, name: &str) -> Option<String> {
+    headers
+        .get(name)
+        .map(|value| String::from_utf8_lossy(value.as_bytes()).into_owned())
 }
 
 /// The index of the assistant message the caller sent last, a prefill.
@@ -46,15 +50,27 @@ impl Provider {
         degradations.extend(encoded.warnings);
         let body = serde_json::to_vec(&encoded.body)?;
 
-        let mut http = HttpRequest::post(format!("{}/v1/messages", self.inner.base_url), body);
+        let uri = request_uri(format!("{}/v1/messages", self.inner.base_url))
+            .map_err(|err| err.with_provider(PROVIDER_NAME))?;
+        let mut http = HttpRequest::post(uri, body);
         if let Some(api_key) = &self.inner.api_key {
-            http = http.header(crate::API_KEY_HEADER, api_key);
+            http = http.header(crate::API_KEY_HEADER, api_key.clone());
         }
         http = http
-            .header("anthropic-version", ANTHROPIC_VERSION)
-            .header("content-type", "application/json");
+            .header(
+                "anthropic-version",
+                HeaderValue::from_static(ANTHROPIC_VERSION),
+            )
+            .header(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         if !encoded.betas.is_empty() {
-            http = http.header("anthropic-beta", encoded.betas.join(","));
+            let betas = HeaderValue::try_from(encoded.betas.join(",")).map_err(|_| {
+                allama::Error::invalid_request(
+                    "an `anthropic-beta` flag holds characters an HTTP header cannot carry",
+                )
+                .authored()
+                .with_provider(PROVIDER_NAME)
+            })?;
+            http = http.header("anthropic-beta", betas);
         }
         http.with_headers(&self.inner.headers)
             .apply_options(&request.options, &self.inner.credential_slot)

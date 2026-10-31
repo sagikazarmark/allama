@@ -24,6 +24,7 @@ use allama_conformance::{
     assert_response_fixture_eq, assert_stream_finish_error_fixture_eq, assert_stream_fixture_eq,
     load_json_fixture, load_text_fixture,
 };
+use allama_http::http::{HeaderValue, StatusCode};
 use futures_util::StreamExt;
 use serde_json::{Value, json};
 
@@ -62,7 +63,7 @@ fn text_response() -> Value {
 async fn chat_posts_expected_request_and_parses_response() {
     let fixtures = fixtures();
     let raw = load_json_fixture(&fixtures, "response_raw.json");
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &raw)]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &raw)]).await;
     let provider = provider(&server);
 
     let response = provider
@@ -100,10 +101,12 @@ async fn chat_posts_expected_request_and_parses_response() {
 
 #[tokio::test]
 async fn chat_reads_request_id_header() {
-    let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &text_response()).header("request-id", "req_011Cabc")
-    ])
-    .await;
+    let server =
+        TestHttpServer::spawn([
+            MockHttpResponse::json_value(StatusCode::OK, &text_response())
+                .header("request-id", HeaderValue::from_static("req_011Cabc")),
+        ])
+        .await;
     let response = provider(&server)
         .chat(&ChatRequest::new(MODEL).user("hi"))
         .await
@@ -122,8 +125,8 @@ async fn chat_success_and_tool_call_contracts() {
         "usage": {"input_tokens": 10, "output_tokens": 3}
     });
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &text_response()),
-        MockHttpResponse::json_value(200, &tool_response),
+        MockHttpResponse::json_value(StatusCode::OK, &text_response()),
+        MockHttpResponse::json_value(StatusCode::OK, &tool_response),
     ])
     .await;
     let provider = provider(&server);
@@ -173,7 +176,7 @@ async fn chat_stream_contract_and_request_id() {
     let sse = load_text_fixture(&fixtures, "stream_cache.sse");
     let server = TestHttpServer::spawn([
         MockHttpResponse::sse(sse.clone()),
-        MockHttpResponse::sse(sse).header("request-id", "req_stream"),
+        MockHttpResponse::sse(sse).header("request-id", HeaderValue::from_static("req_stream")),
     ])
     .await;
     let provider = provider(&server);
@@ -231,8 +234,10 @@ async fn chat_stream_clean_eof_reports_incomplete_stream() {
 async fn chat_stream_mid_stream_overload_is_typed() {
     let sse = "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"m\",\"model\":\"x\",\"usage\":{\"input_tokens\":1}}}\n\n\
 event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}\n\n";
-    let server =
-        TestHttpServer::spawn([MockHttpResponse::sse(sse).header("request-id", "req_ov")]).await;
+    let server = TestHttpServer::spawn([
+        MockHttpResponse::sse(sse).header("request-id", HeaderValue::from_static("req_ov"))
+    ])
+    .await;
     let mut stream = provider(&server)
         .chat_stream(&ChatRequest::new(MODEL).user("hi"))
         .await
@@ -250,11 +255,11 @@ event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\"
 #[tokio::test]
 async fn chat_maps_non_success_status_to_typed_error() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        429,
+        StatusCode::TOO_MANY_REQUESTS,
         &error_body("rate_limit_error", "too many requests"),
     )
-    .header("request-id", "req-anthropic-429")
-    .header("retry-after", "3")])
+    .header("request-id", HeaderValue::from_static("req-anthropic-429"))
+    .header("retry-after", HeaderValue::from_static("3"))])
     .await;
 
     let err = provider(&server)
@@ -273,10 +278,13 @@ async fn server_retry_directive_is_surfaced_and_followed() {
     use allama::wrappers::{RetryPolicy, RetryingProvider};
 
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(409, &error_body("invalid_request_error", "conflict"))
-            .header("request-id", "req_409")
-            .header("x-should-retry", "true"),
-        MockHttpResponse::json_value(200, &text_response()),
+        MockHttpResponse::json_value(
+            StatusCode::CONFLICT,
+            &error_body("invalid_request_error", "conflict"),
+        )
+        .header("request-id", HeaderValue::from_static("req_409"))
+        .header("x-should-retry", HeaderValue::from_static("true")),
+        MockHttpResponse::json_value(StatusCode::OK, &text_response()),
     ])
     .await;
     let err = provider(&server)
@@ -288,9 +296,12 @@ async fn server_retry_directive_is_surfaced_and_followed() {
     assert_eq!(err.request_id(), Some("req_409"));
 
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(409, &error_body("invalid_request_error", "conflict"))
-            .header("x-should-retry", "true"),
-        MockHttpResponse::json_value(200, &text_response()),
+        MockHttpResponse::json_value(
+            StatusCode::CONFLICT,
+            &error_body("invalid_request_error", "conflict"),
+        )
+        .header("x-should-retry", HeaderValue::from_static("true")),
+        MockHttpResponse::json_value(StatusCode::OK, &text_response()),
     ])
     .await;
     let retrying = RetryingProvider::new(
@@ -308,10 +319,19 @@ async fn server_retry_directive_is_surfaced_and_followed() {
 #[tokio::test]
 async fn retry_after_accepts_http_dates_and_ignores_garbage() {
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(429, &error_body("rate_limit_error", "slow"))
-            .header("retry-after", "Thu, 01 Jan 1970 00:00:00 GMT"),
-        MockHttpResponse::json_value(429, &error_body("rate_limit_error", "slow"))
-            .header("retry-after", "-1"),
+        MockHttpResponse::json_value(
+            StatusCode::TOO_MANY_REQUESTS,
+            &error_body("rate_limit_error", "slow"),
+        )
+        .header(
+            "retry-after",
+            HeaderValue::from_static("Thu, 01 Jan 1970 00:00:00 GMT"),
+        ),
+        MockHttpResponse::json_value(
+            StatusCode::TOO_MANY_REQUESTS,
+            &error_body("rate_limit_error", "slow"),
+        )
+        .header("retry-after", HeaderValue::from_static("-1")),
     ])
     .await;
     let provider = provider(&server);
@@ -343,19 +363,25 @@ async fn error_contracts() {
     });
     let failures = [
         MockHttpResponse::json_value(
-            401,
+            StatusCode::UNAUTHORIZED,
             &error_body("authentication_error", "invalid x-api-key"),
         ),
-        MockHttpResponse::json_value(429, &error_body("rate_limit_error", "slow down")),
-        MockHttpResponse::json_value(529, &error_body("overloaded_error", "Overloaded")),
         MockHttpResponse::json_value(
-            400,
+            StatusCode::TOO_MANY_REQUESTS,
+            &error_body("rate_limit_error", "slow down"),
+        ),
+        MockHttpResponse::json_value(
+            StatusCode::from_u16(529).unwrap(),
+            &error_body("overloaded_error", "Overloaded"),
+        ),
+        MockHttpResponse::json_value(
+            StatusCode::BAD_REQUEST,
             &error_body(
                 "invalid_request_error",
                 "prompt is too long: 300000 tokens > 200000 maximum",
             ),
         ),
-        MockHttpResponse::json_value(429, &quota),
+        MockHttpResponse::json_value(StatusCode::TOO_MANY_REQUESTS, &quota),
     ];
     // Each failure answers `chat`, then `chat_stream`.
     let server = TestHttpServer::spawn(
@@ -389,7 +415,7 @@ async fn structured_output_contracts() {
          event: message_stop\ndata: {{\"type\":\"message_stop\"}}\n\n"
     );
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &response),
+        MockHttpResponse::json_value(StatusCode::OK, &response),
         MockHttpResponse::sse(sse),
     ])
     .await;
@@ -410,7 +436,7 @@ async fn structured_output_contracts() {
 #[tokio::test]
 async fn unsupported_hints_warn_and_strict_policy_rejects_before_sending() {
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &text_response()),
+        MockHttpResponse::json_value(StatusCode::OK, &text_response()),
         MockHttpResponse::sse(load_text_fixture(&fixtures(), "stream.sse")),
     ])
     .await;
@@ -460,7 +486,7 @@ async fn streaming_emits_request_warnings() {
 #[tokio::test]
 async fn forced_tool_choice_is_refused_by_the_api_not_the_adapter() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        400,
+        StatusCode::BAD_REQUEST,
         &error_body(
             "invalid_request_error",
             "tool_choice: type \"tool\" and \"any\" are not supported for this model.",
@@ -491,7 +517,7 @@ async fn forced_tool_choice_is_refused_by_the_api_not_the_adapter() {
 async fn a_deprecated_sampling_parameter_is_refused_by_the_api() {
     let refusal = |parameter: &str| {
         MockHttpResponse::json_value(
-            400,
+            StatusCode::BAD_REQUEST,
             &json!({
                 "type": "error",
                 "error": {
@@ -507,7 +533,7 @@ async fn a_deprecated_sampling_parameter_is_refused_by_the_api() {
         refusal("top_p"),
         refusal("top_k"),
         refusal("temperature"),
-        MockHttpResponse::json_value(200, &text_response()),
+        MockHttpResponse::json_value(StatusCode::OK, &text_response()),
     ])
     .await;
     let provider = provider(&server);
@@ -544,7 +570,7 @@ async fn a_deprecated_sampling_parameter_is_refused_by_the_api() {
 async fn a_refused_prefill_names_the_assistant_message_sent_last() {
     let refusal = || {
         MockHttpResponse::json_value(
-            400,
+            StatusCode::BAD_REQUEST,
             &error_body(
                 "invalid_request_error",
                 "Your API request included an `assistant` message in the final position, which \
@@ -610,7 +636,11 @@ async fn forced_tool_choice_answered_unsupported_is_refused_without_a_request() 
 
 #[tokio::test]
 async fn caching_files_and_parallel_control_reach_the_wire() {
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &text_response())]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(
+        StatusCode::OK,
+        &text_response(),
+    )])
+    .await;
     let tool = ToolDefinition::new("f", json!({"type": "object", "properties": {}}));
     let request = ChatRequest::new(MODEL)
         .system(SystemPrompt::new("Long system prompt").with_cache(CacheBreakpoint::new()))
@@ -635,8 +665,8 @@ async fn caching_files_and_parallel_control_reach_the_wire() {
 async fn raw_response_is_kept_only_when_requested() {
     let raw = load_json_fixture(&fixtures(), "response_raw.json");
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &raw),
-        MockHttpResponse::json_value(200, &raw),
+        MockHttpResponse::json_value(StatusCode::OK, &raw),
+        MockHttpResponse::json_value(StatusCode::OK, &raw),
     ])
     .await;
     let provider = provider(&server);
@@ -674,7 +704,8 @@ async fn replay_transport_runs_the_adapter_without_a_server() {
     let raw = load_text_fixture(&fixtures(), "response_raw.json");
     let sse = load_text_fixture(&fixtures(), "stream.sse");
     let transport = ReplayTransport::new([
-        ReplayResponse::json(200, raw).header("request-id", "req_replay"),
+        ReplayResponse::json(StatusCode::OK, raw)
+            .header("request-id", HeaderValue::from_static("req_replay")),
         ReplayResponse::sse(sse),
     ]);
     let provider = Provider::builder()
@@ -697,11 +728,17 @@ async fn replay_transport_runs_the_adapter_without_a_server() {
     assert!(!streamed.content.is_empty());
 
     let sent = transport.requests();
-    assert_eq!(sent[0].url, "https://api.anthropic.com/v1/messages");
-    assert_eq!(sent[0].headers.get("x-api-key"), Some("replay-key"));
+    assert_eq!(
+        sent[0].uri.to_string(),
+        "https://api.anthropic.com/v1/messages"
+    );
+    assert_eq!(
+        sent[0].headers.get("x-api-key"),
+        Some(&HeaderValue::from_static("replay-key"))
+    );
     assert!(sent[0].timeout.is_some(), "unary requests are bounded");
     assert!(sent[1].timeout.is_none(), "streams are not");
-    let body: Value = serde_json::from_slice(sent[1].body.as_ref().unwrap()).unwrap();
+    let body: Value = serde_json::from_slice(sent[1].body.as_ref()).unwrap();
     assert_eq!(body["stream"], true);
 }
 
@@ -795,7 +832,10 @@ async fn stream_invalid_utf8_fails_without_a_retry() {
     let garbled = |body: &[u8]| {
         let mut bytes = message_start.as_bytes().to_vec();
         bytes.extend_from_slice(body);
-        ReplayResponse::new(200, bytes).header("content-type", "text/event-stream")
+        ReplayResponse::new(StatusCode::OK, bytes).header(
+            "content-type",
+            HeaderValue::from_static("text/event-stream"),
+        )
     };
     let block_start = b"event: content_block_start\ndata: {\"type\":\"content_block_start\",\
         \"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n";
@@ -889,14 +929,15 @@ async fn stream_invalid_utf8_fails_without_a_retry() {
 #[tokio::test]
 async fn a_redirect_to_another_host_is_never_followed() {
     for stream in [false, true] {
-        let target = TestHttpServer::spawn([MockHttpResponse::json(200, "{}")]).await;
+        let target = TestHttpServer::spawn([MockHttpResponse::json(StatusCode::OK, "{}")]).await;
         let location = format!(
             "{}/v1/messages",
             target.url().replace("127.0.0.1", "localhost")
         );
         let origin =
-            TestHttpServer::spawn([MockHttpResponse::text(307, "").header("location", location)])
-                .await;
+            TestHttpServer::spawn([MockHttpResponse::text(StatusCode::TEMPORARY_REDIRECT, "")
+                .header("location", HeaderValue::try_from(location).unwrap())])
+            .await;
         let provider = Provider::builder()
             .api_key("SECRET-KEY-123")
             .base_url(origin.url())

@@ -4,7 +4,9 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use allama_http::{Bytes, Headers};
+use allama_http::Bytes;
+use allama_http::http::header::{CONTENT_TYPE, IntoHeaderName};
+use allama_http::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::Router;
 use axum::body::{Body, to_bytes};
 use axum::extract::{Request, State};
@@ -17,7 +19,10 @@ use tokio::task::JoinHandle;
 /// The status [`TestHttpServer`] answers a request with when no response
 /// is queued for it: not a status any real API sends, so a failure caused
 /// by an unplanned request is recognisable in the error.
-pub const UNPLANNED_REQUEST_STATUS: u16 = 599;
+pub const UNPLANNED_REQUEST_STATUS: StatusCode = match StatusCode::from_u16(599) {
+    Ok(status) => status,
+    Err(_) => panic!("599 is a valid status code"),
+};
 
 /// A canned response that [`TestHttpServer`] answers with.
 ///
@@ -27,15 +32,15 @@ pub const UNPLANNED_REQUEST_STATUS: u16 = 599;
 /// serializes a value, and [`header`](Self::header) adds a header.
 #[derive(Debug, Clone)]
 pub struct MockHttpResponse {
-    status: u16,
-    headers: Vec<(String, String)>,
+    status: StatusCode,
+    headers: HeaderMap,
     body: Bytes,
 }
 
 impl MockHttpResponse {
     /// A response with `status` and a plain `body` (no `content-type`).
     #[must_use]
-    pub fn text(status: u16, body: impl Into<String>) -> Self {
+    pub fn text(status: StatusCode, body: impl Into<String>) -> Self {
         Self::bytes(status, body.into())
     }
 
@@ -43,8 +48,8 @@ impl MockHttpResponse {
     /// `application/json`: a captured body, or one that is not valid JSON
     /// on purpose.
     #[must_use]
-    pub fn json(status: u16, body: impl Into<Bytes>) -> Self {
-        Self::bytes(status, body).header("content-type", "application/json")
+    pub fn json(status: StatusCode, body: impl Into<Bytes>) -> Self {
+        Self::bytes(status, body).header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
     }
 
     /// A response with `status` and `value` serialized as an
@@ -54,7 +59,7 @@ impl MockHttpResponse {
     ///
     /// When `value` does not serialize.
     #[must_use]
-    pub fn json_value(status: u16, value: &impl Serialize) -> Self {
+    pub fn json_value(status: StatusCode, value: &impl Serialize) -> Self {
         Self::json(
             status,
             serde_json::to_vec(value).expect("serialize mock JSON response"),
@@ -72,27 +77,35 @@ impl MockHttpResponse {
             format!("{body}\n\n")
         };
 
-        Self::text(200, normalized).header("content-type", "text/event-stream")
+        Self::text(StatusCode::OK, normalized)
+            .header(CONTENT_TYPE, HeaderValue::from_static("text/event-stream"))
     }
 
     /// A `200` `application/x-ndjson` response with `body` as the
     /// newline-delimited JSON stream, as written.
     #[must_use]
     pub fn ndjson(body: impl Into<String>) -> Self {
-        Self::text(200, body).header("content-type", "application/x-ndjson")
+        Self::text(StatusCode::OK, body).header(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/x-ndjson"),
+        )
     }
 
-    /// Add a response header (`retry-after` on a `429`, for example).
+    /// Add a response header (`retry-after` on a `429`, for example), after
+    /// the values of the same name already set.
+    ///
+    /// The name is a [`HeaderName`](allama_http::http::HeaderName) or a
+    /// `&'static str`, which panics when it is not a valid header name.
     #[must_use]
-    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.push((name.into(), value.into()));
+    pub fn header(mut self, name: impl IntoHeaderName, value: HeaderValue) -> Self {
+        self.headers.append(name, value);
         self
     }
 
-    fn bytes(status: u16, body: impl Into<Bytes>) -> Self {
+    fn bytes(status: StatusCode, body: impl Into<Bytes>) -> Self {
         Self {
             status,
-            headers: Vec::new(),
+            headers: HeaderMap::new(),
             body: body.into(),
         }
     }
@@ -111,30 +124,31 @@ pub struct RecordedRequest {
     pub path: String,
     /// The raw query string, without the leading `?`.
     pub query: Option<String>,
-    /// The headers in the order received, names in lowercase, a header
-    /// sent twice listed twice (see [`header_values`](Self::header_values)).
-    /// Headers whose value is not visible ASCII are left out. `Debug`
-    /// redacts credential values.
-    pub headers: Headers,
+    /// The headers received, a header sent twice kept twice (see
+    /// [`header_values`](Self::header_values)). `Debug` redacts credential
+    /// values.
+    pub headers: HeaderMap,
     /// The raw request body.
     pub body: Vec<u8>,
 }
 
 impl RecordedRequest {
-    /// The first value of header `name` (matched case-insensitively).
+    /// The first value of header `name` (matched case-insensitively), when
+    /// it is visible ASCII.
     #[must_use]
     pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers.get(name)
+        self.headers.get(name)?.to_str().ok()
     }
 
-    /// Every value of header `name` (matched case-insensitively), in the
-    /// order received: a credential sent once has one.
+    /// Every value of header `name` (matched case-insensitively) that is
+    /// visible ASCII, in the order received: a credential sent once has
+    /// one.
     #[must_use]
     pub fn header_values(&self, name: &str) -> Vec<&str> {
         self.headers
+            .get_all(name)
             .iter()
-            .filter(|(header, _)| header.eq_ignore_ascii_case(name))
-            .map(|(_, value)| value)
+            .filter_map(|value| value.to_str().ok())
             .collect()
     }
 
@@ -166,7 +180,7 @@ impl fmt::Debug for RecordedRequest {
             .field("method", &self.method)
             .field("path", &self.path)
             .field("query", &self.query)
-            .field("headers", &self.headers);
+            .field("headers", &allama_http::redacted_headers(&self.headers));
         match std::str::from_utf8(&self.body) {
             Ok(text) => debug.field("body", &text),
             Err(_) => debug.field("body", &self.body),
@@ -193,16 +207,6 @@ fn lock(state: &Mutex<Shared>) -> MutexGuard<'_, Shared> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-fn recorded_headers(headers: &axum::http::HeaderMap) -> Headers {
-    let mut recorded = Headers::new();
-    for (name, value) in headers {
-        if let Ok(value) = value.to_str() {
-            recorded.insert(name.as_str().to_ascii_lowercase(), value);
-        }
-    }
-    recorded
-}
-
 async fn handle_request(State(state): State<AppState>, request: Request) -> Response {
     let (parts, body) = request.into_parts();
     let body = to_bytes(body, usize::MAX)
@@ -215,7 +219,7 @@ async fn handle_request(State(state): State<AppState>, request: Request) -> Resp
             method: parts.method.to_string(),
             path: parts.uri.path().to_string(),
             query: parts.uri.query().map(str::to_string),
-            headers: recorded_headers(&parts.headers),
+            headers: parts.headers,
             body: body.to_vec(),
         });
         let next = shared.responses.pop_front();
@@ -231,17 +235,16 @@ async fn handle_request(State(state): State<AppState>, request: Request) -> Resp
             "TestHttpServer: no response is queued for this request; queue one for each \
              request the test expects",
         )
-        .header("x-test-http-server", "unplanned-request")
+        .header(
+            "x-test-http-server",
+            HeaderValue::from_static("unplanned-request"),
+        )
     });
 
-    let mut builder = Response::builder().status(response.status);
-    for (name, value) in response.headers {
-        builder = builder.header(name, value);
-    }
-
-    builder
-        .body(Body::from(response.body))
-        .expect("build mock HTTP response")
+    let mut built = Response::new(Body::from(response.body));
+    *built.status_mut() = response.status;
+    *built.headers_mut() = response.headers;
+    built
 }
 
 /// A local HTTP server that answers each request with the next queued
@@ -262,11 +265,13 @@ async fn handle_request(State(state): State<AppState>, request: Request) -> Resp
 ///
 /// ```no_run
 /// use allama_conformance::{MockHttpResponse, TestHttpServer};
+/// use allama_http::http::{HeaderValue, StatusCode};
 ///
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() {
 /// let server = TestHttpServer::spawn([
-///     MockHttpResponse::json(429, r#"{"error":"slow down"}"#).header("retry-after", "2"),
+///     MockHttpResponse::json(StatusCode::TOO_MANY_REQUESTS, r#"{"error":"slow down"}"#)
+///         .header("retry-after", HeaderValue::from_static("2")),
 /// ])
 /// .await;
 /// // Build the provider with `server.url()` as its base URL and call it.
@@ -417,16 +422,17 @@ mod tests {
             method: "POST".into(),
             path: "/v1/chat".into(),
             query: None,
-            headers: Headers::new(),
+            headers: HeaderMap::new(),
             body: body.to_vec(),
         }
     }
 
-    async fn post(server: &TestHttpServer, headers: &[(&str, &str)]) -> u16 {
-        use allama_http::{HttpRequest, HttpTransport, ReqwestTransport};
-        let mut request = HttpRequest::post(format!("{}/v1/chat", server.url()), "{}");
+    async fn post(server: &TestHttpServer, headers: &[(&'static str, &'static str)]) -> StatusCode {
+        use allama_http::{HttpRequest, HttpTransport, ReqwestTransport, request_uri};
+        let uri = request_uri(format!("{}/v1/chat", server.url())).unwrap();
+        let mut request = HttpRequest::post(uri, "{}");
         for (name, value) in headers {
-            request = request.header(*name, *value);
+            request = request.header(*name, HeaderValue::from_static(value));
         }
         ReqwestTransport::new().send(request).await.unwrap().status
     }
@@ -440,7 +446,7 @@ mod tests {
 
     #[tokio::test]
     async fn an_unplanned_request_gets_a_distinctive_status_and_fails_the_test() {
-        let server = TestHttpServer::spawn([MockHttpResponse::json(200, "{}")]).await;
+        let server = TestHttpServer::spawn([MockHttpResponse::json(StatusCode::OK, "{}")]).await;
         assert_eq!(post(&server, &[]).await, 200);
         assert_eq!(post(&server, &[]).await, UNPLANNED_REQUEST_STATUS);
         assert_eq!(server.remaining(), 0);
@@ -457,8 +463,8 @@ mod tests {
     #[tokio::test]
     async fn a_leftover_response_fails_the_test() {
         let server = TestHttpServer::spawn([
-            MockHttpResponse::json(200, "{}"),
-            MockHttpResponse::json(200, "{}"),
+            MockHttpResponse::json(StatusCode::OK, "{}"),
+            MockHttpResponse::json(StatusCode::OK, "{}"),
         ])
         .await;
         assert_eq!(post(&server, &[]).await, 200);
@@ -476,14 +482,14 @@ mod tests {
     #[tokio::test]
     async fn an_untaken_response_alone_does_not_fail_the_drop() {
         // A redirect target that must not be followed.
-        let server = TestHttpServer::spawn([MockHttpResponse::json(200, "{}")]).await;
+        let server = TestHttpServer::spawn([MockHttpResponse::json(StatusCode::OK, "{}")]).await;
         assert_eq!(server.remaining(), 1);
         drop(server);
     }
 
     #[tokio::test]
     async fn a_header_sent_twice_is_recorded_twice() {
-        let server = TestHttpServer::spawn([MockHttpResponse::json(200, "{}")]).await;
+        let server = TestHttpServer::spawn([MockHttpResponse::json(StatusCode::OK, "{}")]).await;
         post(
             &server,
             &[
@@ -520,10 +526,8 @@ mod tests {
     fn an_ndjson_response_keeps_its_body_as_written() {
         let response = MockHttpResponse::ndjson("{\"a\":1}\n{\"b\":2}\n");
         assert_eq!(response.status, 200);
-        assert_eq!(
-            response.headers,
-            [("content-type".to_owned(), "application/x-ndjson".to_owned())]
-        );
+        assert_eq!(response.headers.len(), 1);
+        assert_eq!(response.headers["content-type"], "application/x-ndjson");
         assert_eq!(&response.body[..], b"{\"a\":1}\n{\"b\":2}\n");
     }
 }

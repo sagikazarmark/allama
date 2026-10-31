@@ -10,6 +10,7 @@ use allama::{
 use allama_conformance::contract::{
     assert_structured_output_contract, assert_structured_output_contract_stream,
 };
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai::{Provider, ResponsesProvider};
 use serde_json::json;
@@ -65,7 +66,7 @@ async fn chat_structured_output_is_json_on_both_paths() {
         "choices": [{"index": 0, "delta": {"role": "assistant", "content": ANSWER}, "finish_reason": "stop"}]
     });
     let provider = chat_provider(ReplayTransport::new([
-        ReplayResponse::json(200, response.to_string()),
+        ReplayResponse::json(StatusCode::OK, response.to_string()),
         ReplayResponse::sse(format!("data: {chunk}\n\ndata: [DONE]\n\n")),
     ]));
     assert_structured_output_contract(&provider, &structured_request("gpt-4o")).await;
@@ -102,7 +103,7 @@ async fn responses_structured_output_is_json_on_both_paths() {
         ));
     }
     let provider = responses_provider(ReplayTransport::new([
-        ReplayResponse::json(200, response.to_string()),
+        ReplayResponse::json(StatusCode::OK, response.to_string()),
         ReplayResponse::sse(sse),
     ]));
     assert_structured_output_contract(&provider, &structured_request("gpt-4.1")).await;
@@ -118,7 +119,7 @@ async fn responses_structured_output_is_json_on_both_paths() {
 async fn chat_completions_content_part_refusal_is_unsupported() {
     let refusal = |index: usize| {
         ReplayResponse::json(
-            400,
+            StatusCode::BAD_REQUEST,
             json!({"error": {
                 "message": format!("Invalid 'messages[{index}]'. Content blocks are expected to be either text or image_url type."),
                 "type": "invalid_request_error",
@@ -149,7 +150,7 @@ async fn chat_completions_content_part_refusal_is_unsupported() {
 #[tokio::test]
 async fn chat_completions_tools_with_reasoning_refusal_names_the_reasoning() {
     let refusal = ReplayResponse::json(
-        400,
+        StatusCode::BAD_REQUEST,
         json!({"error": {
             "message": "Function tools with reasoning_effort are not supported for gpt-6-astra in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.",
             "type": "invalid_request_error",
@@ -176,8 +177,7 @@ async fn chat_completions_tools_with_reasoning_refusal_names_the_reasoning() {
     assert_eq!(err.unsupported_field(), Some(RequestField::Reasoning));
     assert!(allama::wrappers::should_fallback(&err));
     let sent = transport.requests();
-    let body: serde_json::Value =
-        serde_json::from_slice(sent[0].body.as_ref().expect("a request body")).unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&sent[0].body).unwrap();
     assert_eq!(body["reasoning_effort"], "low");
     assert_eq!(body["tools"][0]["function"]["name"], "get_weather");
 }

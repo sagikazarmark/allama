@@ -4,6 +4,7 @@
 
 use allama::prelude::*;
 use allama::{EmbeddingProvider, EmbeddingRequest};
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::{Provider, ResponsesProvider};
 
@@ -15,7 +16,10 @@ fn compat(body: &'static str, cap: usize) -> Provider {
     Provider::builder()
         .base_url("http://upstream/v1")
         .max_response_size(cap)
-        .http_transport(ReplayTransport::new([ReplayResponse::json(200, body)]))
+        .http_transport(ReplayTransport::new([ReplayResponse::json(
+            StatusCode::OK,
+            body,
+        )]))
         .build()
         .unwrap()
 }
@@ -24,7 +28,10 @@ fn responses(cap: usize) -> ResponsesProvider {
     ResponsesProvider::builder()
         .base_url("http://upstream/v1")
         .max_response_size(cap)
-        .http_transport(ReplayTransport::new([ReplayResponse::json(200, RESPONSE)]))
+        .http_transport(ReplayTransport::new([ReplayResponse::json(
+            StatusCode::OK,
+            RESPONSE,
+        )]))
         .build()
         .unwrap()
 }

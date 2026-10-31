@@ -10,7 +10,8 @@ use allama_conformance::capabilities::UNKNOWN_MODEL;
 use allama_conformance::probe::ProbeOutcome;
 use allama_conformance::stream_errors::ErrorKindProbe;
 use allama_conformance::{ExtractionAdapterUnderTest, TransportOutcome, assert_extraction_adapter};
-use allama_http::{CredentialPlacement, CredentialSlot, Headers, ReplayResponse, ReplayTransport};
+use allama_http::http::StatusCode;
+use allama_http::{CredentialPlacement, CredentialSlot, ReplayResponse, ReplayTransport};
 use serde_json::{Map, Value, json};
 
 fn provider(transport: &ReplayTransport) -> Provider {
@@ -96,8 +97,10 @@ fn answers(request: &ExtractionRequest) -> Value {
 
 /// `extract_values` over a transport that answers the request's fields.
 async fn probe(request: ExtractionRequest) -> ProbeOutcome<ExtractionResponse> {
-    let transport =
-        ReplayTransport::new([ReplayResponse::json(200, answers(&request).to_string())]);
+    let transport = ReplayTransport::new([ReplayResponse::json(
+        StatusCode::OK,
+        answers(&request).to_string(),
+    )]);
     let result = provider(&transport).extract_values(&request).await;
     ProbeOutcome::new(result, bodies(&transport))
 }
@@ -143,9 +146,9 @@ async fn passes_every_contract() {
     }
     let slot = CredentialSlot::new(DEFAULT_CREDENTIAL_SCOPE, CredentialPlacement::Bearer);
     let under_test = ExtractionAdapterUnderTest::new(["@cf/cloudflare/clairic"], probe)
-        .error_mapping(|status, pairs, body| {
-            map_http_error(status, &pairs.iter().copied().collect::<Headers>(), &body)
-        })
+        .error_mapping(allama_conformance::error_kinds::http_error_mapping(
+            map_http_error,
+        ))
         .error_envelope(envelope)
         .transport_options(slot, |options: RequestOptions| async move {
             let transport = ReplayTransport::default();

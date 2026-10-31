@@ -6,8 +6,8 @@ use std::time::Duration;
 use futures_util::StreamExt;
 
 use crate::{
-    Headers, HttpRequest, HttpResponse, HttpTransport, Method, SendFuture, TransportError,
-    TransportErrorKind,
+    HttpRequest, HttpResponse, HttpTransport, SendFuture, TransportError, TransportErrorKind,
+    is_sensitive_header,
 };
 
 #[cfg(feature = "reqwest-middleware")]
@@ -146,20 +146,9 @@ impl HttpTransport for ReqwestTransport {
         Box::pin(single_threaded(async move {
             let built = self.build(request)?;
             record_server(built.url());
-            let response = self.client.execute(built).await.map_err(send_error)?;
-            let status = response.status().as_u16();
-            let headers = response
-                .headers()
-                .iter()
-                // A value that is not visible ASCII (obs-text) is kept,
-                // decoded lossily, rather than dropped.
-                .map(|(name, value)| {
-                    (
-                        name.as_str(),
-                        String::from_utf8_lossy(value.as_bytes()).into_owned(),
-                    )
-                })
-                .collect::<Headers>();
+            let mut response = self.client.execute(built).await.map_err(send_error)?;
+            let status = response.status();
+            let headers = std::mem::take(response.headers_mut());
             let body = response
                 .bytes_stream()
                 .map(|chunk| chunk.map_err(|e| with_cause(e, TransportErrorKind::Body)));
@@ -173,34 +162,41 @@ impl HttpTransport for ReqwestTransport {
 }
 
 impl ReqwestTransport {
-    /// The `reqwest` request for `request`, its sensitive header values
-    /// marked so.
+    /// The `reqwest` request for `request`, the values of credential
+    /// headers marked sensitive.
+    ///
+    /// `reqwest` speaks the same `http` types, so only the URI is converted:
+    /// to the `reqwest::Url` it sends to, which fails (an
+    /// [`InvalidRequest`](TransportErrorKind::InvalidRequest)) for a URI
+    /// that is not absolute.
     fn build(&self, request: HttpRequest) -> Result<reqwest::Request, TransportError> {
-        let method = match request.method {
-            Method::Get => reqwest::Method::GET,
-            Method::Post => reqwest::Method::POST,
-        };
-        let mut builder = self.client.request(method, &request.url);
-        for header in &request.headers.0 {
-            builder = match reqwest::header::HeaderValue::from_str(&header.value) {
-                // Marked sensitive, so `reqwest` and the `http` crate
-                // keep it out of their own `Debug` output.
-                Ok(mut value) if header.is_sensitive() => {
-                    value.set_sensitive(true);
-                    builder.header(header.name.as_str(), value)
-                }
-                _ => builder.header(header.name.as_str(), header.value.as_str()),
-            };
+        let HttpRequest {
+            method,
+            uri,
+            mut headers,
+            body,
+            timeout,
+        } = request;
+        let url = reqwest::Url::parse(&uri.to_string()).map_err(|_| {
+            TransportError::new(
+                TransportErrorKind::InvalidRequest,
+                "the request URI is not an absolute URL",
+            )
+            .authored()
+        })?;
+        // Marked sensitive, so `reqwest` and the `http` crate keep them out
+        // of their own `Debug` output.
+        for (name, value) in &mut headers {
+            if is_sensitive_header(name.as_str()) {
+                value.set_sensitive(true);
+            }
         }
-        if let Some(body) = request.body {
-            builder = builder.body(body);
+        let mut built = reqwest::Request::new(method, url);
+        *built.headers_mut() = headers;
+        if !body.is_empty() {
+            *built.body_mut() = Some(body.into());
         }
-        // Set on the built request: `reqwest-middleware` has no builder
-        // `timeout` on `wasm32`.
-        let mut built = builder
-            .build()
-            .map_err(|e| with_cause(e, TransportErrorKind::InvalidRequest))?;
-        *built.timeout_mut() = request.timeout;
+        *built.timeout_mut() = timeout;
         Ok(built)
     }
 }
@@ -313,26 +309,30 @@ mod tests {
     use std::time::Duration;
 
     use allama_conformance::{MockHttpResponse, TestHttpServer};
+    use http::{HeaderValue, StatusCode, Uri};
 
     use super::*;
 
+    fn uri(url: &str) -> Uri {
+        Uri::try_from(url).unwrap()
+    }
+
     #[tokio::test]
     async fn sends_requests_and_streams_bodies() {
-        let server = TestHttpServer::spawn([
-            MockHttpResponse::text(201, "hello").header("x-request-id", "req_1")
-        ])
+        let server = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::CREATED, "hello")
+            .header("x-request-id", HeaderValue::from_static("req_1"))])
         .await;
         let transport = ReqwestTransport::new();
         let response = transport
             .send(
-                HttpRequest::post(format!("{}/v1/items", server.url()), "{\"a\":1}")
-                    .header("authorization", "Bearer k")
+                HttpRequest::post(uri(&format!("{}/v1/items", server.url())), "{\"a\":1}")
+                    .header("authorization", HeaderValue::from_static("Bearer k"))
                     .timeout(Some(Duration::from_secs(5))),
             )
             .await
             .unwrap();
-        assert_eq!(response.status, 201);
-        assert_eq!(response.headers.get("X-Request-Id"), Some("req_1"));
+        assert_eq!(response.status, StatusCode::CREATED);
+        assert_eq!(response.headers["X-Request-Id"], "req_1");
         assert_eq!(response.text().await.unwrap(), "hello");
 
         let recorded = &server.recorded_requests().await[0];
@@ -342,6 +342,32 @@ mod tests {
         );
         assert_eq!(recorded.header("authorization"), Some("Bearer k"));
         assert_eq!(recorded.body_json()["a"], 1);
+    }
+
+    /// An empty body is sent as no body, on a `GET` and on a `POST` (the
+    /// Responses API's cancel) alike.
+    #[tokio::test]
+    async fn empty_bodies_are_sent_as_no_body() {
+        let server = TestHttpServer::spawn([
+            MockHttpResponse::text(StatusCode::OK, "a"),
+            MockHttpResponse::text(StatusCode::OK, "b"),
+        ])
+        .await;
+        let transport = ReqwestTransport::new();
+        for request in [
+            HttpRequest::get(uri(&format!("{}/v1/models", server.url()))),
+            HttpRequest::post(uri(&format!("{}/v1/cancel", server.url())), ""),
+        ] {
+            transport.send(request).await.unwrap();
+        }
+        let recorded = server.recorded_requests().await;
+        assert_eq!(recorded.len(), 2);
+        assert_eq!(recorded[0].method, "GET");
+        assert_eq!(recorded[1].method, "POST");
+        for request in &recorded {
+            assert!(request.body.is_empty(), "{request:?}");
+            assert_eq!(request.header("transfer-encoding"), None);
+        }
     }
 
     /// With `rustls-ring` alone, `reqwest` ships no crypto provider and
@@ -358,13 +384,14 @@ mod tests {
     #[tokio::test]
     async fn failures_are_classified() {
         let refused = ReqwestTransport::new()
-            .send(HttpRequest::get("http://127.0.0.1:1/"))
+            .send(HttpRequest::get(uri("http://127.0.0.1:1/")))
             .await
             .unwrap_err();
         assert_eq!(refused.kind(), TransportErrorKind::Connect);
 
+        // A URI `http` accepts but no client can send to: a path alone.
         let unbuildable = ReqwestTransport::new()
-            .send(HttpRequest::get("not a url"))
+            .send(HttpRequest::get(uri("/v1/models")))
             .await
             .unwrap_err();
         assert_eq!(unbuildable.kind(), TransportErrorKind::InvalidRequest);
@@ -376,11 +403,11 @@ mod tests {
     fn sensitive_headers_are_marked_on_the_request() {
         let built = ReqwestTransport::new()
             .build(
-                HttpRequest::get("http://127.0.0.1:1/v1/models")
-                    .header("authorization", "Bearer SECRET")
-                    .header("x-api-key", "SECRET")
-                    .sensitive_header("x-route", "SECRET")
-                    .header("x-request-id", "req_1"),
+                HttpRequest::get(uri("http://127.0.0.1:1/v1/models"))
+                    .header("authorization", HeaderValue::from_static("Bearer SECRET"))
+                    .header("x-api-key", HeaderValue::from_static("SECRET"))
+                    .sensitive_header("x-route", HeaderValue::from_static("SECRET"))
+                    .header("x-request-id", HeaderValue::from_static("req_1")),
             )
             .unwrap();
         let headers = built.headers();
@@ -392,25 +419,30 @@ mod tests {
     }
 
     /// A response header value that is not visible ASCII (obs-text) is
-    /// kept, decoded lossily, not dropped.
+    /// kept as sent, not dropped.
     #[tokio::test]
     async fn obs_text_response_headers_are_kept() {
-        let server =
-            TestHttpServer::spawn([MockHttpResponse::text(200, "ok").header("x-region", "zürich")])
-                .await;
+        let server = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::OK, "ok").header(
+            "x-region",
+            HeaderValue::from_bytes("zürich".as_bytes()).unwrap(),
+        )])
+        .await;
         let response = ReqwestTransport::new()
-            .send(HttpRequest::get(format!("{}/v1/models", server.url())))
+            .send(HttpRequest::get(uri(&format!(
+                "{}/v1/models",
+                server.url()
+            ))))
             .await
             .unwrap();
-        assert_eq!(response.headers.get("x-region"), Some("zürich"));
+        assert_eq!(response.headers["x-region"].as_bytes(), "zürich".as_bytes());
     }
 
     #[tokio::test]
     async fn error_text_drops_the_query_string() {
         let refused = ReqwestTransport::new()
-            .send(HttpRequest::get(
+            .send(HttpRequest::get(uri(
                 "http://user:pw@127.0.0.1:1/v1/models?key=SECRET",
-            ))
+            )))
             .await
             .unwrap_err();
         let text = refused.to_string();
@@ -443,9 +475,9 @@ mod tests {
     #[tokio::test]
     async fn query_string_key_stays_out_of_the_error() {
         let err = ReqwestTransport::new()
-            .send(HttpRequest::get(
+            .send(HttpRequest::get(uri(
                 "http://127.0.0.1:1/v1beta/models/m:generateContent?key=secret",
-            ))
+            )))
             .await
             .unwrap_err()
             .into_error();
@@ -473,10 +505,15 @@ mod tests {
 mod wasm_tests {
     use std::time::Duration;
 
+    use http::{HeaderValue, StatusCode, Uri};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_test::wasm_bindgen_test;
 
     use super::*;
+
+    fn uri(url: &str) -> Uri {
+        Uri::try_from(url).unwrap()
+    }
 
     #[wasm_bindgen(inline_js = r#"
         export async function startServer() {
@@ -513,14 +550,14 @@ mod wasm_tests {
         let url = server_url().await;
         let response = ReqwestTransport::new()
             .send(
-                HttpRequest::post(format!("{url}/v1/items"), "{\"a\":1}")
-                    .header("authorization", "Bearer k")
+                HttpRequest::post(uri(&format!("{url}/v1/items")), "{\"a\":1}")
+                    .header("authorization", HeaderValue::from_static("Bearer k"))
                     .timeout(Some(Duration::from_secs(5))),
             )
             .await
             .unwrap();
-        assert_eq!(response.status, 201);
-        assert_eq!(response.headers.get("X-Request-Id"), Some("req_1"));
+        assert_eq!(response.status, StatusCode::CREATED);
+        assert_eq!(response.headers["X-Request-Id"], "req_1");
         assert_eq!(
             response.text().await.unwrap(),
             "POST /v1/items Bearer k {\"a\":1}"
@@ -531,13 +568,16 @@ mod wasm_tests {
     async fn failures_are_classified() {
         let url = server_url().await;
         let slow = ReqwestTransport::new()
-            .send(HttpRequest::get(format!("{url}/slow")).timeout(Some(Duration::from_millis(50))))
+            .send(
+                HttpRequest::get(uri(&format!("{url}/slow")))
+                    .timeout(Some(Duration::from_millis(50))),
+            )
             .await
             .unwrap_err();
         assert_eq!(slow.kind(), TransportErrorKind::Timeout);
 
         let unbuildable = ReqwestTransport::new()
-            .send(HttpRequest::get("not a url"))
+            .send(HttpRequest::get(uri("/v1/models")))
             .await
             .unwrap_err();
         assert_eq!(unbuildable.kind(), TransportErrorKind::InvalidRequest);

@@ -11,6 +11,7 @@ use allama::wrappers::TracingProvider;
 use allama::{ChatProvider, ChatRequest, ChatResponse};
 use allama_conformance::{MockHttpResponse, TestHttpServer};
 use allama_http::{HttpRequest, HttpTransport, ReqwestTransport};
+use http::{StatusCode, Uri};
 use tracing::field::{Field, Visit};
 use tracing::span::{Attributes, Id, Record};
 use tracing::{Event, Subscriber};
@@ -51,7 +52,7 @@ impl ChatProvider for Sends {
 
     async fn chat(&self, request: &ChatRequest) -> allama::Result<ChatResponse> {
         let response = ReqwestTransport::new()
-            .send(HttpRequest::get(self.url.clone()))
+            .send(HttpRequest::get(Uri::try_from(self.url.clone()).unwrap()))
             .await
             .map_err(allama_http::TransportError::into_error)?;
         assert_eq!(response.status, 200);
@@ -71,7 +72,7 @@ impl allama::ProviderIdentity for Sends {
 
 #[tokio::test]
 async fn the_transport_records_the_server_it_sent_to() {
-    let server = TestHttpServer::spawn([MockHttpResponse::text(200, "ok")]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::text(StatusCode::OK, "ok")]).await;
     let port = server.url().rsplit(':').next().unwrap().to_owned();
     let provider = TracingProvider::new(Sends {
         inner: MockProvider::with_text("ok"),

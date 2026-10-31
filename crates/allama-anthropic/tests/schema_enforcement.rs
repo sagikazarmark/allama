@@ -13,6 +13,7 @@ use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama::{RequestField, Subject, WarningKind};
 use allama_anthropic::Provider;
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -56,7 +57,7 @@ impl Target {
 
 fn message(content: Value, stop_reason: &str) -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "msg_1", "type": "message", "role": "assistant", "model": MODEL,
             "content": content, "stop_reason": stop_reason, "stop_sequence": null,
@@ -203,7 +204,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }

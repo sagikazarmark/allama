@@ -4,6 +4,7 @@
 
 use allama::prelude::*;
 use allama_conformance::{TransportOutcome, assert_transport_options_applied};
+use allama_http::http::HeaderValue;
 use allama_http::{
     Credential, CredentialPlacement, CredentialSlot, HttpRequestOptions, ReplayTransport,
 };
@@ -37,9 +38,9 @@ fn sent_values(transport: &ReplayTransport, name: &str) -> Vec<String> {
     let request = requests.last().expect("the adapter sent a request");
     request
         .headers
+        .get_all(name)
         .iter()
-        .filter(|(key, _)| key.eq_ignore_ascii_case(name))
-        .map(|(_, value)| value.to_owned())
+        .map(|value| value.to_str().unwrap().to_owned())
         .collect()
 }
 
@@ -141,7 +142,10 @@ async fn a_tenant_key_replaces_the_provider_key() {
 
 #[tokio::test]
 async fn a_plain_credential_header_is_refused_before_sending() {
-    let plain = HttpRequestOptions::new().header("Authorization", "Bearer PLAIN-SECRET");
+    let plain = HttpRequestOptions::new().header(
+        "Authorization",
+        HeaderValue::from_static("Bearer PLAIN-SECRET"),
+    );
     let transport = ReplayTransport::default();
     let err = compat(&transport)
         .chat(&chat_request(plain.clone()))
@@ -166,9 +170,10 @@ async fn a_plain_credential_header_is_refused_before_sending() {
 async fn an_idempotency_key_passes() {
     let transport = ReplayTransport::default();
     let _ = compat(&transport)
-        .chat(&chat_request(
-            HttpRequestOptions::new().header("Idempotency-Key", "idem-1"),
-        ))
+        .chat(&chat_request(HttpRequestOptions::new().header(
+            "Idempotency-Key",
+            HeaderValue::from_static("idem-1"),
+        )))
         .await;
     assert_eq!(sent_values(&transport, "idempotency-key"), ["idem-1"]);
     assert_eq!(

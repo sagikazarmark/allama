@@ -7,8 +7,10 @@ use allama::{
     ValidationCoverage,
 };
 
+use allama_http::http::HeaderValue;
+use allama_http::http::header::CONTENT_TYPE;
 use allama_http::sse::{SseChatStream, SseStream};
-use allama_http::{HttpRequest, HttpResponse};
+use allama_http::{HttpRequest, HttpResponse, request_uri};
 
 use crate::embedding::{
     EmbeddingWireOptions, EmbeddingsResponse, from_embeddings_response, to_embeddings_request,
@@ -289,9 +291,11 @@ impl Provider {
     /// `options` applied.
     fn build_post(&self, url: &str, body: String, options: &RequestOptions) -> Result<HttpRequest> {
         let config = &self.inner.transport;
-        let mut request = HttpRequest::post(url, body).header("content-type", "application/json");
+        let uri = request_uri(url).map_err(|err| err.with_provider(self.provider_name()))?;
+        let mut request = HttpRequest::post(uri, body)
+            .header(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         if let Some((name, value)) = &config.auth {
-            request = request.header(name, value);
+            request = request.header(name.clone(), value.clone());
         }
         request
             .with_headers(&config.headers)

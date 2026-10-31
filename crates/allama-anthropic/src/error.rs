@@ -2,9 +2,10 @@
 //! failures to typed [`allama::Error`]s.
 
 use allama::{Error, RequestField, Subject};
+use allama_http::TransportError;
 #[cfg(test)]
 use allama_http::TransportErrorKind;
-use allama_http::{Headers, TransportError};
+use allama_http::http::{HeaderMap, StatusCode};
 
 use crate::PROVIDER_NAME;
 use crate::wire;
@@ -30,7 +31,7 @@ pub(crate) fn map_body_read_error(err: TransportError, request_id: Option<String
 /// A success response's body did not match the Messages API shape
 /// ([`allama_http::malformed_response`]).
 pub(crate) fn map_response_decode_error(
-    status: u16,
+    status: StatusCode,
     body: &[u8],
     err: serde_json::Error,
     request_id: Option<String>,
@@ -67,8 +68,8 @@ pub(crate) fn map_stream_api_error(
 /// but is kept only as the body. `prefill` is the index of the assistant
 /// message the caller sent last, which a refusal of a prefill names.
 pub(crate) fn map_http_error(
-    status: u16,
-    headers: &Headers,
+    status: StatusCode,
+    headers: &HeaderMap,
     body: &str,
     prefill: Option<usize>,
 ) -> Error {
@@ -115,20 +116,20 @@ pub(crate) fn map_http_error(
 /// constructor message; the caller adds the context and marks it
 /// [authored](Error::authored).
 fn classify(
-    status: Option<u16>,
+    status: Option<StatusCode>,
     error_type: &str,
     text: &str,
     code: Option<&str>,
     prefill: Option<usize>,
 ) -> Error {
     let message = match status {
-        Some(status) => format!("HTTP {status}"),
+        Some(status) => format!("HTTP {}", status.as_u16()),
         None => "Anthropic stream reported an error".to_owned(),
     };
 
     if code.is_some_and(|c| QUOTA_ERROR_CODES.contains(&c))
         || error_type == "billing_error"
-        || status == Some(402)
+        || status == Some(StatusCode::PAYMENT_REQUIRED)
         || is_quota_message(text)
     {
         Error::quota_exhausted(message)
@@ -353,15 +354,24 @@ pub(crate) fn conformance_map_timeout_transport_error() -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use allama_http::http::StatusCode;
     use serde_json::json;
 
     /// A response to a request that ends on a user message.
-    fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
-        super::map_http_error(status, headers, body, None)
+    fn map_http_error(status: u16, headers: &HeaderMap, body: &str) -> Error {
+        super::map_http_error(StatusCode::from_u16(status).unwrap(), headers, body, None)
     }
 
-    fn headers(pairs: &[(&str, &str)]) -> Headers {
-        pairs.iter().copied().collect()
+    fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+        pairs
+            .iter()
+            .map(|(name, value)| {
+                (
+                    allama_http::http::HeaderName::try_from(*name).unwrap(),
+                    allama_http::http::HeaderValue::try_from(*value).unwrap(),
+                )
+            })
+            .collect()
     }
 
     fn body(error_type: &str, message: &str) -> String {
@@ -433,7 +443,7 @@ mod tests {
             ),
         ];
         for (text, field) in cases {
-            let http = map_http_error(400, &Headers::new(), &body("invalid_request_error", text));
+            let http = map_http_error(400, &HeaderMap::new(), &body("invalid_request_error", text));
             let in_band = stream_error("invalid_request_error", text);
             for err in [http, in_band] {
                 assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
@@ -447,7 +457,7 @@ mod tests {
         // Other rejections stay invalid requests.
         let other = map_http_error(
             400,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body("invalid_request_error", "max_tokens: Field required"),
         );
         assert!(matches!(other, Error::InvalidRequest { .. }), "{other:?}");
@@ -472,7 +482,7 @@ mod tests {
                 "request_id": "req_011CfzPcSSaAQ7Wd46DMkbkW"
             })
             .to_string();
-            let http = map_http_error(400, &Headers::new(), &recorded);
+            let http = map_http_error(400, &HeaderMap::new(), &recorded);
             let in_band = stream_error("invalid_request_error", &upstream);
             for err in [http, in_band] {
                 assert!(matches!(err, Error::Unsupported { .. }), "{err:?}");
@@ -492,7 +502,7 @@ mod tests {
         // Another parameter worded the same way is not a sampling refusal.
         let other = map_http_error(
             400,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body(
                 "invalid_request_error",
                 "`stop_sequences` is deprecated for this model.",
@@ -515,8 +525,8 @@ mod tests {
              `assistant` response is not supported.",
         ] {
             let err = super::map_http_error(
-                400,
-                &Headers::new(),
+                StatusCode::BAD_REQUEST,
+                &HeaderMap::new(),
                 &body("invalid_request_error", text),
                 Some(3),
             );
@@ -551,7 +561,7 @@ mod tests {
     fn maps_auth_statuses() {
         let err = map_http_error(
             401,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body("authentication_error", "invalid x-api-key"),
         );
         assert!(matches!(&err, Error::Auth { message, .. } if message == "HTTP 401"));
@@ -565,7 +575,11 @@ mod tests {
             err.context().unwrap().provider_type.as_deref(),
             Some("authentication_error")
         );
-        let err = map_http_error(403, &Headers::new(), &body("permission_error", "forbidden"));
+        let err = map_http_error(
+            403,
+            &HeaderMap::new(),
+            &body("permission_error", "forbidden"),
+        );
         assert!(matches!(err, Error::Auth { .. }));
     }
 
@@ -590,7 +604,7 @@ mod tests {
             "request_id": "req_body"
         })
         .to_string();
-        let err = map_http_error(500, &Headers::new(), &body);
+        let err = map_http_error(500, &HeaderMap::new(), &body);
         assert!(matches!(err, Error::Provider { .. }));
         assert_eq!(err.request_id(), Some("req_body"));
         assert!(err.is_retryable());
@@ -620,7 +634,7 @@ mod tests {
     fn billing_and_user_spend_limits_are_quota_exhausted() {
         let err = map_http_error(
             400,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body(
                 "invalid_request_error",
                 "Your credit balance is too low to access the Anthropic API.",
@@ -629,7 +643,7 @@ mod tests {
         assert!(matches!(err, Error::QuotaExhausted { .. }), "{err:?}");
         let err = map_http_error(
             400,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body(
                 "invalid_request_error",
                 "You have reached your specified API usage limits. You will regain access on 2026-11-01.",
@@ -638,7 +652,7 @@ mod tests {
         assert!(matches!(err, Error::QuotaExhausted { .. }), "{err:?}");
         let err = map_http_error(
             402,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body("billing_error", "payment required"),
         );
         assert!(matches!(err, Error::QuotaExhausted { .. }), "{err:?}");
@@ -649,12 +663,12 @@ mod tests {
         for status in [503, 529] {
             let err = map_http_error(
                 status,
-                &Headers::new(),
+                &HeaderMap::new(),
                 &body("overloaded_error", "Overloaded"),
             );
             assert!(matches!(err, Error::Overloaded { .. }));
         }
-        let err = map_http_error(503, &Headers::new(), "Service Unavailable");
+        let err = map_http_error(503, &HeaderMap::new(), "Service Unavailable");
         assert!(matches!(&err, Error::Overloaded { message, .. } if message == "HTTP 503"));
         assert_eq!(err.upstream_message(), None);
     }
@@ -663,7 +677,7 @@ mod tests {
     fn maps_context_length_with_limit() {
         let err = map_http_error(
             400,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body(
                 "invalid_request_error",
                 "prompt is too long: 208310 tokens > 200000 maximum",
@@ -681,7 +695,7 @@ mod tests {
         );
         let err = map_http_error(
             400,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body(
                 "invalid_request_error",
                 "too many tokens: your request had 200000",
@@ -700,7 +714,7 @@ mod tests {
     fn maps_content_filtering_and_invalid_request() {
         let err = map_http_error(
             400,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body(
                 "invalid_request_error",
                 "Your request was blocked due to content filtering",
@@ -709,7 +723,7 @@ mod tests {
         assert!(matches!(err, Error::ContentFiltered { .. }));
         let err = map_http_error(
             400,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body(
                 "invalid_request_error",
                 "max_tokens must be a positive integer",
@@ -722,20 +736,20 @@ mod tests {
     fn maps_model_not_found() {
         let err = map_http_error(
             404,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body("not_found_error", "model: claude-nope"),
         );
         assert!(matches!(err, Error::ModelNotFound { .. }), "{err:?}");
-        let err = map_http_error(404, &Headers::new(), "Not Found");
+        let err = map_http_error(404, &HeaderMap::new(), "Not Found");
         assert!(matches!(err, Error::InvalidRequest { .. }));
     }
 
     #[test]
     fn maps_server_errors() {
-        let err = map_http_error(502, &Headers::new(), &body("api_error", "bad gateway"));
+        let err = map_http_error(502, &HeaderMap::new(), &body("api_error", "bad gateway"));
         assert!(matches!(err, Error::Provider { .. }));
         assert_eq!(err.status(), Some(502));
-        let err = map_http_error(600, &Headers::new(), "weird");
+        let err = map_http_error(600, &HeaderMap::new(), "weird");
         assert!(matches!(err, Error::Provider { .. }));
         assert_eq!(err.context().unwrap().body.as_deref(), Some("weird"));
     }
@@ -750,17 +764,17 @@ mod tests {
             (529, "overloaded"),
             (499, "provider"),
         ] {
-            let err = map_http_error(status, &Headers::new(), "<html>gateway</html>");
+            let err = map_http_error(status, &HeaderMap::new(), "<html>gateway</html>");
             assert_eq!(err.kind_name(), kind, "HTTP {status}");
             assert_eq!(err.status(), Some(status));
         }
-        assert!(!map_http_error(499, &Headers::new(), "").is_retryable());
+        assert!(!map_http_error(499, &HeaderMap::new(), "").is_retryable());
         // Anthropic's own 504 and 529 (https://docs.claude.com/en/api/errors).
-        let err = map_http_error(504, &Headers::new(), &body("timeout_error", "timed out"));
+        let err = map_http_error(504, &HeaderMap::new(), &body("timeout_error", "timed out"));
         assert!(matches!(err, Error::Timeout { .. }), "{err:?}");
         let err = map_http_error(
             529,
-            &Headers::new(),
+            &HeaderMap::new(),
             &body("overloaded_error", "Overloaded"),
         );
         assert!(matches!(err, Error::Overloaded { .. }), "{err:?}");

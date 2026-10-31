@@ -20,6 +20,7 @@ use allama::{
     ResponseFormat, SystemPrompt, Text, ToolCall, ToolChoice, ToolDefinition,
 };
 use allama_conformance::capabilities::UNKNOWN_MODEL;
+use allama_conformance::error_kinds::http_error_mapping;
 use allama_conformance::probe::ProbeOutcome;
 use allama_conformance::stream_end::StreamEnds;
 use allama_conformance::stream_errors::ErrorKindProbe;
@@ -29,14 +30,23 @@ use allama_conformance::{
     assert_response_fixture_eq, assert_stream_finish_error_fixture_eq, assert_stream_fixture_eq,
     assert_usage_contract, load_json_fixture, load_text_fixture,
 };
-use allama_http::{CredentialPlacement, CredentialSlot, Headers, ReplayResponse, ReplayTransport};
+use allama_http::{CredentialPlacement, CredentialSlot, ReplayResponse, ReplayTransport};
 use futures_util::StreamExt;
 use serde_json::{Value, json};
 
 use crate::ChatRequestOptions;
+use allama_http::http::{HeaderMap, HeaderValue, StatusCode};
 
-fn headers(pairs: &[(&str, &str)]) -> Headers {
-    pairs.iter().copied().collect()
+fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+    pairs
+        .iter()
+        .map(|(name, value)| {
+            (
+                allama_http::http::HeaderName::try_from(*name).unwrap(),
+                allama_http::http::HeaderValue::try_from(*value).unwrap(),
+            )
+        })
+        .collect()
 }
 
 fn fixtures() -> FixtureDir {
@@ -514,7 +524,7 @@ fn error_fixtures_match() {
         (
             "error_auth.json",
             crate::error::map_http_error(
-                401,
+                StatusCode::UNAUTHORIZED,
                 &headers(&[("request-id", "req_011CauthExample")]),
                 &body("authentication_error", "invalid x-api-key"),
                 None,
@@ -523,7 +533,7 @@ fn error_fixtures_match() {
         (
             "error_rate_limited.json",
             crate::error::map_http_error(
-                429,
+                StatusCode::TOO_MANY_REQUESTS,
                 &headers(&[("request-id", "req-anthropic-429"), ("retry-after", "3")]),
                 &body("rate_limit_error", "too many requests"),
                 None,
@@ -532,8 +542,8 @@ fn error_fixtures_match() {
         (
             "error_quota_exhausted.json",
             crate::error::map_http_error(
-                429,
-                &Headers::new(),
+                StatusCode::TOO_MANY_REQUESTS,
+                &HeaderMap::new(),
                 &json!({
                     "type": "error",
                     "error": {
@@ -550,8 +560,8 @@ fn error_fixtures_match() {
         (
             "error_context_length.json",
             crate::error::map_http_error(
-                400,
-                &Headers::new(),
+                StatusCode::BAD_REQUEST,
+                &HeaderMap::new(),
                 &body(
                     "invalid_request_error",
                     "prompt is too long: 208310 tokens > 200000 maximum",
@@ -562,8 +572,8 @@ fn error_fixtures_match() {
         (
             "error_model_not_found.json",
             crate::error::map_http_error(
-                404,
-                &Headers::new(),
+                StatusCode::NOT_FOUND,
+                &HeaderMap::new(),
                 &body("not_found_error", "model: claude-does-not-exist"),
                 None,
             ),
@@ -667,7 +677,7 @@ const MODELS: &[&str] = &[
 
 fn ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "msg_1", "type": "message", "role": "assistant", "model": "claude-haiku-4-5",
             "content": [{"type": "text", "text": "ok"}],
@@ -690,7 +700,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice::<Value>(body).expect("JSON request body"))
         .collect()
 }
@@ -802,9 +812,9 @@ async fn the_adapter_passes_every_contract() {
         Contract::StrictNotHonouredWarns,
         Contract::UnreplayableReasoningDropped,
     ])
-    .error_mapping(|status, headers, body| {
-        crate::error::map_http_error(status, &headers.iter().copied().collect(), &body, None)
-    })
+    .error_mapping(http_error_mapping(|status, headers, body| {
+        crate::error::map_http_error(status, headers, body, None)
+    }))
     .error_envelope(error_envelope)
     .stream_body(error_stream)
     .stream_replay(|body| async move {
@@ -825,7 +835,8 @@ async fn the_adapter_passes_every_contract() {
     )
     .malformed_response(
         |body| async move {
-            let answer = ReplayResponse::new(200, body).header("request-id", "req_1");
+            let answer = ReplayResponse::new(StatusCode::OK, body)
+                .header("request-id", HeaderValue::from_static("req_1"));
             provider(&ReplayTransport::new([answer]))
                 .chat(&ChatRequest::new("claude-haiku-4-5").user("hi"))
                 .await
@@ -835,9 +846,12 @@ async fn the_adapter_passes_every_contract() {
     // The decoding contracts: each pair is one response as `chat` and as
     // `chat_stream` receive it.
     .unary_replay(|body| async move {
-        provider(&ReplayTransport::new([ReplayResponse::json(200, body)]))
-            .chat(&ChatRequest::new("claude-haiku-4-5").user("hi"))
-            .await
+        provider(&ReplayTransport::new([ReplayResponse::json(
+            StatusCode::OK,
+            body,
+        )]))
+        .chat(&ChatRequest::new("claude-haiku-4-5").user("hi"))
+        .await
     })
     .response_captures([capture("agree_text")])
     .tool_call_capture(

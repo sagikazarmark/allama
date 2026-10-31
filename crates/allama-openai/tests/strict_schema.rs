@@ -9,6 +9,7 @@ use allama::chat::extract::{ChatExtractExt, ChatExtracted, ChatExtractionMode, S
 use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama::{DynChatProvider, RequestField, Subject, UnsupportedPolicy, Warning, WarningKind};
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai::{Provider, ResponsesProvider};
 use serde::Deserialize;
@@ -20,7 +21,7 @@ const FINE_TUNED: &str = "ft:gpt-4.1-mini:acme::abc123";
 
 fn chat_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "chatcmpl-1", "object": "chat.completion", "model": MODEL,
             "choices": [{"index": 0, "finish_reason": "stop",
@@ -33,7 +34,7 @@ fn chat_ok() -> ReplayResponse {
 
 fn responses_ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "resp_1", "object": "response", "status": "completed", "model": MODEL,
             "output": [{"type": "message", "id": "msg_1", "role": "assistant", "status": "completed",
@@ -121,7 +122,7 @@ impl Api {
                 "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
             }),
         };
-        ReplayResponse::json(200, body.to_string())
+        ReplayResponse::json(StatusCode::OK, body.to_string())
     }
 
     /// The tool's `(parameters, strict)` as sent.
@@ -152,7 +153,7 @@ fn bodies(transport: &ReplayTransport) -> Vec<Value> {
     transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect()
 }

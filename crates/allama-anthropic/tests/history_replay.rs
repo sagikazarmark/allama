@@ -19,6 +19,7 @@ use allama::{
     UserContent, Warning, WarningKind,
 };
 use allama_anthropic::{NAMESPACE, Provider};
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use serde_json::{Value, json};
 
@@ -62,7 +63,7 @@ fn golden_history() -> History {
 /// and the response warnings.
 async fn replay(request: &ChatRequest) -> (Value, Vec<Warning>) {
     let transport = ReplayTransport::new([ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "msg_replay", "type": "message", "role": "assistant", "model": "claude-opus-5-5",
             "content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn",
@@ -77,7 +78,7 @@ async fn replay(request: &ChatRequest) -> (Value, Vec<Warning>) {
         .unwrap();
     let response = provider.chat(request).await.unwrap();
     let sent = &transport.requests()[0];
-    let body = serde_json::from_slice(sent.body.as_deref().expect("a request body")).unwrap();
+    let body = serde_json::from_slice(sent.body.as_ref()).unwrap();
     (body, response.warnings)
 }
 

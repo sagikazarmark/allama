@@ -47,10 +47,23 @@ fn all_but(run: &[Contract]) -> Vec<Contract> {
         .collect()
 }
 
+/// `pairs` as the `http` headers `allama_http` reads.
+fn header_map(pairs: &[(&str, &str)]) -> allama_http::http::HeaderMap {
+    pairs
+        .iter()
+        .map(|(name, value)| {
+            (
+                allama_http::http::HeaderName::try_from(*name).unwrap(),
+                allama_http::http::HeaderValue::try_from(*value).unwrap(),
+            )
+        })
+        .collect()
+}
+
 /// An error mapping that follows the rules: the body only in its slot, the
 /// retry signals from the headers.
 fn honest_mapping(status: u16, headers: &[(&str, &str)], body: String) -> Error {
-    let headers: allama_http::Headers = headers.iter().copied().collect();
+    let headers = header_map(headers);
     let error = match status {
         429 => Error::rate_limited(format!("HTTP {status}")),
         400..=499 => Error::invalid_request(format!("HTTP {status}")),
@@ -58,7 +71,10 @@ fn honest_mapping(status: u16, headers: &[(&str, &str)], body: String) -> Error 
     };
     error
         .authored()
-        .with_context(allama_http::error_context(status, &headers))
+        .with_context(allama_http::error_context(
+            allama_http::http::StatusCode::from_u16(status).unwrap(),
+            &headers,
+        ))
         .with_body(body)
 }
 

@@ -4,13 +4,14 @@
 
 use allama::prelude::*;
 use allama_conformance::{MockHttpResponse, TestHttpServer};
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_openai_compat::providers::Vllm;
 use allama_providers::{ProviderSettings, Registry};
 use serde_json::json;
 
 fn completion() -> MockHttpResponse {
     MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "id": "c1", "model": "m",
             "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": "ok"}}],
@@ -21,7 +22,7 @@ fn completion() -> MockHttpResponse {
 
 fn error(status: u16) -> MockHttpResponse {
     MockHttpResponse::json_value(
-        status,
+        StatusCode::from_u16(status).unwrap(),
         &json!({"error": {"message": "try again", "type": "conflict"}}),
     )
 }
@@ -61,8 +62,11 @@ async fn x_should_retry_true_retries_a_conflict() {
     assert_eq!(err.status(), Some(409));
     assert_eq!(server.recorded_requests().await.len(), 1);
 
-    let server =
-        TestHttpServer::spawn([error(409).header("x-should-retry", "true"), completion()]).await;
+    let server = TestHttpServer::spawn([
+        error(409).header("x-should-retry", HeaderValue::from_static("true")),
+        completion(),
+    ])
+    .await;
     let response = provider(&server).chat(&request()).await.unwrap();
     assert_eq!(response.text_or_empty(), "ok");
     assert_eq!(server.recorded_requests().await.len(), 2);
@@ -70,8 +74,11 @@ async fn x_should_retry_true_retries_a_conflict() {
 
 #[tokio::test]
 async fn x_should_retry_false_stops_a_rate_limit() {
-    let server =
-        TestHttpServer::spawn([error(429).header("x-should-retry", "false"), completion()]).await;
+    let server = TestHttpServer::spawn([
+        error(429).header("x-should-retry", HeaderValue::from_static("false")),
+        completion(),
+    ])
+    .await;
 
     let err = provider(&server).chat(&request()).await.unwrap_err();
 

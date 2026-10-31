@@ -603,6 +603,7 @@ impl ResponsesProviderBuilder {
 
 #[cfg(test)]
 mod tests {
+    use allama_http::http::StatusCode;
     use std::time::Duration;
 
     use serde_json::json;
@@ -618,8 +619,10 @@ mod tests {
     #[cfg(feature = "reqwest")]
     #[tokio::test]
     async fn a_custom_client_keeps_the_default_timeout() {
-        let transport =
-            allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+        let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "",
+        )]);
         let provider = ResponsesProvider::builder()
             .api_key("k")
             .http_transport(transport.clone())
@@ -653,8 +656,10 @@ mod tests {
             (Some(five), five),
             (Some(None), None),
         ] {
-            let transport =
-                allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(500, "")]);
+            let transport = allama_http::ReplayTransport::new([allama_http::ReplayResponse::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "",
+            )]);
             let mut builder = ResponsesProvider::builder()
                 .api_key("k")
                 .http_transport(transport.clone());

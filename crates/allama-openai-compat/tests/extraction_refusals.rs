@@ -14,6 +14,7 @@ use allama::chat::extract::{
 use allama::prelude::*;
 use allama::schemars::{self, JsonSchema};
 use allama::{Error, FinishReason};
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::{Provider, ResponsesProvider};
 use serde::Deserialize;
@@ -79,7 +80,7 @@ fn assert_refused(error: Error) {
 #[tokio::test]
 async fn chat_completions_refusals_fail_extraction_once() {
     let (provider, transport) = chat_completions(ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "c1", "model": "m",
             "choices": [{"index": 0, "finish_reason": "stop",
@@ -116,7 +117,7 @@ async fn responses_refusals_fail_extraction_once() {
     let message = json!({"type": "message", "id": "msg_1", "role": "assistant", "status": "completed",
         "content": [{"type": "refusal", "refusal": REFUSAL}]});
     let (provider, transport) = responses(ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({"id": "resp_1", "model": "m", "status": "completed", "output": [message]})
             .to_string(),
     ));

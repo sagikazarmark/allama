@@ -15,7 +15,9 @@
 use allama::{Error, ErrorContext};
 use serde_json::{Map, Value};
 
-use crate::Headers;
+use http::{HeaderMap, StatusCode};
+
+use crate::header_text;
 
 /// The response headers that carry a request id, tried in order: OpenAI and
 /// most compatible servers send `x-request-id`, Anthropic `request-id`.
@@ -28,7 +30,7 @@ const REQUEST_ID_HEADERS: [&str; 2] = ["x-request-id", "request-id"];
 /// - [`request_id`](ErrorContext::request_id) from `x-request-id` or
 ///   `request-id`;
 /// - [`retry_after`](ErrorContext::retry_after) from `Retry-After` or
-///   `retry-after-ms` (see [`Headers::retry_after`]);
+///   `retry-after-ms` (see [`retry_after`](crate::retry_after()));
 /// - [`server_retry_directive`](ErrorContext::server_retry_directive) from
 ///   `x-should-retry: true` or `false`; any other value is no directive.
 ///
@@ -43,24 +45,26 @@ const REQUEST_ID_HEADERS: [&str; 2] = ["x-request-id", "request-id"];
 ///
 /// ```
 /// use allama::Error;
-/// use allama_http::{Headers, error_context, error_envelope, status_error};
+/// use allama_http::http::{HeaderMap, HeaderValue, StatusCode};
+/// use allama_http::{error_context, error_envelope, status_error};
 ///
-/// fn map_http_error(status: u16, headers: &Headers, body: &str) -> Error {
-///     let error = status_error(status, format!("HTTP {status}"));
+/// fn map_http_error(status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
+///     let error = status_error(status, format!("HTTP {}", status.as_u16()));
 ///     error_envelope(body)
 ///         .unwrap_or_default()
 ///         .apply(error.with_context(error_context(status, headers)).authored())
 ///         .with_body(body.to_owned())
 /// }
 ///
-/// let headers: Headers = [
-///     ("x-request-id", "req_1"),
-///     ("retry-after", "2"),
-///     ("x-should-retry", "false"),
-/// ]
-/// .into_iter()
-/// .collect();
-/// let err = map_http_error(429, &headers, r#"{"error": {"message": "slow down"}}"#);
+/// let mut headers = HeaderMap::new();
+/// headers.insert("x-request-id", HeaderValue::from_static("req_1"));
+/// headers.insert("retry-after", HeaderValue::from_static("2"));
+/// headers.insert("x-should-retry", HeaderValue::from_static("false"));
+/// let err = map_http_error(
+///     StatusCode::TOO_MANY_REQUESTS,
+///     &headers,
+///     r#"{"error": {"message": "slow down"}}"#,
+/// );
 /// assert_eq!(err.status(), Some(429));
 /// assert_eq!(err.request_id(), Some("req_1"));
 /// assert_eq!(err.retry_after(), Some(std::time::Duration::from_secs(2)));
@@ -68,15 +72,16 @@ const REQUEST_ID_HEADERS: [&str; 2] = ["x-request-id", "request-id"];
 /// assert_eq!(err.upstream_message(), Some("slow down"));
 /// ```
 #[must_use]
-pub fn error_context(status: u16, headers: &Headers) -> ErrorContext {
+pub fn error_context(status: StatusCode, headers: &HeaderMap) -> ErrorContext {
     let mut context = ErrorContext::new();
-    context.status = Some(status);
+    context.status = Some(status.as_u16());
     context.request_id = REQUEST_ID_HEADERS
         .iter()
-        .filter_map(|name| headers.get(name))
-        .find_map(non_empty);
-    context.retry_after = headers.retry_after("retry-after");
-    context.server_retry_directive = headers.get("x-should-retry").and_then(retry_directive);
+        .filter_map(|name| header_text(headers, name))
+        .find_map(|id| non_empty(&id));
+    context.retry_after = crate::retry_after(headers, "retry-after");
+    context.server_retry_directive =
+        header_text(headers, "x-should-retry").and_then(|value| retry_directive(&value));
     context
 }
 
@@ -119,28 +124,33 @@ pub fn error_context(status: u16, headers: &Headers) -> ErrorContext {
 ///   [`Error::Unsupported`], whose `Provider` stage comes only from an
 ///   adapter's own table of the replies it recognises (ADR 0003).
 ///
-/// `message` is the adapter's own text, such as `HTTP {status}`. The error
+/// `message` is the adapter's own text, such as `HTTP 429` (format the
+/// code with [`StatusCode::as_u16`]: a `StatusCode`'s `Display` adds the
+/// reason phrase). The error
 /// carries the status and nothing else: add the rest of its context with
 /// [`error_context`] and [`Error::with_context`], and mark the message
 /// [`authored`](Error::authored).
 ///
 /// ```
 /// use allama::Error;
+/// use allama_http::http::StatusCode;
 /// use allama_http::status_error;
 ///
-/// assert!(matches!(status_error(504, "HTTP 504"), Error::Timeout { .. }));
-/// assert!(matches!(status_error(529, "HTTP 529"), Error::Overloaded { .. }));
-/// let cancelled = status_error(499, "HTTP 499");
+/// let status = |code| StatusCode::from_u16(code).unwrap();
+/// assert!(matches!(status_error(status(504), "HTTP 504"), Error::Timeout { .. }));
+/// assert!(matches!(status_error(status(529), "HTTP 529"), Error::Overloaded { .. }));
+/// let cancelled = status_error(status(499), "HTTP 499");
 /// assert!(matches!(cancelled, Error::Provider { .. }));
 /// assert_eq!(cancelled.status(), Some(499));
 /// assert!(!cancelled.is_retryable());
-/// assert!(!status_error(501, "HTTP 501").is_retryable());
-/// assert!(status_error(502, "HTTP 502").is_retryable());
-/// assert!(matches!(status_error(307, "HTTP 307"), Error::UnexpectedResponse { .. }));
+/// assert!(!status_error(status(501), "HTTP 501").is_retryable());
+/// assert!(status_error(status(502), "HTTP 502").is_retryable());
+/// assert!(matches!(status_error(status(307), "HTTP 307"), Error::UnexpectedResponse { .. }));
 /// ```
 #[must_use]
-pub fn status_error(status: u16, message: impl Into<String>) -> Error {
+pub fn status_error(status: StatusCode, message: impl Into<String>) -> Error {
     let message = message.into();
+    let status = status.as_u16();
     let error = match status {
         300..=399 => Error::unexpected_response(message),
         401 | 403 => Error::auth(message),
@@ -175,22 +185,23 @@ pub fn status_error(status: u16, message: impl Into<String>) -> Error {
 /// [`Error::with_upstream_message`]. Never put it in the constructor message
 /// of an [`authored`](Error::authored) error: upstream text may echo prompts
 /// or input values. The constructor message is the adapter's own text; for
-/// HTTP errors the bundled providers use `HTTP {status}`, with or without an
+/// HTTP errors the bundled providers use `HTTP <code>`, with or without an
 /// envelope:
 ///
 /// ```
 /// use allama::Error;
+/// use allama_http::http::StatusCode;
 /// use allama_http::{error_envelope, status_error};
 ///
-/// fn map_http_error(status: u16, body: &str) -> Error {
+/// fn map_http_error(status: StatusCode, body: &str) -> Error {
 ///     let envelope = error_envelope(body).unwrap_or_default();
 ///     envelope
-///         .apply(status_error(status, format!("HTTP {status}")).authored())
+///         .apply(status_error(status, format!("HTTP {}", status.as_u16())).authored())
 ///         .with_body(body.to_owned())
 /// }
 ///
 /// let err = map_http_error(
-///     400,
+///     StatusCode::BAD_REQUEST,
 ///     r#"{"error": {"message": "bad value 'my SSN is 123-45-6789'", "param": "messages.[0].content"}}"#,
 /// );
 /// assert_eq!(
@@ -200,7 +211,7 @@ pub fn status_error(status: u16, message: impl Into<String>) -> Error {
 /// assert_eq!(err.upstream_message(), Some("bad value 'my SSN is 123-45-6789'"));
 ///
 /// // An unrecognised body never reaches the message.
-/// let err = map_http_error(502, "<html>my SSN is 123-45-6789</html>");
+/// let err = map_http_error(StatusCode::BAD_GATEWAY, "<html>my SSN is 123-45-6789</html>");
 /// assert_eq!(err.to_string(), "provider error (502): HTTP 502");
 /// ```
 ///
@@ -257,11 +268,12 @@ pub fn error_envelope_value(value: &Value) -> Option<ErrorEnvelope> {
 ///
 /// ```
 /// use allama::Error;
+/// use allama_http::http::StatusCode;
 /// use allama_http::malformed_response;
 ///
 /// let body = b"<html>502 Bad Gateway</html>";
 /// let decoded = serde_json::from_slice::<serde_json::Value>(body);
-/// let err = malformed_response(200, body, decoded.unwrap_err())
+/// let err = malformed_response(StatusCode::OK, body, decoded.unwrap_err())
 ///     .with_provider("acme")
 ///     .with_request_id("req_1");
 /// assert!(matches!(err, Error::UnexpectedResponse { .. }));
@@ -276,10 +288,10 @@ pub fn error_envelope_value(value: &Value) -> Option<ErrorEnvelope> {
 /// [`Error::Serialization`] is for failures of the caller's own
 /// (de)serialization, never for what a provider sent.
 #[must_use]
-pub fn malformed_response(status: u16, body: &[u8], err: impl std::fmt::Display) -> Error {
+pub fn malformed_response(status: StatusCode, body: &[u8], err: impl std::fmt::Display) -> Error {
     Error::unexpected_response("the response body could not be decoded")
         .authored()
-        .with_status(status)
+        .with_status(status.as_u16())
         .with_upstream_message(err.to_string())
         .with_body_opt(
             (!body.is_empty())
@@ -371,14 +383,25 @@ mod tests {
         }
     }
 
-    fn headers(pairs: &[(&str, &str)]) -> Headers {
-        pairs.iter().copied().collect()
+    fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for (name, value) in pairs {
+            headers.append(
+                http::HeaderName::try_from(*name).unwrap(),
+                http::HeaderValue::from_str(value).unwrap(),
+            );
+        }
+        headers
+    }
+
+    fn status(code: u16) -> StatusCode {
+        StatusCode::from_u16(code).unwrap()
     }
 
     #[test]
     fn error_context_reads_status_and_headers() {
         let context = error_context(
-            409,
+            status(409),
             &headers(&[
                 ("X-Request-Id", "req_1"),
                 ("Retry-After", "3"),
@@ -397,7 +420,7 @@ mod tests {
         rest.server_retry_directive = None;
         assert_eq!(rest, ErrorContext::new());
 
-        let mut bare = error_context(500, &Headers::new());
+        let mut bare = error_context(status(500), &HeaderMap::new());
         assert_eq!(bare.status, Some(500));
         bare.status = None;
         assert_eq!(bare, ErrorContext::new());
@@ -405,15 +428,15 @@ mod tests {
 
     #[test]
     fn error_context_request_id_headers() {
-        let anthropic = error_context(429, &headers(&[("request-id", "req_a")]));
+        let anthropic = error_context(status(429), &headers(&[("request-id", "req_a")]));
         assert_eq!(anthropic.request_id.as_deref(), Some("req_a"));
         let both = error_context(
-            429,
+            status(429),
             &headers(&[("request-id", "req_a"), ("x-request-id", "req_x")]),
         );
         assert_eq!(both.request_id.as_deref(), Some("req_x"));
         let empty = error_context(
-            429,
+            status(429),
             &headers(&[("x-request-id", " "), ("request-id", "req_a")]),
         );
         assert_eq!(empty.request_id.as_deref(), Some("req_a"));
@@ -430,10 +453,10 @@ mod tests {
             ("yes", None),
             ("", None),
         ] {
-            let context = error_context(503, &headers(&[("x-should-retry", value)]));
+            let context = error_context(status(503), &headers(&[("x-should-retry", value)]));
             assert_eq!(context.server_retry_directive, expected, "{value:?}");
         }
-        let context = error_context(429, &headers(&[("retry-after-ms", "1500")]));
+        let context = error_context(status(429), &headers(&[("retry-after-ms", "1500")]));
         assert_eq!(
             context.retry_after,
             Some(std::time::Duration::from_millis(1500))
@@ -462,7 +485,7 @@ mod tests {
             (529, "overloaded"),
             (600, "provider"),
         ] {
-            let err = status_error(status, format!("HTTP {status}"));
+            let err = status_error(super::tests::status(status), format!("HTTP {status}"));
             assert_eq!(err.kind_name(), kind, "HTTP {status}");
             assert_eq!(err.status(), Some(status));
             assert_eq!(err.message(), format!("HTTP {status}"));
@@ -471,7 +494,7 @@ mod tests {
 
     #[test]
     fn a_closed_request_is_neither_retried_nor_blamed_on_the_request() {
-        let err = status_error(499, "HTTP 499");
+        let err = status_error(status(499), "HTTP 499");
         assert!(matches!(err, Error::Provider { .. }), "{err:?}");
         assert!(!err.is_retryable());
         assert!(!err.is_transient());
@@ -479,15 +502,15 @@ mod tests {
 
     #[test]
     fn timeouts_are_retryable() {
-        for status in [408, 504, 524] {
-            assert!(status_error(status, "x").is_retryable(), "{status}");
+        for code in [408, 504, 524] {
+            assert!(status_error(status(code), "x").is_retryable(), "{code}");
         }
     }
 
     #[test]
     fn malformed_responses_keep_the_body_out_of_the_log() {
         let body = b"<html>my SSN is 123-45-6789</html>";
-        let err = malformed_response(200, body, "expected value at line 1 column 1");
+        let err = malformed_response(StatusCode::OK, body, "expected value at line 1 column 1");
         assert!(matches!(err, Error::UnexpectedResponse { .. }), "{err:?}");
         assert!(!err.is_retryable());
         assert_eq!(err.status(), Some(200));
@@ -501,7 +524,10 @@ mod tests {
         );
         assert!(!err.as_log().to_string().contains("SSN"));
         assert_eq!(
-            malformed_response(200, b"", "EOF").context().unwrap().body,
+            malformed_response(StatusCode::OK, b"", "EOF")
+                .context()
+                .unwrap()
+                .body,
             None
         );
     }

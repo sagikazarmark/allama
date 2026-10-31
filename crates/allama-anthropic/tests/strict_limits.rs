@@ -12,6 +12,7 @@ use allama::prelude::*;
 use allama::schemars::JsonSchema;
 use allama::{RequestField, Subject, UnsupportedPolicy, Warning, WarningKind};
 use allama_anthropic::Provider;
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use serde_json::{Map, Value, json};
 
@@ -19,7 +20,7 @@ const MODEL: &str = "claude-haiku-4-5-20251001";
 
 fn ok() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "msg_1", "type": "message", "role": "assistant", "model": MODEL,
             "content": [{"type": "text", "text": "{}"}],
@@ -41,7 +42,7 @@ async fn send(request: &ChatRequest) -> (Result<ChatResponse>, Vec<Value>) {
     let bodies = transport
         .requests()
         .iter()
-        .filter_map(|r| r.body.as_ref())
+        .filter_map(|r| Some(r.body.as_ref()).filter(|body| !body.is_empty()))
         .map(|body| serde_json::from_slice(body).expect("JSON request body"))
         .collect();
     (result, bodies)

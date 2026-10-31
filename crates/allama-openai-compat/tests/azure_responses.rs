@@ -3,6 +3,7 @@
 
 use allama::prelude::*;
 use allama::{ContentBlock, ProviderIdentity, RequestField, Subject, WarningKind};
+use allama_http::http::{HeaderValue, StatusCode};
 use allama_http::{Credential, HttpRequestOptions, ReplayResponse, ReplayTransport};
 use allama_openai_compat::ResponsesProvider;
 use allama_openai_compat::providers::Azure;
@@ -10,7 +11,7 @@ use serde_json::{Value, json};
 
 fn responses_text() -> ReplayResponse {
     ReplayResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "id": "resp_1", "object": "response", "status": "completed", "model": "gpt-5-mini",
             "output": [{"type": "message", "id": "msg_1", "role": "assistant", "status": "completed",
@@ -18,14 +19,14 @@ fn responses_text() -> ReplayResponse {
             "usage": {"input_tokens": 5, "output_tokens": 2, "total_tokens": 7}
         }),
     )
-    .header("apim-request-id", "apim-1")
+    .header("apim-request-id", HeaderValue::from_static("apim-1"))
 }
 
 /// A reasoning turn that ends in a function call, with the encrypted
 /// reasoning and item ids only the Responses API takes back.
 fn responses_tool_call() -> ReplayResponse {
     ReplayResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "id": "resp_2", "object": "response", "status": "completed", "model": "gpt-5-mini",
             "output": [
@@ -40,7 +41,7 @@ fn responses_tool_call() -> ReplayResponse {
 
 fn chat_text() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         r#"{"id":"c1","model":"gpt-5-mini","choices":[{"index":0,"message":{"role":"assistant","content":"Sunny."},"finish_reason":"stop"}]}"#,
     )
 }
@@ -56,14 +57,14 @@ fn azure_responses(transport: &ReplayTransport) -> ResponsesProvider {
 fn header_values(transport: &ReplayTransport, index: usize, name: &str) -> Vec<String> {
     transport.requests()[index]
         .headers
+        .get_all(name)
         .iter()
-        .filter(|(key, _)| key.eq_ignore_ascii_case(name))
-        .map(|(_, value)| value.to_owned())
+        .map(|value| value.to_str().unwrap().to_owned())
         .collect()
 }
 
 fn body(transport: &ReplayTransport, index: usize) -> Value {
-    serde_json::from_slice(transport.requests()[index].body.as_ref().unwrap()).unwrap()
+    serde_json::from_slice(transport.requests()[index].body.as_ref()).unwrap()
 }
 
 fn weather_request(deployment: &str) -> ChatRequest {
@@ -98,7 +99,7 @@ async fn reaches_the_resource_with_its_key() {
 
     let sent = transport.requests();
     assert_eq!(
-        sent[0].url,
+        sent[0].uri.to_string(),
         "https://res.openai.azure.com/openai/v1/responses"
     );
     assert_eq!(header_values(&transport, 0, "api-key"), ["provider-key"]);

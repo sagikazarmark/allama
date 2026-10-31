@@ -19,6 +19,7 @@ use allama_conformance::{
     assert_response_fixture_eq, assert_stream_fixture_eq, load_json_fixture, load_text_fixture,
 };
 use allama_gemini::{ChatRequestOptions, Provider, SafetySetting};
+use allama_http::http::{HeaderValue, StatusCode};
 use serde_json::{Value, json};
 
 fn fixtures() -> FixtureDir {
@@ -50,7 +51,7 @@ fn error_body(code: u16, message: &str, status: &str) -> Value {
 async fn chat_posts_expected_request_and_parses_response() {
     let fixtures = fixtures();
     let raw = load_json_fixture(&fixtures, "response_raw.json");
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &raw)]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &raw)]).await;
 
     let response = provider(&server)
         .chat(
@@ -95,8 +96,11 @@ async fn chat_posts_expected_request_and_parses_response() {
 
 #[tokio::test]
 async fn models_prefix_is_not_duplicated_in_the_path() {
-    let server =
-        TestHttpServer::spawn([MockHttpResponse::json_value(200, &text_response("hi"))]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(
+        StatusCode::OK,
+        &text_response("hi"),
+    )])
+    .await;
     provider(&server)
         .chat(&ChatRequest::new("models/gemini-2.5-flash").user("hi"))
         .await
@@ -113,8 +117,11 @@ async fn models_prefix_is_not_duplicated_in_the_path() {
 /// a tuned model keeps its own collection.
 #[tokio::test]
 async fn hostile_model_ids_send_nothing() {
-    let server =
-        TestHttpServer::spawn([MockHttpResponse::json_value(200, &text_response("hi"))]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(
+        StatusCode::OK,
+        &text_response("hi"),
+    )])
+    .await;
     let provider = provider(&server);
     let hostile = "../../v1/tunedModels/x:delete?ignored=";
     let err = provider
@@ -188,7 +195,7 @@ async fn chat_stream_uses_stream_endpoint_and_collects_recorded_fixture() {
 async fn request_warnings_reach_unary_and_streaming_responses() {
     let sse = format!("data: {}\n\n", text_response("hi"));
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &text_response("hi")),
+        MockHttpResponse::json_value(StatusCode::OK, &text_response("hi")),
         MockHttpResponse::sse(sse),
     ])
     .await;
@@ -216,9 +223,9 @@ async fn request_warnings_reach_unary_and_streaming_responses() {
 #[tokio::test]
 async fn success_contracts_hold() {
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &text_response("Hello!")),
+        MockHttpResponse::json_value(StatusCode::OK, &text_response("Hello!")),
         MockHttpResponse::sse(format!("data: {}\n\n", text_response("Hello!"))),
-        MockHttpResponse::json_value(200, &text_response("{\"greeting\":\"hi\"}")),
+        MockHttpResponse::json_value(StatusCode::OK, &text_response("{\"greeting\":\"hi\"}")),
         MockHttpResponse::sse(format!(
             "data: {}\n\n",
             text_response("{\"greeting\":\"hi\"}")
@@ -242,7 +249,7 @@ async fn tool_call_contracts_hold_for_recorded_response() {
     let raw = load_json_fixture(&fixtures, "gemini3_tool_response_raw.json");
     let chunk = serde_json::to_string(&raw).unwrap();
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &raw),
+        MockHttpResponse::json_value(StatusCode::OK, &raw),
         MockHttpResponse::sse(format!("data: {chunk}\n\n")),
     ])
     .await;
@@ -261,7 +268,7 @@ async fn tool_call_contracts_hold_for_recorded_response() {
 async fn error_contracts_hold() {
     let failures = [
         MockHttpResponse::json_value(
-            400,
+            StatusCode::BAD_REQUEST,
             &json!({"error": {
                 "code": 400,
                 "message": "API key not valid. Please pass a valid API key.",
@@ -270,15 +277,15 @@ async fn error_contracts_hold() {
             }}),
         ),
         MockHttpResponse::json_value(
-            429,
+            StatusCode::TOO_MANY_REQUESTS,
             &error_body(429, "Resource exhausted", "RESOURCE_EXHAUSTED"),
         ),
         MockHttpResponse::json_value(
-            503,
+            StatusCode::SERVICE_UNAVAILABLE,
             &error_body(503, "The model is overloaded.", "UNAVAILABLE"),
         ),
         MockHttpResponse::json_value(
-            400,
+            StatusCode::BAD_REQUEST,
             &error_body(
                 400,
                 "The input token count (2000000) exceeds the maximum number of tokens allowed (1048576).",
@@ -286,7 +293,7 @@ async fn error_contracts_hold() {
             ),
         ),
         MockHttpResponse::json_value(
-            402,
+            StatusCode::PAYMENT_REQUIRED,
             &error_body(402, "Prepayment credits depleted.", "RESOURCE_EXHAUSTED"),
         ),
     ];
@@ -310,7 +317,7 @@ async fn error_contracts_hold() {
 #[tokio::test]
 async fn unsupported_hints_warn_and_strict_policy_rejects_before_sending() {
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &text_response("hi")),
+        MockHttpResponse::json_value(StatusCode::OK, &text_response("hi")),
         MockHttpResponse::sse(format!("data: {}\n\n", text_response("hi"))),
     ])
     .await;
@@ -333,7 +340,7 @@ async fn unsupported_hints_warn_and_strict_policy_rejects_before_sending() {
 async fn a_penalty_refusal_is_unsupported_by_the_provider() {
     let refusal = || {
         MockHttpResponse::json_value(
-            400,
+            StatusCode::BAD_REQUEST,
             &error_body(
                 400,
                 "Penalty is not enabled for this model",
@@ -370,7 +377,7 @@ async fn a_penalty_refusal_is_unsupported_by_the_provider() {
 async fn rate_limit_prefers_retry_info_then_header() {
     let server = TestHttpServer::spawn([
         MockHttpResponse::json_value(
-            429,
+            StatusCode::TOO_MANY_REQUESTS,
             &json!({"error": {
                 "code": 429,
                 "message": "Quota exceeded",
@@ -378,11 +385,11 @@ async fn rate_limit_prefers_retry_info_then_header() {
                 "details": [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "7s"}]
             }}),
         )
-        .header("retry-after", "1.5"),
-        MockHttpResponse::json_value(429, &error_body(429, "Quota exceeded", "RESOURCE_EXHAUSTED"))
-            .header("retry-after", "1.5"),
-        MockHttpResponse::json_value(429, &error_body(429, "Quota exceeded", "RESOURCE_EXHAUSTED"))
-            .header("retry-after", "-1"),
+        .header("retry-after", HeaderValue::from_static("1.5")),
+        MockHttpResponse::json_value(StatusCode::TOO_MANY_REQUESTS, &error_body(429, "Quota exceeded", "RESOURCE_EXHAUSTED"))
+            .header("retry-after", HeaderValue::from_static("1.5")),
+        MockHttpResponse::json_value(StatusCode::TOO_MANY_REQUESTS, &error_body(429, "Quota exceeded", "RESOURCE_EXHAUSTED"))
+            .header("retry-after", HeaderValue::from_static("-1")),
     ])
     .await;
     let provider = provider(&server);
@@ -406,10 +413,10 @@ async fn rate_limit_prefers_retry_info_then_header() {
 #[tokio::test]
 async fn http_errors_carry_the_server_retry_directive() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        503,
+        StatusCode::SERVICE_UNAVAILABLE,
         &error_body(503, "The model is overloaded.", "UNAVAILABLE"),
     )
-    .header("x-should-retry", "false")])
+    .header("x-should-retry", HeaderValue::from_static("false"))])
     .await;
     let err = provider(&server)
         .chat(&ChatRequest::new("gemini-2.5-flash").user("hi"))
@@ -440,7 +447,7 @@ async fn mid_stream_error_is_typed() {
 #[tokio::test]
 async fn chat_accepts_success_response_without_candidates() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "responseId": "resp-empty",
             "modelVersion": "gemini-2.5-pro",
@@ -468,7 +475,7 @@ async fn chat_accepts_success_response_without_candidates() {
 #[tokio::test]
 async fn chat_rejects_blocked_prompt_feedback() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        200,
+        StatusCode::OK,
         &json!({
             "responseId": "resp-blocked",
             "promptFeedback": {"blockReason": "SAFETY", "blockReasonMessage": "Prompt blocked by safety filters"},
@@ -493,7 +500,7 @@ async fn chat_rejects_blocked_prompt_feedback() {
 async fn embed_posts_expected_request_and_parses_response() {
     let fixtures = fixtures();
     let raw = load_json_fixture(&fixtures, "embed_response_raw.json");
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &raw)]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &raw)]).await;
 
     let provider = Provider::builder()
         .api_key("test-key")
@@ -539,7 +546,7 @@ async fn embed_posts_expected_request_and_parses_response() {
 async fn embed_sends_the_input_type_as_task_type() {
     let fixtures = fixtures();
     let raw = load_json_fixture(&fixtures, "embed_response_raw.json");
-    let server = TestHttpServer::spawn([MockHttpResponse::json_value(200, &raw)]).await;
+    let server = TestHttpServer::spawn([MockHttpResponse::json_value(StatusCode::OK, &raw)]).await;
     let request = EmbeddingRequest::new("gemini-embedding-001")
         .inputs(["hello world", "gemini embeddings"])
         .input_type(allama::EmbeddingInputType::Document);
@@ -555,7 +562,7 @@ async fn embed_sends_the_input_type_as_task_type() {
 #[tokio::test]
 async fn embed_maps_errors() {
     let server = TestHttpServer::spawn([MockHttpResponse::json_value(
-        404,
+        StatusCode::NOT_FOUND,
         &error_body(404, "models/nope is not found", "NOT_FOUND"),
     )])
     .await;
@@ -570,8 +577,8 @@ async fn embed_maps_errors() {
 async fn raw_response_is_kept_only_when_requested() {
     let raw = load_json_fixture(&fixtures(), "response_raw.json");
     let server = TestHttpServer::spawn([
-        MockHttpResponse::json_value(200, &raw),
-        MockHttpResponse::json_value(200, &raw),
+        MockHttpResponse::json_value(StatusCode::OK, &raw),
+        MockHttpResponse::json_value(StatusCode::OK, &raw),
     ])
     .await;
     let provider = provider(&server);
@@ -623,12 +630,16 @@ async fn replay_transport_runs_the_adapter_without_a_server() {
     assert!(response.citations().count() > 0);
     let sent = &transport.requests()[0];
     assert!(
-        sent.url
+        sent.uri
+            .to_string()
             .ends_with("/models/gemini-2.5-flash:streamGenerateContent?alt=sse"),
         "{}",
-        sent.url
+        sent.uri.to_string()
     );
-    assert_eq!(sent.headers.get("x-goog-api-key"), Some("replay-key"));
+    assert_eq!(
+        sent.headers.get("x-goog-api-key"),
+        Some(&HeaderValue::from_static("replay-key"))
+    );
 }
 
 /// A stream whose connection stalls after its first event fails with a
@@ -726,8 +737,12 @@ async fn stream_invalid_utf8_fails_without_a_retry() {
         chunk.extend_from_slice(b"\"}],\"role\": \"model\"},\"index\": 0}]}\n\n");
         chunk
     };
-    let sse =
-        |body: Vec<u8>| ReplayResponse::new(200, body).header("content-type", "text/event-stream");
+    let sse = |body: Vec<u8>| {
+        ReplayResponse::new(StatusCode::OK, body).header(
+            "content-type",
+            HeaderValue::from_static("text/event-stream"),
+        )
+    };
     let provider = |transport: &ReplayTransport| {
         Provider::builder()
             .api_key("replay-key")

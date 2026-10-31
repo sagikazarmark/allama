@@ -10,6 +10,7 @@ use allama::{
     FinishReason, Image, MediaSource, Message, ProviderData, Text, ToolDefinition, WarningKind,
 };
 use allama_conformance::{FixtureDir, load_text_fixture};
+use allama_http::http::StatusCode;
 use allama_http::{ReplayResponse, ReplayTransport};
 use allama_openai_compat::{ClientToolCall, ResponsesProvider, ResponsesQuirks};
 use serde_json::{Value, json};
@@ -34,7 +35,7 @@ fn provider(responses: Vec<ReplayResponse>) -> (ResponsesProvider, ReplayTranspo
 
 fn text_body() -> ReplayResponse {
     ReplayResponse::json(
-        200,
+        StatusCode::OK,
         json!({
             "id": "resp_t", "object": "response", "status": "completed", "model": "m",
             "output": [{"type": "message", "id": "msg_t", "role": "assistant", "status": "completed",
@@ -69,7 +70,7 @@ async fn streamed(name: &str) -> ChatResponse {
 async fn mcp_approval_waits_for_the_client_and_is_answered_as_an_item() {
     let (provider, transport) = provider(vec![
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             load_text_fixture(&fixtures(), "mcp_approval_request.json"),
         ),
         text_body(),
@@ -250,7 +251,7 @@ async fn chat_shaped_annotations_are_not_replayed() {
 async fn in_band_error_codes_are_classified() {
     let failed = |code: Value| {
         ReplayResponse::json(
-            200,
+            StatusCode::OK,
             json!({"id": "r", "status": "failed", "output": [],
                    "error": {"code": code, "message": "nope"}})
             .to_string(),

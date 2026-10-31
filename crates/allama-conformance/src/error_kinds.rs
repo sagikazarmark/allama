@@ -39,8 +39,60 @@
 //! ```
 
 use allama::Error;
+use allama_http::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 
 pub use crate::stream_errors::ErrorKindProbe;
+
+/// An HTTP adapter's error mapping in the form the error contracts take.
+///
+/// The contracts call a mapping with a plain status, header pairs and a
+/// body, so a mapping need not be HTTP's. An HTTP adapter maps with the
+/// `http` status and headers [`HttpResponse::map_error`] passes; wrap that
+/// function here and hand the contracts the same mapping the adapter uses.
+///
+/// [`HttpResponse::map_error`]: allama_http::HttpResponse::map_error
+///
+/// ```
+/// use allama::Error;
+/// use allama_conformance::error_kinds::http_error_mapping;
+/// use allama_http::http::{HeaderMap, StatusCode};
+/// use allama_http::{error_context, status_error};
+///
+/// fn map_http_error(status: StatusCode, headers: &HeaderMap, body: &str) -> Error {
+///     status_error(status, format!("HTTP {}", status.as_u16()))
+///         .with_context(error_context(status, headers))
+///         .authored()
+///         .with_body(body.to_owned())
+/// }
+///
+/// let map = http_error_mapping(map_http_error);
+/// let err = map(429, &[("retry-after", "2")], String::new());
+/// assert_eq!(err.status(), Some(429));
+/// assert_eq!(err.retry_after(), Some(std::time::Duration::from_secs(2)));
+/// ```
+///
+/// # Panics
+///
+/// The returned mapping panics when a contract passes a status, header
+/// name or header value that is not valid HTTP, which none does.
+pub fn http_error_mapping<F>(map: F) -> impl Fn(u16, &[(&str, &str)], String) -> Error
+where
+    F: Fn(StatusCode, &HeaderMap, &str) -> Error,
+{
+    move |status, headers, body| {
+        let status = StatusCode::from_u16(status).expect("a contract status is a valid status");
+        let headers = headers
+            .iter()
+            .map(|(name, value)| {
+                (
+                    HeaderName::try_from(*name).expect("a contract header has a valid name"),
+                    HeaderValue::try_from(*value).expect("a contract header has a valid value"),
+                )
+            })
+            .collect();
+        map(status, &headers, &body)
+    }
+}
 
 /// Assert that the adapter's HTTP error mapping gives each error kind its
 /// [`Error`] variant.
