@@ -4,6 +4,12 @@ all-features = true
 [advisories]
 # A yanked crate in the lockfile is a broken or withdrawn release.
 yanked = "deny"
+ignore = [
+  # chrono is unmaintained, but `worker` (Cloudflare's workers-rs, used by
+  # allama-cloudflare-worker and the example Worker) depends on it
+  # unconditionally, through 0.9.0. Drop this once `worker` moves off chrono.
+  { id = "RUSTSEC-2026-0543", reason = "no chrono-free release of worker yet" },
+]
 
 [licenses]
 allow = [
